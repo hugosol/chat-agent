@@ -404,7 +404,7 @@ AgentState 释放，checkpoint 清除
 web-agent/
 ├── pom.xml
 ├── src/main/java/com/hugosol/webagent/
-│   ├── EnglishCoachApplication.java
+│   ├── WebAgentApplication.java
 │   │
 │   ├── graph/                              // LangGraph 核心
 │   │   ├── CoachState.java                 // AgentState 定义 + Schema
@@ -508,7 +508,7 @@ web-agent/
 
 | 阶段 | 范围 | 产出 |
 |------|------|------|
-| **1. 骨架** | Spring Boot 项目 + Maven 依赖 + application.yml | pom.xml, EnglishCoachApplication, 目录结构 |
+| **1. 骨架** | Spring Boot 项目 + Maven 依赖 + application.yml | pom.xml, WebAgentApplication, 目录结构 |
 | **2. 模型层** | 5 个 JPA Entity + 4 个枚举 + 5 个 Repository | 表结构 + 数据访问层 |
 | **3. LangGraph 核心** | CoachState (10 个 Channel) + 3 个 Node + CoachGraphBuilder | 编译通过的单轮线性图 |
 | **4. Agent 接入** | 3 个 Agent + PromptLoader + 3 个 Prompt 文件 | LangChain4j DeepSeek 调用链路 |

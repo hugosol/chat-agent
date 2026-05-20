@@ -10,14 +10,21 @@ Uses **LangChain4j** + **langgraph4j** + **DeepSeek** to run 3 AI agents that ro
 git clone <repo-url>
 cd web-agent
 
-# 2. Set DeepSeek API key
-#    Windows:
+# 2. Set DeepSeek API key (pick one):
+#    Option A: Create application-local.yml and set the key there, then run with local profile
+#    Option B: Set environment variable
+
+#    Option A — local profile:
+#    Create src/main/resources/application-local.yml with:
+#      langchain4j.openai.chat-model.api-key: sk-your-deepseek-api-key
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+
+#    Option B — environment variable (Windows):
 set DEEPSEEK_API_KEY=sk-your-deepseek-api-key
+mvn spring-boot:run
 
-#    macOS / Linux:
+#    Option B — environment variable (macOS / Linux):
 export DEEPSEEK_API_KEY=sk-your-deepseek-api-key
-
-# 3. Build & run
 mvn spring-boot:run
 
 # 4. Open browser
@@ -107,7 +114,7 @@ The Service layer manages the session loop. `MemorySaver` checkpoints state per 
 web-agent/
 ├── pom.xml
 ├── src/main/java/com/hugosol/webagent/
-│   ├── EnglishCoachApplication.java
+│   ├── WebAgentApplication.java
 │   ├── graph/
 │   │   ├── CoachState.java
 │   │   ├── CoachGraphBuilder.java

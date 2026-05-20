@@ -1,0 +1,4 @@
+langchain4j:
+  openai:
+    chat-model:
+      api-key: ${DEEPSEEK_API_KEY:sk-****}

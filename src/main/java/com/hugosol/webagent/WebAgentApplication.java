@@ -4,9 +4,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class EnglishCoachApplication {
+public class WebAgentApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(EnglishCoachApplication.class, args);
+        SpringApplication.run(WebAgentApplication.class, args);
     }
 }
