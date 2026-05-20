@@ -10,28 +10,22 @@ import java.util.Map;
 
 public class CoachState extends AgentState {
 
-    public static final String SESSION_ID        = "sessionId";
-    public static final String SCENARIO          = "scenario";
-    public static final String PERSONA           = "persona";
-    public static final String STATE_STATUS      = "stateStatus";
-    public static final String MESSAGES          = "messages";
-    public static final String USER_INPUT        = "userInput";
-    public static final String CONVERSATION_TEXT = "conversationText";
-    public static final String CORRECTIONS       = "corrections";
-    public static final String MERGED_RESPONSE   = "mergedResponse";
-    public static final String TOKEN_COUNT       = "tokenCount";
+    public static final String SESSION_ID   = "sessionId";
+    public static final String SCENARIO     = "scenario";
+    public static final String PERSONA      = "persona";
+    public static final String STATE_STATUS = "stateStatus";
+    public static final String MESSAGES     = "messages";
+    public static final String USER_INPUT   = "userInput";
+    public static final String CORRECTIONS  = "corrections";
 
     static final Map<String, Channel<?>> SCHEMA = Map.of(
-            SESSION_ID,        Channels.base(() -> ""),
-            SCENARIO,          Channels.base(() -> ""),
-            PERSONA,           Channels.base(() -> ""),
-            STATE_STATUS,      Channels.base(() -> "IDLE"),
-            MESSAGES,          Channels.appender(ArrayList::new),
-            USER_INPUT,        Channels.base(() -> ""),
-            CONVERSATION_TEXT, Channels.base(() -> ""),
-            CORRECTIONS,       Channels.appender(ArrayList::new),
-            MERGED_RESPONSE,   Channels.base(() -> ""),
-            TOKEN_COUNT,       Channels.base(() -> 0)
+            SESSION_ID,   Channels.base(() -> ""),
+            SCENARIO,     Channels.base(() -> ""),
+            PERSONA,      Channels.base(() -> ""),
+            STATE_STATUS, Channels.base(() -> "IDLE"),
+            MESSAGES,     Channels.appender(ArrayList::new),
+            USER_INPUT,   Channels.base(() -> ""),
+            CORRECTIONS,  Channels.appender(ArrayList::new)
     );
 
     public CoachState(Map<String, Object> initData) {
@@ -46,10 +40,7 @@ public class CoachState extends AgentState {
                 STATE_STATUS, "IDLE",
                 MESSAGES, new ArrayList<>(),
                 USER_INPUT, "",
-                CONVERSATION_TEXT, "",
-                CORRECTIONS, new ArrayList<>(),
-                MERGED_RESPONSE, "",
-                TOKEN_COUNT, 0
+                CORRECTIONS, new ArrayList<>()
         );
     }
 
@@ -78,20 +69,8 @@ public class CoachState extends AgentState {
         return this.<String>value(USER_INPUT).orElse("");
     }
 
-    public String conversationText() {
-        return this.<String>value(CONVERSATION_TEXT).orElse("");
-    }
-
     @SuppressWarnings("unchecked")
     public List<CorrectionData> corrections() {
         return this.<List<CorrectionData>>value(CORRECTIONS).orElse(List.of());
-    }
-
-    public String mergedResponse() {
-        return this.<String>value(MERGED_RESPONSE).orElse("");
-    }
-
-    public int tokenCount() {
-        return this.<Integer>value(TOKEN_COUNT).orElse(0);
     }
 }

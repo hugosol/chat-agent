@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>English Coach</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>WebAgent</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
         <header>
-            <h1>English Coach</h1>
             <div class="token-bar-container">
                 <div class="token-bar-label">Token</div>
                 <div class="token-bar">
@@ -17,15 +16,28 @@
                 </div>
                 <div class="token-bar-pct" id="tokenPct">0%</div>
             </div>
-            <div class="scenario-info" id="scenarioInfo"></div>
+            <button id="correctionShowBtn" class="correction-show-btn hidden">
+                Corrections <span id="correctionBadge">0</span>
+            </button>
         </header>
 
         <main>
-            <div id="chatArea" class="chat-area">
-                <div id="earlierMarker" class="earlier-marker hidden">
-                    <button id="showEarlierBtn">Show earlier messages</button>
+            <div class="main-layout">
+                <div id="chatArea" class="chat-area">
+                    <div id="earlierMarker" class="earlier-marker hidden">
+                        <button id="showEarlierBtn">Show earlier messages</button>
+                    </div>
+                    <div id="messages"></div>
                 </div>
-                <div id="messages"></div>
+                <div id="correctionSidebar" class="correction-sidebar collapsed">
+                    <div class="correction-sidebar-header">
+                        <span>Corrections</span>
+                        <button id="correctionSidebarToggle">&times;</button>
+                    </div>
+                    <div id="correctionSidebarContent" class="correction-sidebar-content">
+                        <div class="correction-sidebar-empty">No corrections yet.</div>
+                    </div>
+                </div>
             </div>
 
             <div id="statusBar" class="status-bar">
@@ -72,6 +84,32 @@
         </div>
         <div id="debugLog" class="debug-log hidden"></div>
     </div>
+
+    <template id="msgTemplate">
+        <div class="message">
+            <span class="role"></span>
+            <span class="content"></span>
+        </div>
+    </template>
+
+    <template id="correctionBubbleTemplate">
+        <div class="message correction-bubble">
+            <span class="role">Correction</span>
+            <span class="content"></span>
+        </div>
+    </template>
+
+    <template id="correctionSidebarItemTemplate">
+        <div class="correction-item">
+            <div class="correction-type"></div>
+            <div class="correction-detail">
+                <span class="correction-original"></span>
+                <span class="correction-arrow">&rarr;</span>
+                <span class="correction-corrected"></span>
+            </div>
+            <div class="correction-explanation"></div>
+        </div>
+    </template>
 
     <script src="app.js"></script>
 </body>

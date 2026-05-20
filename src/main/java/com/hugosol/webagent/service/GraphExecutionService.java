@@ -1,11 +1,14 @@
 package com.hugosol.webagent.service;
 
+import com.hugosol.webagent.agent.ConversationAgent;
 import com.hugosol.webagent.agent.ReportAgent;
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.CorrectionData;
 import com.hugosol.webagent.graph.MessageData;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.slf4j.Logger;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -23,11 +27,23 @@ public class GraphExecutionService {
     private static final Logger log = LoggerFactory.getLogger(GraphExecutionService.class);
 
     private final CompiledGraph<CoachState> graph;
+    private final ConversationAgent conversationAgent;
     private final ReportAgent reportAgent;
     private final Map<String, CoachState> activeStates = new ConcurrentHashMap<>();
+    private final Map<String, Integer> activeTokenCounts = new ConcurrentHashMap<>();
 
-    public GraphExecutionService(CoachGraphBuilder graphBuilder, ReportAgent reportAgent) {
+    public interface TurnCallback {
+        void onConversationToken(String delta, int messageId);
+        void onConversationComplete(String fullText, int messageId, int tokenCount);
+        void onCorrections(List<CorrectionData> corrections, int messageId);
+        void onError(String message);
+    }
+
+    public GraphExecutionService(CoachGraphBuilder graphBuilder,
+                                  ConversationAgent conversationAgent,
+                                  ReportAgent reportAgent) {
         this.graph = graphBuilder.getCompiledGraph();
+        this.conversationAgent = conversationAgent;
         this.reportAgent = reportAgent;
     }
 
@@ -35,43 +51,85 @@ public class GraphExecutionService {
         Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
+        activeTokenCounts.put(sessionId, 0);
         log.info("GraphExecutionService: initialized session {}", sessionId);
     }
 
-    public TurnResult processTurn(String sessionId, String userInput) {
+    public void processTurn(String sessionId, String userInput, int messageId, TurnCallback callback) {
         CoachState state = activeStates.get(sessionId);
         if (state == null) {
-            throw new IllegalStateException("No active session: " + sessionId);
+            callback.onError("No active session: " + sessionId);
+            return;
         }
 
         MessageData userMessage = new MessageData("USER", userInput);
+        state.messages().add(userMessage);
+        int correctionsBefore = state.corrections().size();
 
-        Map<String, Object> input = Map.of(
-                CoachState.USER_INPUT, userInput,
-                CoachState.MESSAGES, userMessage,
-                CoachState.STATE_STATUS, "PROCESSING"
-        );
+        List<MessageData> historySnapshot = new ArrayList<>(state.messages());
 
-        var config = RunnableConfig.builder()
-                .threadId(sessionId)
-                .build();
+        CompletableFuture.runAsync(() -> {
+            StringBuilder fullText = new StringBuilder();
 
-        CoachState finalState = null;
-        for (var item : graph.stream(input, config)) {
-            finalState = item.state();
-        }
+            conversationAgent.generateStream(userInput, historySnapshot, state.scenario(), state.persona(),
+                    new StreamingChatResponseHandler() {
+                        @Override
+                        public void onPartialResponse(String token) {
+                            fullText.append(token);
+                            callback.onConversationToken(token, messageId);
+                        }
 
-        if (finalState == null) {
-            throw new RuntimeException("Graph execution produced no result");
-        }
+                        @Override
+                        public void onCompleteResponse(ChatResponse response) {
+                            String agentText = fullText.toString();
+                            int tokens = (response != null && response.tokenUsage() != null)
+                                    ? response.tokenUsage().totalTokenCount() : 0;
 
-        activeStates.put(sessionId, finalState);
+                            synchronized (state) {
+                                state.messages().add(new MessageData("AGENT", agentText));
+                                activeTokenCounts.merge(sessionId, tokens, Integer::sum);
+                            }
 
-        String merged = finalState.mergedResponse();
-        List<CorrectionData> corrections = finalState.corrections();
-        int tokenCount = finalState.tokenCount();
+                            callback.onConversationComplete(agentText, messageId, tokens);
+                        }
 
-        return new TurnResult(merged, corrections, tokenCount);
+                        @Override
+                        public void onError(Throwable error) {
+                            log.error("ConversationAgent error", error);
+                            callback.onError("Conversation error: " + error.getMessage());
+                        }
+                    });
+        });
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                Map<String, Object> input = Map.of(CoachState.USER_INPUT, userInput);
+                var config = RunnableConfig.builder()
+                        .threadId(sessionId)
+                        .build();
+
+                CoachState finalState = null;
+                for (var item : graph.stream(input, config)) {
+                    finalState = item.state();
+                }
+
+                if (finalState != null) {
+                    List<CorrectionData> allCorrections = finalState.corrections();
+                    List<CorrectionData> newOnly = allCorrections.subList(
+                            Math.min(correctionsBefore, allCorrections.size()),
+                            allCorrections.size());
+
+                    synchronized (state) {
+                        state.corrections().addAll(newOnly);
+                    }
+
+                    callback.onCorrections(new ArrayList<>(newOnly), messageId);
+                }
+            } catch (Exception e) {
+                log.error("Correction graph error", e);
+                callback.onError("Correction error: " + e.getMessage());
+            }
+        });
     }
 
     public ReportResult generateReport(String sessionId) {
@@ -80,38 +138,21 @@ public class GraphExecutionService {
             throw new IllegalStateException("No active session: " + sessionId);
         }
         List<MessageData> messages = new ArrayList<>(state.messages());
-        List<CorrectionData> corrections = state.corrections();
+        List<CorrectionData> corrections = new ArrayList<>(state.corrections());
         return reportAgent.generate(messages, corrections);
     }
 
-    public List<MessageData> getSessionMessages(String sessionId) {
-        CoachState state = activeStates.get(sessionId);
-        if (state == null) {
-            return List.of();
-        }
-        return state.messages();
+    public CoachState getSessionState(String sessionId) {
+        return activeStates.get(sessionId);
     }
 
     public int getTokenCount(String sessionId) {
-        CoachState state = activeStates.get(sessionId);
-        if (state == null) return 0;
-        return state.tokenCount();
-    }
-
-    public List<CorrectionData> getSessionCorrections(String sessionId) {
-        CoachState state = activeStates.get(sessionId);
-        if (state == null) return List.of();
-        return state.corrections();
+        return activeTokenCounts.getOrDefault(sessionId, 0);
     }
 
     public void removeSession(String sessionId) {
         activeStates.remove(sessionId);
+        activeTokenCounts.remove(sessionId);
         log.info("GraphExecutionService: removed session {}", sessionId);
     }
-
-    public record TurnResult(
-            String mergedResponse,
-            List<CorrectionData> corrections,
-            int tokenCount
-    ) {}
 }

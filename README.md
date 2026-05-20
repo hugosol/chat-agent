@@ -42,8 +42,9 @@ mvn spring-boot:run
 | 2 | Click **Start Session** |
 | 3 | Type your English message → press **Enter** or click **Send** |
 | 4 | Agent replies with natural English + embedded corrections |
-| 5 | Click **🔊** on any Agent message to hear TTS playback |
-| 6 | Click **End & Report** to get a fluency score + error summary |
+| 5 | Correction summary appears below your message in chat; tap **"Corrections N"** in header to see details |
+| 6 | Click **🔊** on any Agent message to hear TTS playback |
+| 7 | Click **End & Report** to get a fluency score + error summary |
 
 > **iOS tip**: The keyboard microphone (🎤) can be used for system-level dictation — the recognized text appears in the input field, then press Send.
 
@@ -133,7 +134,7 @@ web-agent/
 │   ├── speech/
 │   │   ├── SpeechToTextService.java
 │   │   └── TextToSpeechService.java
-│   ├── model/          (JPA entities + enums)
+│   ├── model/          (JPA entities + enums: ScenarioType, PersonaType, ErrorType...)
 │   ├── repository/     (Spring Data JPA)
 │   ├── service/        (GraphExecutionService, SessionService)
 │   └── config/         (LangChain4j, WebSocket, PromptLoader)
@@ -157,7 +158,7 @@ Environment variables (set before running):
 |----------|---------|-------------|
 | `DEEPSEEK_API_KEY` | *(required)* | Your DeepSeek API key |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API endpoint |
-| `DEEPSEEK_MODEL` | `deepseek-chat` | Model name |
+| `DEEPSEEK_MODEL` | `deepseek-v4-flash` | Model name |
 
 All other settings are in `src/main/resources/application.yml`.
 
@@ -167,7 +168,7 @@ All other settings are in `src/main/resources/application.yml`.
 |-----------|--------|
 | **iOS TTS** | Requires clicking 🔊 button on each message (browser blocks auto-play without user gesture) |
 | **Mobile input** | Text-only (SpeechRecognition API not supported by iOS Safari/Chrome). iOS keyboard mic provides system dictation. |
-| **Checkpoint persistence** | MemorySaver — lost on server restart. Upgrade to Postgres/Redis Saver for production. |
+| **Correction sidebar** | Overlay panel (doesn't squeeze chat). Starts collapsed, tap "Corrections N" in header to toggle. |
 | **Token window** | UI shows warning at 80% usage. User must manually end session before overflow. |
 
 ## V2 Roadmap

@@ -1,12 +1,13 @@
 package com.hugosol.webagent.websocket;
 
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
+import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.CorrectionData;
 import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.model.PersonaType;
 import com.hugosol.webagent.model.ScenarioType;
 import com.hugosol.webagent.model.Session;
 import com.hugosol.webagent.service.GraphExecutionService;
-import com.hugosol.webagent.service.GraphExecutionService.TurnResult;
 import com.hugosol.webagent.service.SessionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -54,10 +55,11 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
         String type = (String) msg.get("type");
 
         switch (type) {
-            case "START_SESSION" -> handleStartSession(wsSession, msg);
-            case "USER_INPUT" -> handleUserInput(wsSession, msg);
-            case "END_SESSION" -> handleEndSession(wsSession);
-            case "LOAD_HISTORY" -> handleLoadHistory(wsSession);
+            case "START_SESSION"  -> handleStartSession(wsSession, msg);
+            case "USER_INPUT"     -> handleUserInput(wsSession, msg);
+            case "END_SESSION"    -> handleEndSession(wsSession);
+            case "RESUME_SESSION" -> handleResumeSession(wsSession, msg);
+            case "LOAD_HISTORY"   -> handleLoadHistory(wsSession);
             default -> sendError(wsSession, "Unknown message type: " + type);
         }
     }
@@ -66,14 +68,15 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String sessionId = wsToSession.remove(session.getId());
         if (sessionId != null) {
-            graphService.removeSession(sessionId);
+            log.info("WebSocket disconnected (session {} kept alive for resume): {}", sessionId, session.getId());
+        } else {
+            log.info("WebSocket disconnected: {}", session.getId());
         }
-        log.info("WebSocket disconnected: {}", session.getId());
     }
 
     private void handleStartSession(WebSocketSession wsSession, Map<String, Object> msg) throws IOException {
         String scenarioStr = (String) msg.getOrDefault("scenario", "WORKPLACE_STANDUP");
-        String persona = (String) msg.getOrDefault("persona", "TEAM_COLLEAGUE");
+        String personaStr = (String) msg.getOrDefault("persona", "TEAM_COLLEAGUE");
 
         ScenarioType scenario;
         try {
@@ -83,8 +86,16 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        Session session = sessionService.createSession(scenario, persona);
-        graphService.initSession(session.getId(), scenario.name(), persona);
+        PersonaType persona;
+        try {
+            persona = PersonaType.valueOf(personaStr);
+        } catch (IllegalArgumentException e) {
+            sendError(wsSession, "Invalid persona: " + personaStr);
+            return;
+        }
+
+        Session session = sessionService.createSession(scenario, persona.name());
+        graphService.initSession(session.getId(), scenario.name(), persona.name());
         wsToSession.put(wsSession.getId(), session.getId());
 
         log.info("Started session {} for WebSocket {}", session.getId(), wsSession.getId());
@@ -93,10 +104,9 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
                 "type", "SESSION_STARTED",
                 "sessionId", session.getId(),
                 "scenario", scenario.name(),
-                "persona", persona
+                "persona", persona.name()
         ));
 
-        sendStateUpdate(wsSession, "LISTENING", 0.0);
     }
 
     private void handleUserInput(WebSocketSession wsSession, Map<String, Object> msg) throws IOException {
@@ -112,33 +122,59 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        int messageId = msg.get("messageId") instanceof Number n ? n.intValue() : 0;
+
         sendStateUpdate(wsSession, "PROCESSING", tokenUsage(sessionId));
 
-        try {
-            TurnResult result = graphService.processTurn(sessionId, userInput);
-
-            double usage = tokenUsage(sessionId);
-
-            sendMessage(wsSession, Map.of(
-                    "type", "AGENT_RESPONSE",
-                    "conversationText", result.mergedResponse(),
-                    "corrections", result.corrections(),
-                    "tokenUsage", usage
-            ));
-
-            sendStateUpdate(wsSession, "SPEAKING", usage);
-
-            if (usage >= WARN_RATIO) {
-                sendMessage(wsSession, Map.of(
-                        "type", "TOKEN_WARNING",
-                        "usage", usage,
-                        "message", "Approaching context limit. Consider ending the session soon."
+        graphService.processTurn(sessionId, userInput, messageId, new GraphExecutionService.TurnCallback() {
+            @Override
+            public void onConversationToken(String delta, int msgId) {
+                sendSynced(wsSession, Map.of(
+                        "type", "AGENT_STREAM_DELTA",
+                        "delta", delta,
+                        "messageId", msgId
                 ));
             }
-        } catch (Exception e) {
-            log.error("Error processing turn", e);
-            sendError(wsSession, "Processing error: " + e.getMessage());
-        }
+
+            @Override
+            public void onConversationComplete(String fullText, int msgId, int tokenCount) {
+                double usage = tokenUsage(sessionId);
+                sendSynced(wsSession, Map.of(
+                        "type", "AGENT_STREAM_END",
+                        "text", fullText,
+                        "messageId", msgId,
+                        "tokenUsage", usage
+                ));
+                sendStateSynced(wsSession, "SPEAKING", usage);
+
+                if (usage >= WARN_RATIO) {
+                    sendSynced(wsSession, Map.of(
+                            "type", "TOKEN_WARNING",
+                            "usage", usage,
+                            "message", "Approaching context limit. Consider ending the session soon."
+                    ));
+                }
+            }
+
+            @Override
+            public void onCorrections(List<CorrectionData> corrections, int msgId) {
+                if (!corrections.isEmpty()) {
+                    sendSynced(wsSession, Map.of(
+                            "type", "CORRECTION_RESULT",
+                            "corrections", corrections,
+                            "messageId", msgId
+                    ));
+                }
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                sendSynced(wsSession, Map.of(
+                        "type", "ERROR",
+                        "message", errorMessage
+                ));
+            }
+        });
     }
 
     private void handleEndSession(WebSocketSession wsSession) throws IOException {
@@ -151,8 +187,9 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
         sendStateUpdate(wsSession, "PROCESSING", tokenUsage(sessionId));
 
         try {
-            List<MessageData> messages = graphService.getSessionMessages(sessionId);
-            List<CorrectionData> corrections = graphService.getSessionCorrections(sessionId);
+            CoachState state = graphService.getSessionState(sessionId);
+            List<MessageData> messages = state != null ? new ArrayList<>(state.messages()) : List.of();
+            List<CorrectionData> corrections = state != null ? new ArrayList<>(state.corrections()) : List.of();
             ReportResult report = graphService.generateReport(sessionId);
 
             sessionService.completeSession(sessionId, messages, corrections, report);
@@ -176,6 +213,35 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    private void handleResumeSession(WebSocketSession wsSession, Map<String, Object> msg) throws IOException {
+        String sessionId = (String) msg.get("sessionId");
+        if (sessionId == null || sessionId.isBlank()) {
+            sendError(wsSession, "Missing sessionId");
+            return;
+        }
+
+        CoachState state = graphService.getSessionState(sessionId);
+        if (state == null) {
+            sendError(wsSession, "Session expired. Please start a new one.");
+            return;
+        }
+
+        wsToSession.put(wsSession.getId(), sessionId);
+        double usage = tokenUsage(sessionId);
+
+        sendMessage(wsSession, Map.of(
+                "type", "SESSION_RESUMED",
+                "sessionId", sessionId,
+                "scenario", state.scenario(),
+                "persona", state.persona(),
+                "messages", new ArrayList<>(state.messages()),
+                "corrections", new ArrayList<>(state.corrections()),
+                "tokenUsage", usage
+        ));
+
+        log.info("Resumed session {} for WebSocket {}", sessionId, wsSession.getId());
+    }
+
     private void handleLoadHistory(WebSocketSession wsSession) throws IOException {
         List<Session> sessions = sessionService.getHistory();
         List<Map<String, Object>> history = sessions.stream()
@@ -197,7 +263,17 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
     private void sendMessage(WebSocketSession wsSession, Map<String, Object> payload) throws IOException {
         if (wsSession.isOpen()) {
             String json = objectMapper.writeValueAsString(payload);
-            wsSession.sendMessage(new TextMessage(json));
+            synchronized (wsSession) {
+                wsSession.sendMessage(new TextMessage(json));
+            }
+        }
+    }
+
+    private void sendSynced(WebSocketSession wsSession, Map<String, Object> payload) {
+        try {
+            sendMessage(wsSession, payload);
+        } catch (IOException e) {
+            log.error("Failed to send WS message", e);
         }
     }
 
@@ -207,6 +283,14 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
                 "state", state,
                 "tokenUsage", tokenUsage
         ));
+    }
+
+    private void sendStateSynced(WebSocketSession wsSession, String state, double tokenUsage) {
+        try {
+            sendStateUpdate(wsSession, state, tokenUsage);
+        } catch (IOException e) {
+            log.error("Failed to send state update", e);
+        }
     }
 
     private void sendError(WebSocketSession wsSession, String errorMessage) throws IOException {
