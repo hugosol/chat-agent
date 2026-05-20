@@ -80,17 +80,17 @@ Tables: `sessions`, `messages`, `error_records`, `session_reports`, `user_progre
 Browser (text input + 🔊 TTS)
     │  WebSocket JSON
     ▼
-CoachWebSocketHandler  ──►  GraphExecutionService  ──►  LangGraph (3 nodes)
+CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor  ──►  LangGraph (1 node: correction)
     │                              │                        │
-    │                              │                        ├── ConversationNode → ConversationAgent → DeepSeek
-    │                              │                        ├── CorrectionNode   → CorrectionAgent   → DeepSeek
-    │                              │                        └── MergeResponseNode (token counting)
+    │                              │                        ├── Future A: ConversationAgent → DeepSeek (streaming)
+    │                              │                        └── Future B: CorrectionNode → CorrectionAgent → DeepSeek
     │                              │
-    │                              ├── SessionService ──►  H2 (JPA)
-    │                              └── ReportAgent    ──►  DeepSeek (session-end)
+    │                              ├── SessionStateStore (runtime state + token tracking)
+    │                              ├── ReportGenerator  → ReportAgent → DeepSeek (session-end)
+    │                              └── SessionService   → H2 (JPA)
     │
     ▼
-STATE_UPDATE / AGENT_RESPONSE / SESSION_REPORT
+AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 ```
 
 ### 3 AI Agents
@@ -104,10 +104,10 @@ STATE_UPDATE / AGENT_RESPONSE / SESSION_REPORT
 ### LangGraph State Machine (Per-Turn)
 
 ```
-START → ConversationNode → CorrectionNode → MergeResponseNode → END
+START → CorrectionNode → END
 ```
 
-The Service layer manages the session loop. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
+The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionStateStore` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
 
 ## Project Structure
 
@@ -122,21 +122,25 @@ web-agent/
 │   │   ├── MessageData.java
 │   │   ├── CorrectionData.java
 │   │   └── nodes/
-│   │       ├── ConversationNode.java
-│   │       ├── CorrectionNode.java
-│   │       └── MergeResponseNode.java
+│   │       └── CorrectionNode.java
 │   ├── agent/
 │   │   ├── ConversationAgent.java
 │   │   ├── CorrectionAgent.java
 │   │   └── ReportAgent.java
 │   ├── websocket/
-│   │   └── CoachWebSocketHandler.java
+│   │   ├── CoachWebSocketHandler.java
+│   │   └── CoachMessageHandler.java
+│   ├── protocol/
+│   │   ├── ClientMessage.java
+│   │   ├── ServerMessage.java
+│   │   ├── MessageHandler.java
+│   │   └── ProtocolDispatcher.java
 │   ├── speech/
 │   │   ├── SpeechToTextService.java
 │   │   └── TextToSpeechService.java
 │   ├── model/          (JPA entities + enums: ScenarioType, PersonaType, ErrorType...)
 │   ├── repository/     (Spring Data JPA)
-│   ├── service/        (GraphExecutionService, SessionService)
+│   ├── service/        (SessionStateStore, TurnProcessor, ReportGenerator, SessionService, TokenTracker)
 │   └── config/         (LangChain4j, WebSocket, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml

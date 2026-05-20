@@ -101,7 +101,7 @@
 
 ## 四、LangGraph 状态机（实现版本）
 
-**架构决策**: LangGraph 图处理**单轮对话**（conversation → correction → merge），会话循环由 Service 层 (`GraphExecutionService`) 管理，而非图内循环。这简化了 HITL 实现并避免了 langgraph4j 的复杂中断机制。
+**架构决策**: LangGraph 图处理**单轮纠错**（仅 `correction` 节点），对话流式生成由 Service 层 (`TurnProcessor`) 管理。
 
 ### 状态定义 (CoachState extends AgentState)
 
@@ -113,10 +113,7 @@ public class CoachState extends AgentState {
     static final String STATE_STATUS      = "stateStatus";        // IDLE/PROCESSING/SPEAKING
     static final String MESSAGES          = "messages";           // List<MessageData> (Appender)
     static final String USER_INPUT        = "userInput";          // 用户输入文本
-    static final String CONVERSATION_TEXT = "conversationText";   // ConversationAgent 输出
     static final String CORRECTIONS       = "corrections";        // List<CorrectionData> (Appender)
-    static final String MERGED_RESPONSE   = "mergedResponse";     // 最终输出文本
-    static final String TOKEN_COUNT       = "tokenCount";
 }
 ```
 
@@ -125,36 +122,37 @@ public class CoachState extends AgentState {
 ### 单轮图结构
 
 ```
-START → conversationAgent → correctionAgent → mergeResponse → END
-           (调用 DeepSeek)    (分析 5 类错误)    (合成+计算 token)
+START → correction → END
+          (调用 DeepSeek, 分析 5 类错误)
 ```
 
-### 节点职责（3 个节点）
+> **实现版本**: 图只有 1 个节点。`ConversationNode` 和 `MergeResponseNode` 已移除——对话流式生成改为 `TurnProcessor` 直接调用 `ConversationAgent.generateStream()`，token 计数由 `TokenTracker` 管理。
+
+### 节点职责（1 个节点）
 
 | 节点 | 实现类 | 职责 |
 |------|--------|------|
-| `conversationAgent` | `ConversationNode` | 从 AgentState 读取 `userInput` + `messages` 历史，调用 `ConversationAgent.generate()`，输出 `conversationText` |
-| `correctionAgent` | `CorrectionNode` | 从 AgentState 读取 `userInput`，调用 `CorrectionAgent.analyze()`，输出 `corrections` 列表 |
-| `mergeResponse` | `MergeResponseNode` | 合并对话文本 + 纠错，估算 token 数，更新 `mergedResponse` + `tokenCount` |
+| `correction` | `CorrectionNode` | 从 AgentState 读取 `userInput`，调用 `CorrectionAgent.analyze()`，输出 `corrections` 列表 |
 
 ### 会话生命周期（由 Service 层管理）
 
 ```
 [用户 Start Session]
   → SessionService.createSession() → H2 写入 Session
-  → GraphExecutionService.initSession() → 创建 CoachState → activeStates Map
+  → SessionStateStore.init() → 创建 CoachState → activeStates Map + TokenTracker 初始化
 
 [每轮对话]
   → WebSocket 收到 USER_INPUT
-  → GraphExecutionService.processTurn(sessionId, userInput)
-    → graph.stream(input, config) → 遍历 3 个节点
-    → 返回 TurnResult(mergedResponse, corrections, tokenCount)
-  → WebSocket 推送 AGENT_RESPONSE + STATE_UPDATE
+  → TurnProcessor.processTurn(sessionId, userInput, messageId, callback)
+    → 两路 CompletableFuture 并行:
+      A) ConversationAgent.generateStream() → 流式推送到前端
+      B) graph.stream(input, config) → CorrectionNode → 纠错结果异步推送
+  → 回调通过 TurnProcessor.TurnCallback 通知 CoachMessageHandler
 
 [用户 End Session]
-  → GraphExecutionService.generateReport() → 调用 ReportAgent
+  → ReportGenerator.generate(messages, corrections) → 调用 ReportAgent
   → SessionService.completeSession() → messages + errors + report → H2
-  → GraphExecutionService.removeSession() → 释放 ActiveState
+  → SessionStateStore.remove() → 释放 state + TokenTracker
 ```
 
 ### Checkpoint 配置
@@ -299,16 +297,16 @@ Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You ar
 #### 后端 → 前端
 
 ```json
-{ "type": "STATE_UPDATE", "state": "LISTENING", "tokenUsage": 0.15 }
-{ "type": "STATE_UPDATE", "state": "PROCESSING" }
-{ "type": "AGENT_RESPONSE",
-  "conversationText": "Sounds like great progress...",
+{ "type": "STATE_UPDATE", "state": "PROCESSING", "tokenUsage": 0.15 }
+{ "type": "AGENT_STREAM_DELTA", "delta": "Sounds", "messageId": 1 }
+{ "type": "AGENT_STREAM_END", "text": "full text", "messageId": 1, "tokenUsage": 0.23 }
+{ "type": "CORRECTION_RESULT",
   "corrections": [
     { "type": "CHINGLISH", "original": "...", "corrected": "...", "explanation": "..." }
   ],
-  "tokenUsage": 0.23
+  "messageId": 1
 }
-{ "type": "STATE_UPDATE", "state": "SPEAKING" }
+{ "type": "STATE_UPDATE", "state": "SPEAKING", "tokenUsage": 0.23 }
 { "type": "SESSION_REPORT", "report": { "summary": "...", "fluencyScore": 6, ... } }
 { "type": "TOKEN_WARNING", "usage": 0.80, "message": "Approaching context limit" }
 { "type": "ERROR", "message": "..." }
@@ -421,14 +419,12 @@ web-agent/
 │   ├── WebAgentApplication.java
 │   │
 │   ├── graph/                              // LangGraph 核心
-│   │   ├── CoachState.java                 // AgentState 定义 + Schema
-│   │   ├── CoachGraphBuilder.java          // StateGraph 构建 + compile (3节点线性图)
-│   │   ├── CorrectionData.java             // 纠错数据结构 (Serializable)
-│   │   ├── MessageData.java                // 消息数据结构 (Serializable)
+│   │   ├── CoachState.java                 // AgentState 定义 + Schema (7 channels)
+│   │   ├── CoachGraphBuilder.java          // StateGraph 构建 + compile (1节点线性图)
+│   │   ├── CorrectionData.java             // 纠错数据结构 (type 为 ErrorType 枚举, Serializable)
+│   │   ├── MessageData.java                // 消息数据结构 (role 为 MessageRole 枚举, Serializable)
 │   │   └── nodes/
-│   │       ├── ConversationNode.java       // 调用 ConversationAgent
-│   │       ├── CorrectionNode.java         // 调用 CorrectionAgent
-│   │       └── MergeResponseNode.java      // 合成响应 + token 估算
+│   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
 │   ├── agent/                              // Agent 调用封装
 │   │   ├── ConversationAgent.java          // 角色扮演对话（Prompt 模板替换 + DeepSeek 调用）
@@ -436,7 +432,14 @@ web-agent/
 │   │   └── ReportAgent.java                // 会话报告生成
 │   │
 │   ├── websocket/
-│   │   └── CoachWebSocketHandler.java      // WS 端点 + JSON 消息路由
+│   │   ├── CoachWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)
+│   │   └── CoachMessageHandler.java        // 协议消息处理 + wsToSession 映射 (实现 MessageHandler)
+│   │
+│   ├── protocol/                           // WS 消息协议
+│   │   ├── ClientMessage.java              // 密封接口 + 5 个子类型 (Jackson 多态反序列化)
+│   │   ├── ServerMessage.java              // 密封接口 + 11 个子类型
+│   │   ├── MessageHandler.java             // 接口: 5 个 handler 方法
+│   │   └── ProtocolDispatcher.java         // JSON 解析/序列化 + 消息分发 + synchronized send()
 │   │
 │   ├── speech/                             // STT/TTS 接口层（V1 仅接口，V2 实现 Whisper）
 │   │   ├── SpeechToTextService.java        // 接口
@@ -462,8 +465,11 @@ web-agent/
 │   │   └── UserProgressRepository.java
 │   │
 │   ├── service/                            // 业务服务
+│   │   ├── SessionStateStore.java           // State 生命周期 + TokenTracker 封装 + 所有 state 读写
+│   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图)
+│   │   ├── ReportGenerator.java            // 报告生成透传
 │   │   ├── SessionService.java             // 会话生命周期 + H2 持久化
-│   │   └── GraphExecutionService.java      // Graph 执行 + activeStates Map 管理
+│   │   └── TokenTracker.java               // 按 AgentType 分计 token
 │   │
 │   └── config/                             // 配置类
 │       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel) Bean 配置
@@ -483,7 +489,7 @@ web-agent/
     └── style.css                           // 深色主题
 ```
 
-> **已移除的节点**（原始设计 vs 实现差异）: `InitializeNode`、`AwaitInputNode`、`DecideNextNode`、`ReportNode`、`SaveSessionNode`。这些职责由 `SessionService` + `GraphExecutionService` 接管，避免了 langgraph4j 的复杂 HITL 中断机制。
+> **图结构简化**: `ConversationNode` 和 `MergeResponseNode` 已移除。对话流式生成由 `TurnProcessor` 直接调用 `ConversationAgent`，token 计数由 `TokenTracker` 封装在 `SessionStateStore` 中管理。
 
 ---
 
@@ -496,7 +502,7 @@ web-agent/
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
 | **TTS** | 浏览器 SpeechSynthesis（🔊 按钮手动触发） | OpenAI TTS（自然度更高） |
-| **LangGraph** | 3 节点线性图（单轮处理） | 可探索条件边 + 子图 |
+| **LangGraph** | 1 节点线性图（仅 correction） | 可探索条件边 + 子图 |
 | **持久化** | H2 File | H2 File（不变） |
 | **恢复** | MemorySaver | 可升级到 Postgres/Redis Saver |
 | **纠错** | Agent 口头自然纠正 | 用户可选审核确认 |
@@ -509,7 +515,8 @@ web-agent/
 
 | 偏差 | 原始设计 | 实现 | 原因 |
 |------|---------|------|------|
-| 图结构 | 8 节点循环图（含 HITL awaitInput） | 3 节点线性图（单轮处理） | 避免 langgraph4j 复杂中断机制；会话循环由 Service 层管理更可控 |
+| 图结构 | 8 节点循环图（含 HITL awaitInput） | 1 节点线性图（仅 correction） | 避免 langgraph4j 复杂中断机制；对话流式由 Service 层管理更可控 |
+| Conversation/Merge 节点 | ConversationNode + MergeResponseNode | 移除，`TurnProcessor` 直接调用 Agent | 流式对话需要异步回调，不适合放在同步图节点中 |
 | 语音输入 | Web Speech API（`SpeechRecognition`） | 文本输入框 + iOS 键盘听写 | iOS Safari/Chrome 均不支持 `SpeechRecognition` API |
 | TTS 触发 | 收到回复后自动播放 | 🔊 按钮手动触发 | iOS Safari 禁止非用户手势触发的音频播放 |
 | TTS onend 恢复 | `utterance.onend` → `showTextInput()` | `showTextInput()` 在 `AGENT_STREAM_END` 后调用 | iOS `SpeechSynthesis.onend` 经常不触发 |
@@ -529,12 +536,12 @@ web-agent/
 |------|------|------|
 | **1. 骨架** | Spring Boot 项目 + Maven 依赖 + application.yml | pom.xml, WebAgentApplication, 目录结构 |
 | **2. 模型层** | 5 个 JPA Entity + 4 个枚举 + 5 个 Repository | 表结构 + 数据访问层 |
-| **3. LangGraph 核心** | CoachState (10 个 Channel) + 3 个 Node + CoachGraphBuilder | 编译通过的单轮线性图 |
+| **3. LangGraph 核心** | CoachState (7 channels) + 1 Node + CoachGraphBuilder | 编译通过的单轮线性图 |
 | **4. Agent 接入** | 3 个 Agent + PromptLoader + 3 个 Prompt 文件 | LangChain4j DeepSeek 调用链路 |
-| **5. 服务层** | GraphExecutionService + SessionService | Graph 执行、Checkpoint、H2 持久化 |
-| **6. WebSocket** | CoachWebSocketHandler + WebSocketConfig + LangChain4jConfig | JSON 消息路由、前后端通讯 |
+| **5. 服务层** | SessionStateStore + TurnProcessor + ReportGenerator + SessionService + TokenTracker | State 读写、并行编排、报告生成、H2 持久化 |
+| **6. WebSocket** | CoachWebSocketHandler + CoachMessageHandler + ProtocolDispatcher + 协议类型 + WebSocketConfig + LangChain4jConfig | JSON 消息路由、前后端通讯 |
 | **7. 前端 V1** | 文本输入栏 + Send 按钮 + TTS 🔊 按钮 + Token 进度条 + Debug 面板 | 可用 UI |
 | **8. 移动端适配** | iOS Safari 兼容：🔊 按钮手势触发 TTS、输入框键盘原生听写、Debug 面板 | iPhone 13 可用 |
-| **9. 端到端验证** | `mvn compile` BUILD SUCCESS（40 个源文件） | 编译通过 |
+| **9. 端到端验证** | `mvn compile` BUILD SUCCESS（41 个源文件） | 编译通过 |
 | **10. Correction UX 优化** | 侧边栏绝对定位浮层 + 默认隐藏 + header toggle；correction 气泡分行编号；Safe-area CSS；移除 LISTENING 状态 | 移动端体验提升 |
 | **11. Scenario/Persona 枚举重构** | `ScenarioType` + `PersonaType` 加描述字段；`ConversationAgent` 用 enum 访问器；`CoachWebSocketHandler` persona 入口校验；prompt 占位符修正 | 自然语言 prompt、可扩展、类型安全 |
