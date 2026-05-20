@@ -2,6 +2,7 @@ package com.hugosol.webagent.websocket;
 
 import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
+import com.hugosol.webagent.service.SessionStateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -17,10 +18,13 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
 
     private final ProtocolDispatcher protocol;
     private final CoachMessageHandler messageHandler;
+    private final SessionStateStore stateStore;
 
-    public CoachWebSocketHandler(ProtocolDispatcher protocol, CoachMessageHandler messageHandler) {
+    public CoachWebSocketHandler(ProtocolDispatcher protocol, CoachMessageHandler messageHandler,
+                                  SessionStateStore stateStore) {
         this.protocol = protocol;
         this.messageHandler = messageHandler;
+        this.stateStore = stateStore;
     }
 
     @Override
@@ -40,6 +44,6 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        messageHandler.unbind(session.getId());
+        stateStore.unbind(session.getId());
     }
 }

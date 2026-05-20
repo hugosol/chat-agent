@@ -20,17 +20,19 @@ public class SessionStateStore {
     private static final Logger log = LoggerFactory.getLogger(SessionStateStore.class);
 
     private final Map<String, CoachState> activeStates = new ConcurrentHashMap<>();
+    private final Map<String, String> wsToSession = new ConcurrentHashMap<>();
     private final TokenTracker tokenTracker;
 
     public SessionStateStore(TokenTracker tokenTracker) {
         this.tokenTracker = tokenTracker;
     }
 
-    public void init(String sessionId, String scenario, String persona) {
+    public void init(String sessionId, String scenario, String persona, String wsId) {
         Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
         tokenTracker.initSession(sessionId);
+        wsToSession.put(wsId, sessionId);
         log.info("SessionStateStore: initialized session {}", sessionId);
     }
 
@@ -41,7 +43,24 @@ public class SessionStateStore {
     public void remove(String sessionId) {
         activeStates.remove(sessionId);
         tokenTracker.removeSession(sessionId);
+        wsToSession.values().removeIf(sessionId::equals);
         log.info("SessionStateStore: removed session {}", sessionId);
+    }
+
+    public void bind(String wsId, String sessionId) {
+        wsToSession.put(wsId, sessionId);
+        log.info("SessionStateStore: bound WebSocket {} to session {}", wsId, sessionId);
+    }
+
+    public void unbind(String wsId) {
+        String sessionId = wsToSession.remove(wsId);
+        if (sessionId != null) {
+            log.info("SessionStateStore: unbound WebSocket {} (session {} kept alive for resume)", wsId, sessionId);
+        }
+    }
+
+    public String getSessionId(String wsId) {
+        return wsToSession.get(wsId);
     }
 
     CoachState getForExecution(String sessionId) {

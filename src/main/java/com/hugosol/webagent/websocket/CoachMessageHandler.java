@@ -21,8 +21,6 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class CoachMessageHandler implements MessageHandler {
@@ -34,7 +32,6 @@ public class CoachMessageHandler implements MessageHandler {
     private final ReportGenerator reportGenerator;
     private final SessionService sessionService;
     private final ProtocolDispatcher protocol;
-    private final Map<String, String> wsToSession = new ConcurrentHashMap<>();
 
     public CoachMessageHandler(SessionStateStore stateStore,
                                TurnProcessor turnProcessor,
@@ -46,15 +43,6 @@ public class CoachMessageHandler implements MessageHandler {
         this.reportGenerator = reportGenerator;
         this.sessionService = sessionService;
         this.protocol = protocol;
-    }
-
-    public void unbind(String wsId) {
-        String sessionId = wsToSession.remove(wsId);
-        if (sessionId != null) {
-            log.info("WebSocket disconnected (session {} kept alive for resume): {}", sessionId, wsId);
-        } else {
-            log.info("WebSocket disconnected: {}", wsId);
-        }
     }
 
     @Override
@@ -79,8 +67,7 @@ public class CoachMessageHandler implements MessageHandler {
         }
 
         Session session = sessionService.createSession(scenario, persona.name());
-        stateStore.init(session.getId(), scenario.name(), persona.name());
-        wsToSession.put(ws.getId(), session.getId());
+        stateStore.init(session.getId(), scenario.name(), persona.name(), ws.getId());
 
         log.info("Started session {} for WebSocket {}", session.getId(), ws.getId());
 
@@ -90,7 +77,7 @@ public class CoachMessageHandler implements MessageHandler {
 
     @Override
     public void onUserInput(WebSocketSession ws, ClientMessage.UserInput msg) throws IOException {
-        String sessionId = wsToSession.get(ws.getId());
+        String sessionId = stateStore.getSessionId(ws.getId());
         if (sessionId == null) {
             protocol.send(ws, new ServerMessage.ErrorMessage("No active session. Send START_SESSION first."));
             return;
@@ -141,7 +128,7 @@ public class CoachMessageHandler implements MessageHandler {
 
     @Override
     public void onEndSession(WebSocketSession ws) throws IOException {
-        String sessionId = wsToSession.get(ws.getId());
+        String sessionId = stateStore.getSessionId(ws.getId());
         if (sessionId == null) {
             protocol.send(ws, new ServerMessage.ErrorMessage("No active session to end."));
             return;
@@ -158,7 +145,6 @@ public class CoachMessageHandler implements MessageHandler {
             sessionService.completeSession(sessionId, messages, corrections, report);
 
             stateStore.remove(sessionId);
-            wsToSession.remove(ws.getId());
 
             var reportData = new ServerMessage.ReportData(
                     report.overallAssessment(),
@@ -187,7 +173,7 @@ public class CoachMessageHandler implements MessageHandler {
             return;
         }
 
-        wsToSession.put(ws.getId(), sessionId);
+        stateStore.bind(ws.getId(), sessionId);
         double usage = stateStore.getUsageRatio(sessionId);
 
         protocol.send(ws, new ServerMessage.SessionResumed(
