@@ -72,12 +72,6 @@ header h1 {
     text-align: right;
 }
 
-.scenario-info {
-    font-size: 0.75em;
-    color: #aaa;
-    white-space: nowrap;
-}
-
 main {
     flex: 1;
     display: flex;
@@ -89,6 +83,7 @@ main {
     display: flex;
     flex: 1;
     overflow: hidden;
+    position: relative;
 }
 
 .chat-area {
@@ -224,16 +219,10 @@ main {
 
 .status-bar .connected { color: #66bb6a; }
 .status-bar .disconnected { color: #888; }
-.status-bar .listening { color: #4fc3f7; animation: pulse 1.5s infinite; }
 .status-bar .processing { color: #f39c12; }
 .status-bar .speaking { color: #66bb6a; }
 .status-bar .warning { color: #e74c3c; font-weight: bold; }
 .status-bar .error { color: #e74c3c; background: #2c1a1a; }
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-}
 
 .text-input-bar {
     display: flex;
@@ -408,19 +397,22 @@ footer {
 }
 
 .correction-sidebar {
-    width: 240px;
-    flex-shrink: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 260px;
     border-left: 1px solid #0f3460;
     background: #0d1b2a;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: width 0.2s;
+    z-index: 10;
+    transition: transform 0.25s ease;
 }
 
 .correction-sidebar.collapsed {
-    width: 0;
-    border-left: none;
+    transform: translateX(100%);
 }
 
 .correction-sidebar-header {
@@ -445,6 +437,23 @@ footer {
 
 .correction-sidebar-header button:hover {
     color: #e94560;
+}
+
+.correction-show-btn {
+    margin-left: auto;
+    padding: 4px 10px;
+    background: #0f3460;
+    border: 1px solid #1a5276;
+    border-radius: 4px;
+    color: #aaa;
+    font-size: 0.75em;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.correction-show-btn:hover {
+    color: #e94560;
+    border-color: #e94560;
 }
 
 .correction-sidebar-content {

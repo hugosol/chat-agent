@@ -10,11 +10,11 @@
     var messageCount = 0;
     var turnCounter = 0;
     var streamBubbles = {};
+    var correctionCount = 0;
 
     var els = {
         tokenBar:        document.getElementById('tokenBar'),
         tokenPct:        document.getElementById('tokenPct'),
-        scenarioInfo:    document.getElementById('scenarioInfo'),
         chatArea:        document.getElementById('chatArea'),
         messages:        document.getElementById('messages'),
         earlierMarker:   document.getElementById('earlierMarker'),
@@ -38,6 +38,8 @@
         correctionSidebar:      document.getElementById('correctionSidebar'),
         correctionSidebarContent: document.getElementById('correctionSidebarContent'),
         correctionSidebarToggle:  document.getElementById('correctionSidebarToggle'),
+        correctionShowBtn:   document.getElementById('correctionShowBtn'),
+        correctionBadge:     document.getElementById('correctionBadge'),
     };
 
     function debugLog(msg) {
@@ -86,7 +88,6 @@
                 debugLog('SESSION_STARTED id=' + msg.sessionId + ' scenario=' + msg.scenario);
                 sessionId = msg.sessionId;
                 localStorage.setItem('sessionId', msg.sessionId);
-                els.scenarioInfo.textContent = msg.scenario + ' | ' + msg.persona;
                 els.startBtn.disabled = true;
                 els.endBtn.disabled = false;
                 els.scenarioSelect.disabled = true;
@@ -96,6 +97,8 @@
                 streamBubbles = {};
                 els.messages.innerHTML = '';
                 els.correctionSidebarContent.innerHTML = '<div class="correction-sidebar-empty">No corrections yet.</div>';
+                correctionCount = 0;
+                updateCorrectionBadge();
                 els.earlierMarker.classList.add('hidden');
                 els.reportModal.classList.add('hidden');
                 showTextInput();
@@ -199,7 +202,6 @@
         debugLog('SESSION_RESUMED sessionId=' + msg.sessionId);
         sessionId = msg.sessionId;
         localStorage.setItem('sessionId', msg.sessionId);
-        els.scenarioInfo.textContent = msg.scenario + ' | ' + msg.persona;
         els.startBtn.disabled = true;
         els.endBtn.disabled = false;
         els.scenarioSelect.disabled = true;
@@ -208,6 +210,7 @@
         streamBubbles = {};
         els.messages.innerHTML = '';
         els.correctionSidebarContent.innerHTML = '';
+        correctionCount = 0;
         els.earlierMarker.classList.add('hidden');
         els.reportModal.classList.add('hidden');
 
@@ -225,6 +228,7 @@
                 addCorrectionSidebarItem(msg.corrections[j]);
             }
         }
+        updateCorrectionBadge();
 
         updateTokenBar(msg.tokenUsage);
         showTextInput();
@@ -291,6 +295,17 @@
             '</div>' +
             '<div class="correction-explanation">' + escapeHtml(c.explanation || '') + '</div>';
         els.correctionSidebarContent.appendChild(item);
+        correctionCount++;
+        updateCorrectionBadge();
+    }
+
+    function updateCorrectionBadge() {
+        els.correctionBadge.textContent = correctionCount;
+        if (correctionCount > 0) {
+            els.correctionBadge.style.color = '#e94560';
+        } else {
+            els.correctionBadge.style.color = '';
+        }
     }
 
     function showTextInput() {
@@ -375,7 +390,6 @@
         els.endBtn.disabled = true;
         els.scenarioSelect.disabled = false;
         els.personaSelect.disabled = false;
-        els.scenarioInfo.textContent = '';
         els.tokenBar.style.width = '0%';
         els.tokenPct.textContent = '0%';
         els.textInputBar.classList.add('hidden');
@@ -450,6 +464,8 @@
         els.reportModal.classList.add('hidden');
         els.messages.innerHTML = '';
         els.correctionSidebarContent.innerHTML = '<div class="correction-sidebar-empty">No corrections yet.</div>';
+        correctionCount = 0;
+        updateCorrectionBadge();
         els.earlierMarker.classList.add('hidden');
         messageCount = 0;
         streamBubbles = {};
@@ -471,6 +487,13 @@
 
     els.correctionSidebarToggle.addEventListener('click', function () {
         els.correctionSidebar.classList.toggle('collapsed');
+        var collapsed = els.correctionSidebar.classList.contains('collapsed');
+        els.correctionShowBtn.classList.toggle('hidden', !collapsed);
+    });
+
+    els.correctionShowBtn.addEventListener('click', function () {
+        els.correctionSidebar.classList.remove('collapsed');
+        els.correctionShowBtn.classList.add('hidden');
     });
 
     connect();

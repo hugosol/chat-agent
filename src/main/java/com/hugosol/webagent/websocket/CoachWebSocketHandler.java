@@ -98,7 +98,6 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
                 "persona", persona
         ));
 
-        sendStateUpdate(wsSession, "LISTENING", 0.0);
     }
 
     private void handleUserInput(WebSocketSession wsSession, Map<String, Object> msg) throws IOException {
