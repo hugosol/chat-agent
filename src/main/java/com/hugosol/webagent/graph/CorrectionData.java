@@ -7,6 +7,7 @@ public class CorrectionData implements Serializable {
     private String original;
     private String corrected;
     private String explanation;
+    private int messageId;
 
     public CorrectionData() {}
 
@@ -28,4 +29,7 @@ public class CorrectionData implements Serializable {
 
     public String getExplanation() { return explanation; }
     public void setExplanation(String explanation) { this.explanation = explanation; }
+
+    public int getMessageId() { return messageId; }
+    public void setMessageId(int messageId) { this.messageId = messageId; }
 }

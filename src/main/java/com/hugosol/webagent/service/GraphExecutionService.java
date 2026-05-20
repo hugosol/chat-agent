@@ -7,6 +7,7 @@ import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.CorrectionData;
 import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.model.AgentType;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import org.bsc.langgraph4j.CompiledGraph;
@@ -29,8 +30,8 @@ public class GraphExecutionService {
     private final CompiledGraph<CoachState> graph;
     private final ConversationAgent conversationAgent;
     private final ReportAgent reportAgent;
+    private final TokenTracker tokenTracker;
     private final Map<String, CoachState> activeStates = new ConcurrentHashMap<>();
-    private final Map<String, Integer> activeTokenCounts = new ConcurrentHashMap<>();
 
     public interface TurnCallback {
         void onConversationToken(String delta, int messageId);
@@ -41,17 +42,19 @@ public class GraphExecutionService {
 
     public GraphExecutionService(CoachGraphBuilder graphBuilder,
                                   ConversationAgent conversationAgent,
-                                  ReportAgent reportAgent) {
+                                  ReportAgent reportAgent,
+                                  TokenTracker tokenTracker) {
         this.graph = graphBuilder.getCompiledGraph();
         this.conversationAgent = conversationAgent;
         this.reportAgent = reportAgent;
+        this.tokenTracker = tokenTracker;
     }
 
     public void initSession(String sessionId, String scenario, String persona) {
         Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
-        activeTokenCounts.put(sessionId, 0);
+        tokenTracker.initSession(sessionId);
         log.info("GraphExecutionService: initialized session {}", sessionId);
     }
 
@@ -87,7 +90,7 @@ public class GraphExecutionService {
 
                             synchronized (state) {
                                 state.messages().add(new MessageData("AGENT", agentText));
-                                activeTokenCounts.merge(sessionId, tokens, Integer::sum);
+                                tokenTracker.addTokens(sessionId, AgentType.CONVERSATION, tokens);
                             }
 
                             callback.onConversationComplete(agentText, messageId, tokens);
@@ -119,6 +122,10 @@ public class GraphExecutionService {
                             Math.min(correctionsBefore, allCorrections.size()),
                             allCorrections.size());
 
+                    for (CorrectionData c : newOnly) {
+                        c.setMessageId(messageId);
+                    }
+
                     synchronized (state) {
                         state.corrections().addAll(newOnly);
                     }
@@ -146,13 +153,9 @@ public class GraphExecutionService {
         return activeStates.get(sessionId);
     }
 
-    public int getTokenCount(String sessionId) {
-        return activeTokenCounts.getOrDefault(sessionId, 0);
-    }
-
     public void removeSession(String sessionId) {
         activeStates.remove(sessionId);
-        activeTokenCounts.remove(sessionId);
+        tokenTracker.removeSession(sessionId);
         log.info("GraphExecutionService: removed session {}", sessionId);
     }
 }

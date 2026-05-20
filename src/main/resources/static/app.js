@@ -218,14 +218,38 @@
         if (msg.messages && msg.messages.length > 0) {
             for (var i = 0; i < msg.messages.length; i++) {
                 var m = msg.messages[i];
-                if (m.role === 'USER') turnCounter++;
-                rebuildMessage(m.role, m.content);
+                if (m.role === 'USER') {
+                    turnCounter++;
+                    var userDiv = createMessageElement(m.role, m.content, turnCounter, false);
+                    els.messages.appendChild(userDiv);
+                    messageCount++;
+                } else {
+                    rebuildMessage(m.role, m.content);
+                }
             }
         }
 
         if (msg.corrections && msg.corrections.length > 0) {
+            var byMsgId = {};
             for (var j = 0; j < msg.corrections.length; j++) {
-                addCorrectionSidebarItem(msg.corrections[j]);
+                var c = msg.corrections[j];
+                addCorrectionSidebarItem(c);
+                var mid = c.messageId || 0;
+                if (!byMsgId[mid]) byMsgId[mid] = [];
+                byMsgId[mid].push(c);
+            }
+            for (var mid in byMsgId) {
+                if (mid === '0') continue;
+                var corrs = byMsgId[mid];
+                var userBubble = els.messages.querySelector('[data-message-id="' + mid + '"].user');
+                if (userBubble) {
+                    var summary = corrs.map(function (c, i) {
+                        return (i + 1) + '. ' + c.original + ' \u2192 ' + c.corrected;
+                    }).join('\n');
+                    var corrBubble = createCorrectionBubble(summary, parseInt(mid));
+                    userBubble.insertAdjacentElement('afterend', corrBubble);
+                    messageCount++;
+                }
             }
         }
         updateCorrectionBadge();
@@ -236,7 +260,7 @@
 
     function rebuildMessage(role, content) {
         var div = createMessageElement(role, content, null, false);
-        if (role === 'Agent') {
+        if (role.toLowerCase() === 'agent') {
             addPlayButton(div, content);
         }
         els.messages.appendChild(div);
@@ -245,9 +269,10 @@
 
     function createMessageElement(role, content, msgId, isStreaming) {
         var div = document.createElement('div');
-        div.className = 'message ' + role.toLowerCase();
-        if (msgId != null && role === 'User') div.setAttribute('data-message-id', msgId);
-        if (msgId != null && role === 'Agent') div.setAttribute('data-message-id', msgId);
+        var roleLower = role.toLowerCase();
+        div.className = 'message ' + roleLower;
+        if (msgId != null && roleLower === 'user') div.setAttribute('data-message-id', msgId);
+        if (msgId != null && roleLower === 'agent') div.setAttribute('data-message-id', msgId);
         var html = '<span class="role">' + role + ':</span> ';
         html += '<span class="content-text">' + escapeHtml(content) + '</span>';
         if (isStreaming) {
