@@ -1,0 +1,55 @@
+package com.hugosol.webagent.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "messages")
+public class Message {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String id;
+
+    @Column(nullable = false)
+    private String sessionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MessageRole role;
+
+    @Column(nullable = false, length = 4000)
+    private String content;
+
+    @Column(nullable = false)
+    private LocalDateTime timestamp;
+
+    private Integer tokenCount;
+
+    public Message() {}
+
+    public Message(String sessionId, MessageRole role, String content) {
+        this.sessionId = sessionId;
+        this.role = role;
+        this.content = content;
+        this.timestamp = LocalDateTime.now();
+    }
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+
+    public MessageRole getRole() { return role; }
+    public void setRole(MessageRole role) { this.role = role; }
+
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    public Integer getTokenCount() { return tokenCount; }
+    public void setTokenCount(Integer tokenCount) { this.tokenCount = tokenCount; }
+}

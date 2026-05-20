@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Coach</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>English Coach</h1>
+            <div class="token-bar-container">
+                <div class="token-bar-label">Token</div>
+                <div class="token-bar">
+                    <div class="token-bar-fill" id="tokenBar"></div>
+                </div>
+                <div class="token-bar-pct" id="tokenPct">0%</div>
+            </div>
+            <div class="scenario-info" id="scenarioInfo"></div>
+        </header>
+
+        <main>
+            <div id="chatArea" class="chat-area">
+                <div id="earlierMarker" class="earlier-marker hidden">
+                    <button id="showEarlierBtn">Show earlier messages</button>
+                </div>
+                <div id="messages"></div>
+            </div>
+
+            <div id="statusBar" class="status-bar">
+                <span id="statusIndicator">Disconnected</span>
+            </div>
+
+            <div id="textInputBar" class="text-input-bar hidden">
+                <input id="textInput" type="text" placeholder="Type or use 🎤 on keyboard..." autocomplete="off" enterkeyhint="send">
+                <button id="sendTextBtn" class="btn btn-send">Send</button>
+            </div>
+        </main>
+
+        <footer>
+            <div class="controls">
+                <select id="scenarioSelect">
+                    <option value="WORKPLACE_STANDUP">Standup Meeting</option>
+                    <option value="WORKPLACE_ONE_ON_ONE">1-on-1 Meeting</option>
+                </select>
+                <select id="personaSelect">
+                    <option value="TEAM_COLLEAGUE">Team Colleague</option>
+                    <option value="MANAGER">Manager</option>
+                </select>
+                <button id="startBtn" class="btn btn-primary">Start Session</button>
+                <button id="endBtn" class="btn btn-danger" disabled>End &amp; Report</button>
+            </div>
+        </footer>
+    </div>
+
+    <div id="reportModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Session Report</h2>
+            <div id="reportContent"></div>
+            <div class="modal-actions">
+                <button id="newSessionBtn" class="btn btn-primary">Start New Session</button>
+                <button id="closeReportBtn" class="btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="debugPanel" class="debug-panel">
+        <div class="debug-header">
+            <button id="debugToggle">Log</button>
+            <button id="debugClear">Clear</button>
+        </div>
+        <div id="debugLog" class="debug-log"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
