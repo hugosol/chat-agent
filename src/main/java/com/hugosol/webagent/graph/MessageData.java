@@ -1,22 +1,29 @@
 package com.hugosol.webagent.graph;
 
+import com.hugosol.webagent.model.MessageRole;
+
 import java.io.Serializable;
 
 public class MessageData implements Serializable {
-    private String role;
+    private int messageId;
+    private MessageRole role;
     private String content;
     private long timestamp;
 
     public MessageData() {}
 
-    public MessageData(String role, String content) {
+    public MessageData(MessageRole role, String content, int messageId) {
         this.role = role;
         this.content = content;
+        this.messageId = messageId;
         this.timestamp = System.currentTimeMillis();
     }
 
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
+    public int getMessageId() { return messageId; }
+    public void setMessageId(int messageId) { this.messageId = messageId; }
+
+    public MessageRole getRole() { return role; }
+    public void setRole(MessageRole role) { this.role = role; }
 
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }

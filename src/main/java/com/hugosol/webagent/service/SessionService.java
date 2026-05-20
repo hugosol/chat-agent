@@ -19,17 +19,20 @@ public class SessionService {
 
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
+    private final SessionArchiver archiver;
     private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
     private final ErrorRecordRepository errorRecordRepository;
     private final SessionReportRepository sessionReportRepository;
     private final UserProgressRepository userProgressRepository;
 
-    public SessionService(SessionRepository sessionRepository,
+    public SessionService(SessionArchiver archiver,
+                          SessionRepository sessionRepository,
                           MessageRepository messageRepository,
                           ErrorRecordRepository errorRecordRepository,
                           SessionReportRepository sessionReportRepository,
                           UserProgressRepository userProgressRepository) {
+        this.archiver = archiver;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.errorRecordRepository = errorRecordRepository;
@@ -56,34 +59,14 @@ public class SessionService {
         session.complete();
         sessionRepository.save(session);
 
-        for (MessageData md : messages) {
-            MessageRole role = switch (md.getRole()) {
-                case "USER" -> MessageRole.USER;
-                case "AGENT" -> MessageRole.AGENT;
-                case "CORRECTION" -> MessageRole.CORRECTION;
-                default -> MessageRole.AGENT;
-            };
-            Message msg = new Message(sessionId, role, md.getContent());
-            messageRepository.save(msg);
+        List<Message> savedMessages = archiver.buildMessages(sessionId, messages);
+        messageRepository.saveAll(savedMessages);
 
-            if (role == MessageRole.USER) {
-                for (CorrectionData cd : corrections) {
-                    ErrorType type = parseErrorType(cd.getType());
-                    ErrorRecord er = new ErrorRecord(
-                            sessionId, msg.getId(), type,
-                            cd.getOriginal(), cd.getCorrected(), cd.getExplanation());
-                    errorRecordRepository.save(er);
-                }
-            }
-        }
+        List<ErrorRecord> errorRecords = archiver.buildErrorRecords(sessionId, corrections, savedMessages);
+        errorRecordRepository.saveAll(errorRecords);
 
-        SessionReport sessionReport = new SessionReport(sessionId);
-        sessionReport.setSummary(report.overallAssessment());
-        sessionReport.setErrorSummary(report.errorSummary());
-        sessionReport.setVocabularySuggestions(report.vocabularySuggestions());
-        sessionReport.setFluencyScore(report.fluencyScore());
-        sessionReport.setKeyTakeaway(report.keyTakeaway());
-        sessionReport = sessionReportRepository.save(sessionReport);
+        SessionReport sessionReport = archiver.buildReport(sessionId, report);
+        sessionReportRepository.save(sessionReport);
 
         updateUserProgress(session);
 
@@ -93,14 +76,6 @@ public class SessionService {
 
     public List<Session> getHistory() {
         return sessionRepository.findAllByOrderByStartTimeDesc();
-    }
-
-    private ErrorType parseErrorType(String type) {
-        try {
-            return ErrorType.valueOf(type.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return ErrorType.GRAMMAR;
-        }
     }
 
     private void updateUserProgress(Session session) {
