@@ -69,5 +69,5 @@ Prompts live in `src/main/resources/prompts/*.txt` and are loaded by `PromptLoad
 - **Token limit**: 128000 hardcoded in `CoachWebSocketHandler`. Warning at 80%.
 - **Error types**: 5 categories — GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY. The `CorrectionAgent` returns JSON parsed into `CorrectionData`.
 - **iOS quirks**: TTS requires user-gesture-triggered 🔊 button click (no autoplay). `SpeechSynthesis.onend` is unreliable on iOS — UI updates happen on `AGENT_RESPONSE` receipt instead.
-- **Session ID flow**: `SessionService` creates a UUID as `threadId`, `CoachWebSocketHandler` tracks `wsToSession` mapping, `GraphExecutionService` uses it as `RunnableConfig.threadId`.
+- **Session ID flow**: `SessionService` creates a Session (JPA generates a UUID `id`), `CoachWebSocketHandler` tracks `wsToSession` mapping, `GraphExecutionService` uses it as `RunnableConfig.threadId`. All three layers (H2, WebSocket, checkpoint) share the same ID.
 - **`CoachState extends AgentState`**: accessed via `this.<Type>value(KEY).orElse(default)` — type-safe accessors are in `CoachState.java`, always use them instead of raw `data()` map access.

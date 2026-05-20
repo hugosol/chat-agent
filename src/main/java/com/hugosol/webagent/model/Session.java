@@ -27,14 +27,11 @@ public class Session {
     @Column(nullable = false)
     private SessionStatus status;
 
-    private String threadId;
-
     public Session() {}
 
-    public Session(ScenarioType scenario, String persona, String threadId) {
+    public Session(ScenarioType scenario, String persona) {
         this.scenario = scenario;
         this.persona = persona;
-        this.threadId = threadId;
         this.startTime = LocalDateTime.now();
         this.status = SessionStatus.ACTIVE;
     }
@@ -61,7 +58,4 @@ public class Session {
 
     public SessionStatus getStatus() { return status; }
     public void setStatus(SessionStatus status) { this.status = status; }
-
-    public String getThreadId() { return threadId; }
-    public void setThreadId(String threadId) { this.threadId = threadId; }
 }

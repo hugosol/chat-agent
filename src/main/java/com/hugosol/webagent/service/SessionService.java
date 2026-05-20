@@ -39,8 +39,7 @@ public class SessionService {
 
     @Transactional
     public Session createSession(ScenarioType scenario, String persona) {
-        String threadId = java.util.UUID.randomUUID().toString();
-        Session session = new Session(scenario, persona, threadId);
+        Session session = new Session(scenario, persona);
         session = sessionRepository.save(session);
         log.info("SessionService: created session {} with scenario={}", session.getId(), scenario);
         return session;
