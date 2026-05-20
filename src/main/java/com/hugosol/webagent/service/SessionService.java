@@ -19,17 +19,20 @@ public class SessionService {
 
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
+    private final SessionArchiver archiver;
     private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
     private final ErrorRecordRepository errorRecordRepository;
     private final SessionReportRepository sessionReportRepository;
     private final UserProgressRepository userProgressRepository;
 
-    public SessionService(SessionRepository sessionRepository,
+    public SessionService(SessionArchiver archiver,
+                          SessionRepository sessionRepository,
                           MessageRepository messageRepository,
                           ErrorRecordRepository errorRecordRepository,
                           SessionReportRepository sessionReportRepository,
                           UserProgressRepository userProgressRepository) {
+        this.archiver = archiver;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.errorRecordRepository = errorRecordRepository;
@@ -56,28 +59,14 @@ public class SessionService {
         session.complete();
         sessionRepository.save(session);
 
-        for (MessageData md : messages) {
-            MessageRole role = md.getRole();
-            Message msg = new Message(sessionId, role, md.getContent());
-            messageRepository.save(msg);
+        List<Message> savedMessages = archiver.buildMessages(sessionId, messages);
+        messageRepository.saveAll(savedMessages);
 
-            if (role == MessageRole.USER) {
-                for (CorrectionData cd : corrections) {
-                    ErrorRecord er = new ErrorRecord(
-                            sessionId, msg.getId(), cd.getType(),
-                            cd.getOriginal(), cd.getCorrected(), cd.getExplanation());
-                    errorRecordRepository.save(er);
-                }
-            }
-        }
+        List<ErrorRecord> errorRecords = archiver.buildErrorRecords(sessionId, corrections, savedMessages);
+        errorRecordRepository.saveAll(errorRecords);
 
-        SessionReport sessionReport = new SessionReport(sessionId);
-        sessionReport.setSummary(report.overallAssessment());
-        sessionReport.setErrorSummary(report.errorSummary());
-        sessionReport.setVocabularySuggestions(report.vocabularySuggestions());
-        sessionReport.setFluencyScore(report.fluencyScore());
-        sessionReport.setKeyTakeaway(report.keyTakeaway());
-        sessionReport = sessionReportRepository.save(sessionReport);
+        SessionReport sessionReport = archiver.buildReport(sessionId, report);
+        sessionReportRepository.save(sessionReport);
 
         updateUserProgress(session);
 

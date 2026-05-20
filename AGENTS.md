@@ -60,7 +60,7 @@ com.hugosol.webagent/
 ├── websocket/       # CoachWebSocketHandler (WS entry), CoachMessageHandler (protocol logic)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionStateStore (state + tokens), TurnProcessor (parallel turns),
-│                    # ReportGenerator, SessionService (JPA), TokenTracker
+│                    # SessionArchiver (entity conversion), ReportGenerator, SessionService (JPA), TokenTracker
 ├── model/           # JPA entities + enums (ScenarioType, PersonaType, ErrorType, etc.)
 ├── repository/      # Spring Data JPA repos
 ├── config/          # LangChain4jConfig (2 beans), WebSocketConfig, PromptLoader

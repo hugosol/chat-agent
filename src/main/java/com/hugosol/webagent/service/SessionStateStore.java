@@ -67,11 +67,11 @@ public class SessionStateStore {
         return activeStates.get(sessionId);
     }
 
-    public void addMessage(String sessionId, MessageRole role, String content) {
+    public void addMessage(String sessionId, MessageRole role, String content, int messageId) {
         CoachState state = activeStates.get(sessionId);
         if (state != null) {
             synchronized (state) {
-                state.messages().add(new MessageData(role, content));
+                state.messages().add(new MessageData(role, content, messageId));
             }
         }
     }

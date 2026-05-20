@@ -422,7 +422,7 @@ web-agent/
 │   │   ├── CoachState.java                 // AgentState 定义 + Schema (7 channels)
 │   │   ├── CoachGraphBuilder.java          // StateGraph 构建 + compile (1节点线性图)
 │   │   ├── CorrectionData.java             // 纠错数据结构 (type 为 ErrorType 枚举, Serializable)
-│   │   ├── MessageData.java                // 消息数据结构 (role 为 MessageRole 枚举, Serializable)
+│   │   ├── MessageData.java                // 消息数据结构 (role + content + messageId，Serializable)
 │   │   └── nodes/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
@@ -465,8 +465,9 @@ web-agent/
 │   ├── service/                            // 业务服务
 │   │   ├── SessionStateStore.java           // State 生命周期 + TokenTracker 封装 + 所有 state 读写
 │   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图)
+│   │   ├── SessionArchiver.java            // 运行时数据 → JPA 实体转换（纯计算，按 messageId 精确关联纠错）
 │   │   ├── ReportGenerator.java            // 报告生成透传
-│   │   ├── SessionService.java             // 会话生命周期 + H2 持久化
+│   │   ├── SessionService.java             // 会话生命周期 + H2 持久化编排
 │   │   └── TokenTracker.java               // 按 AgentType 分计 token
 │   │
 │   └── config/                             // 配置类
@@ -527,6 +528,8 @@ web-agent/
 | Scenario/Persona 描述 | switch 硬编码 + 裸枚举名传入 prompt | `ScenarioType`/`PersonaType` 枚举字段 + enum 访问器 | 自然语言描述、方便扩展、入口校验 |
 | Prompt 占位符 | `{scenario_role}` 填入枚举名 | `{persona_role}` 填入 `PersonaType.getRoleDescription()` | 修正语义混淆，LLM 看到自然语言 |
 | LISTENING 状态 | session 启动后发送 STATE_UPDATE "LISTENING" | 移除，showTextInput() 设置 "Type your message" | 与键盘语音输入模式不匹配 |
+| 归档逻辑 | 双层循环全量绑定（Auto→所有 USER Message） | `SessionArchiver` 按 `messageId` 精确关联 + `MessageData` 携带 `messageId` | 修复 ErrorRecord 重复绑定 bug；实体转换抽成纯计算模块，可脱离 DB 测试 |
+| Speech 接口 | V1 预留接口 `SpeechToTextService` / `TextToSpeechService` | 删除（零实现者，V2 再按需定义） | 空壳接口不产生 leverage，徒增探索成本 |
 
 ### 实现阶段
 
@@ -540,6 +543,7 @@ web-agent/
 | **6. WebSocket** | CoachWebSocketHandler + CoachMessageHandler + ProtocolDispatcher + 协议类型 + WebSocketConfig + LangChain4jConfig | JSON 消息路由、前后端通讯 |
 | **7. 前端 V1** | 文本输入栏 + Send 按钮 + TTS 🔊 按钮 + Token 进度条 + Debug 面板 | 可用 UI |
 | **8. 移动端适配** | iOS Safari 兼容：🔊 按钮手势触发 TTS、输入框键盘原生听写、Debug 面板 | iPhone 13 可用 |
-| **9. 端到端验证** | `mvn compile` BUILD SUCCESS（41 个源文件） | 编译通过 |
+| **9. 端到端验证** | `mvn compile` BUILD SUCCESS（40 个源文件） | 编译通过 |
 | **10. Correction UX 优化** | 侧边栏绝对定位浮层 + 默认隐藏 + header toggle；correction 气泡分行编号；Safe-area CSS；移除 LISTENING 状态 | 移动端体验提升 |
 | **11. Scenario/Persona 枚举重构** | `ScenarioType` + `PersonaType` 加描述字段；`ConversationAgent` 用 enum 访问器；`CoachWebSocketHandler` persona 入口校验；prompt 占位符修正 | 自然语言 prompt、可扩展、类型安全 |
+| **12. 归档深化** | `MessageData` 加 `messageId` 字段；`SessionArchiver` 纯计算模块提取；删除 `speech/` 空壳接口 | 修复 ErrorRecord 重复绑定；实体转换可脱离 DB 测试；消除无 leverage 模块 |
