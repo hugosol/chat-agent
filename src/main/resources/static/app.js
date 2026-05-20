@@ -246,7 +246,7 @@
     function createMessageElement(role, content, msgId, isStreaming) {
         var div = document.createElement('div');
         div.className = 'message ' + role.toLowerCase();
-        if (msgId != null && role === 'You') div.setAttribute('data-message-id', msgId);
+        if (msgId != null && role === 'User') div.setAttribute('data-message-id', msgId);
         if (msgId != null && role === 'Agent') div.setAttribute('data-message-id', msgId);
         var html = '<span class="role">' + role + ':</span> ';
         html += '<span class="content-text">' + escapeHtml(content) + '</span>';
@@ -328,7 +328,7 @@
         var msgId = turnCounter;
         debugLog('sendTextInput msgId=' + msgId + ' "' + text.slice(0, 60) + '"');
 
-        var userBubble = createMessageElement('You', text, msgId, false);
+        var userBubble = createMessageElement('User', text, msgId, false);
         els.messages.appendChild(userBubble);
         messageCount++;
 
