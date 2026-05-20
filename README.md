@@ -135,9 +135,7 @@ web-agent/
 │   │   ├── ServerMessage.java
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
-│   ├── speech/
-│   │   ├── SpeechToTextService.java
-│   │   └── TextToSpeechService.java
+│   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
 │   ├── model/          (JPA entities + enums: ScenarioType, PersonaType, ErrorType...)
 │   ├── repository/     (Spring Data JPA)
 │   ├── service/        (SessionStateStore, TurnProcessor, ReportGenerator, SessionService, TokenTracker)

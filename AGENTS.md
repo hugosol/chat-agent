@@ -64,7 +64,7 @@ com.hugosol.webagent/
 ├── model/           # JPA entities + enums (ScenarioType, PersonaType, ErrorType, etc.)
 ├── repository/      # Spring Data JPA repos
 ├── config/          # LangChain4jConfig (2 beans), WebSocketConfig, PromptLoader
-└── speech/          # STT/TTS interfaces (V1 stubs, V2 will implement Whisper)
+└── speech/          # (vacant — V2 will add STT/TTS adapters when needed)
 ```
 
 ## WebSocket Protocol

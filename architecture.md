@@ -441,9 +441,7 @@ web-agent/
 │   │   ├── MessageHandler.java             // 接口: 5 个 handler 方法
 │   │   └── ProtocolDispatcher.java         // JSON 解析/序列化 + 消息分发 + synchronized send()
 │   │
-│   ├── speech/                             // STT/TTS 接口层（V1 仅接口，V2 实现 Whisper）
-│   │   ├── SpeechToTextService.java        // 接口
-│   │   └── TextToSpeechService.java        // 接口
+│   ├── speech/                             // STT/TTS（预留，V2 按实际需求定义接口）
 │   │
 │   ├── model/                              // JPA Entity
 │   │   ├── Session.java
