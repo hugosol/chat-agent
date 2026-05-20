@@ -2,7 +2,8 @@ package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.graph.MessageData;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -13,15 +14,16 @@ import java.util.List;
 public class ConversationAgent {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationAgent.class);
-    private final ChatLanguageModel chatModel;
+    private final StreamingChatLanguageModel chatModel;
     private final String promptTemplate;
 
-    public ConversationAgent(ChatLanguageModel chatModel, PromptLoader promptLoader) {
+    public ConversationAgent(StreamingChatLanguageModel chatModel, PromptLoader promptLoader) {
         this.chatModel = chatModel;
         this.promptTemplate = promptLoader.load("conversation.txt");
     }
 
-    public String generate(String userInput, List<MessageData> history, String scenario, String persona) {
+    public void generateStream(String userInput, List<MessageData> history, String scenario, String persona,
+                                StreamingChatResponseHandler handler) {
         String personaDesc = buildPersonaDescription(persona);
         String historyText = buildHistoryText(history);
 
@@ -33,9 +35,7 @@ public class ConversationAgent {
                 .replace("{userInput}", userInput);
 
         log.debug("ConversationAgent prompt length: {}", prompt.length());
-        String response = chatModel.chat(prompt);
-        log.debug("ConversationAgent response length: {}", response.length());
-        return response;
+        chatModel.chat(prompt, handler);
     }
 
     private String buildPersonaDescription(String persona) {

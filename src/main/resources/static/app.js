@@ -7,8 +7,9 @@
     var ws = null;
     var sessionId = null;
     var synth = window.speechSynthesis;
-    var isMuted = false;
     var messageCount = 0;
+    var turnCounter = 0;
+    var streamBubbles = {};
 
     var els = {
         tokenBar:        document.getElementById('tokenBar'),
@@ -34,6 +35,9 @@
         debugLog:        document.getElementById('debugLog'),
         debugToggle:     document.getElementById('debugToggle'),
         debugClear:      document.getElementById('debugClear'),
+        correctionSidebar:      document.getElementById('correctionSidebar'),
+        correctionSidebarContent: document.getElementById('correctionSidebarContent'),
+        correctionSidebarToggle:  document.getElementById('correctionSidebarToggle'),
     };
 
     function debugLog(msg) {
@@ -55,6 +59,11 @@
         ws.onopen = function () {
             debugLog('ws.onopen');
             setStatus('Connected', 'connected');
+            var savedSessionId = localStorage.getItem('sessionId');
+            if (savedSessionId) {
+                debugLog('resuming session: ' + savedSessionId);
+                ws.send(JSON.stringify({ type: 'RESUME_SESSION', sessionId: savedSessionId }));
+            }
         };
         ws.onclose = function () {
             debugLog('ws.onclose');
@@ -76,16 +85,37 @@
             case 'SESSION_STARTED':
                 debugLog('SESSION_STARTED id=' + msg.sessionId + ' scenario=' + msg.scenario);
                 sessionId = msg.sessionId;
+                localStorage.setItem('sessionId', msg.sessionId);
                 els.scenarioInfo.textContent = msg.scenario + ' | ' + msg.persona;
                 els.startBtn.disabled = true;
                 els.endBtn.disabled = false;
                 els.scenarioSelect.disabled = true;
                 els.personaSelect.disabled = true;
                 messageCount = 0;
+                turnCounter = 0;
+                streamBubbles = {};
                 els.messages.innerHTML = '';
+                els.correctionSidebarContent.innerHTML = '<div class="correction-sidebar-empty">No corrections yet.</div>';
                 els.earlierMarker.classList.add('hidden');
                 els.reportModal.classList.add('hidden');
                 showTextInput();
+                break;
+
+            case 'AGENT_STREAM_DELTA':
+                handleStreamDelta(msg.messageId, msg.delta);
+                break;
+
+            case 'AGENT_STREAM_END':
+                handleStreamEnd(msg.messageId, msg.text, msg.tokenUsage);
+                break;
+
+            case 'CORRECTION_RESULT':
+                handleCorrectionResult(msg.messageId, msg.corrections);
+                break;
+
+            case 'TOKEN_WARNING':
+                debugLog('TOKEN_WARNING usage=' + msg.usage);
+                setStatus('Warning: ' + msg.message, 'warning');
                 break;
 
             case 'STATE_UPDATE':
@@ -94,23 +124,8 @@
                 updateTokenBar(msg.tokenUsage);
                 break;
 
-            case 'AGENT_RESPONSE':
-                debugLog('AGENT_RESPONSE text=' + (msg.conversationText || '').slice(0, 60) + ' corrections=' + ((msg.corrections && msg.corrections.length) || 0));
-                addMessage('Agent', msg.conversationText, msg.conversationText);
-                if (msg.corrections && msg.corrections.length > 0) {
-                    var corrText = msg.corrections.map(function (c) {
-                        return c.type + ': "' + c.original + '" \u2192 "' + c.corrected + '"';
-                    }).join('\n');
-                    addMessage('Correction', corrText);
-                }
-                updateTokenBar(msg.tokenUsage);
-                try { speakText(msg.conversationText); } catch (e) { debugLog('TTS error: ' + e); }
-                showTextInput();
-                break;
-
-            case 'TOKEN_WARNING':
-                debugLog('TOKEN_WARNING usage=' + msg.usage);
-                setStatus('Warning: ' + msg.message, 'warning');
+            case 'SESSION_RESUMED':
+                handleSessionResumed(msg);
                 break;
 
             case 'SESSION_REPORT':
@@ -126,6 +141,156 @@
                 setStatus('Error: ' + msg.message, 'error');
                 break;
         }
+    }
+
+    function handleStreamDelta(msgId, delta) {
+        var bubble = streamBubbles[msgId];
+        if (!bubble) {
+            bubble = createMessageElement('Agent', '', msgId, true);
+            els.messages.appendChild(bubble);
+            streamBubbles[msgId] = bubble;
+            messageCount++;
+        }
+        var contentEl = bubble.querySelector('.content-text');
+        contentEl.textContent += delta;
+        els.chatArea.scrollTop = els.chatArea.scrollHeight;
+    }
+
+    function handleStreamEnd(msgId, fullText, tokenUsage) {
+        var bubble = streamBubbles[msgId];
+        if (bubble) {
+            var contentEl = bubble.querySelector('.content-text');
+            contentEl.textContent = fullText;
+            addPlayButton(bubble, fullText);
+            delete streamBubbles[msgId];
+            handleCollapse();
+        }
+        updateTokenBar(tokenUsage);
+        try { speakText(fullText); } catch (e) { debugLog('TTS error: ' + e); }
+        showTextInput();
+    }
+
+    function handleCorrectionResult(msgId, corrections) {
+        if (!corrections || corrections.length === 0) return;
+
+        var userBubble = els.messages.querySelector('[data-message-id="' + msgId + '"].user');
+        if (!userBubble) {
+            debugLog('correction: no user bubble for msgId=' + msgId);
+            return;
+        }
+
+        var summary = corrections.map(function (c) {
+            return c.original + ' \u2192 ' + c.corrected;
+        }).join('  |  ');
+
+        var corrBubble = createCorrectionBubble(summary, msgId);
+        userBubble.insertAdjacentElement('afterend', corrBubble);
+        messageCount++;
+
+        for (var i = 0; i < corrections.length; i++) {
+            addCorrectionSidebarItem(corrections[i]);
+        }
+
+        handleCollapse();
+        els.chatArea.scrollTop = els.chatArea.scrollHeight;
+    }
+
+    function handleSessionResumed(msg) {
+        debugLog('SESSION_RESUMED sessionId=' + msg.sessionId);
+        sessionId = msg.sessionId;
+        localStorage.setItem('sessionId', msg.sessionId);
+        els.scenarioInfo.textContent = msg.scenario + ' | ' + msg.persona;
+        els.startBtn.disabled = true;
+        els.endBtn.disabled = false;
+        els.scenarioSelect.disabled = true;
+        els.personaSelect.disabled = true;
+        messageCount = 0;
+        streamBubbles = {};
+        els.messages.innerHTML = '';
+        els.correctionSidebarContent.innerHTML = '';
+        els.earlierMarker.classList.add('hidden');
+        els.reportModal.classList.add('hidden');
+
+        turnCounter = 0;
+        if (msg.messages && msg.messages.length > 0) {
+            for (var i = 0; i < msg.messages.length; i++) {
+                var m = msg.messages[i];
+                if (m.role === 'USER') turnCounter++;
+                rebuildMessage(m.role, m.content);
+            }
+        }
+
+        if (msg.corrections && msg.corrections.length > 0) {
+            for (var j = 0; j < msg.corrections.length; j++) {
+                addCorrectionSidebarItem(msg.corrections[j]);
+            }
+        }
+
+        updateTokenBar(msg.tokenUsage);
+        showTextInput();
+    }
+
+    function rebuildMessage(role, content) {
+        var div = createMessageElement(role, content, null, false);
+        if (role === 'Agent') {
+            addPlayButton(div, content);
+        }
+        els.messages.appendChild(div);
+        messageCount++;
+    }
+
+    function createMessageElement(role, content, msgId, isStreaming) {
+        var div = document.createElement('div');
+        div.className = 'message ' + role.toLowerCase();
+        if (msgId != null && role === 'You') div.setAttribute('data-message-id', msgId);
+        if (msgId != null && role === 'Agent') div.setAttribute('data-message-id', msgId);
+        var html = '<span class="role">' + role + ':</span> ';
+        html += '<span class="content-text">' + escapeHtml(content) + '</span>';
+        if (isStreaming) {
+            html += '<span class="stream-cursor">|</span>';
+        }
+        div.innerHTML = html;
+        return div;
+    }
+
+    function createCorrectionBubble(summary, msgId) {
+        var div = document.createElement('div');
+        div.className = 'message correction-bubble';
+        div.setAttribute('data-message-id', msgId);
+        div.innerHTML = '<span class="role">Correction:</span> <span class="content-text">' + escapeHtml(summary) + '</span>';
+        return div;
+    }
+
+    function addPlayButton(bubble, ttsText) {
+        var cursor = bubble.querySelector('.stream-cursor');
+        if (cursor) cursor.remove();
+        var btn = document.createElement('button');
+        btn.className = 'btn-play';
+        btn.title = 'Read aloud';
+        btn.textContent = '🔊';
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            debugLog('BTN play TTS');
+            speakText(ttsText);
+        });
+        bubble.appendChild(btn);
+    }
+
+    function addCorrectionSidebarItem(c) {
+        var empty = els.correctionSidebarContent.querySelector('.correction-sidebar-empty');
+        if (empty) empty.remove();
+
+        var item = document.createElement('div');
+        item.className = 'correction-item';
+        item.innerHTML =
+            '<div class="correction-type">' + escapeHtml(c.type) + '</div>' +
+            '<div class="correction-detail">' +
+                '<span class="correction-original">' + escapeHtml(c.original) + '</span>' +
+                '<span class="correction-arrow">\u2192</span>' +
+                '<span class="correction-corrected">' + escapeHtml(c.corrected) + '</span>' +
+            '</div>' +
+            '<div class="correction-explanation">' + escapeHtml(c.explanation || '') + '</div>';
+        els.correctionSidebarContent.appendChild(item);
     }
 
     function showTextInput() {
@@ -144,18 +309,24 @@
     function sendTextInput() {
         var text = els.textInput.value.trim();
         if (!text || !sessionId) return;
-        debugLog('sendTextInput: "' + text.slice(0, 60) + '"');
-        addMessage('You', text);
-        ws.send(JSON.stringify({ type: 'USER_INPUT', text: text }));
+        turnCounter++;
+        var msgId = turnCounter;
+        debugLog('sendTextInput msgId=' + msgId + ' "' + text.slice(0, 60) + '"');
+
+        var userBubble = createMessageElement('You', text, msgId, false);
+        els.messages.appendChild(userBubble);
+        messageCount++;
+
+        ws.send(JSON.stringify({ type: 'USER_INPUT', text: text, messageId: msgId }));
         els.textInput.value = '';
         els.textInput.disabled = true;
         els.sendTextBtn.disabled = true;
         els.textInput.placeholder = 'Waiting for reply...';
         setStatus('Processing...', 'processing');
+        els.chatArea.scrollTop = els.chatArea.scrollHeight;
     }
 
     function speakText(text) {
-        if (isMuted) return;
         synth.cancel();
         var utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
@@ -163,25 +334,7 @@
         synth.speak(utterance);
     }
 
-    function addMessage(role, content, ttsText) {
-        messageCount++;
-        var div = document.createElement('div');
-        div.className = 'message ' + role.toLowerCase();
-        var html = '<span class="role">' + role + ':</span> ' + escapeHtml(content);
-        if (role === 'Agent' && ttsText) {
-            html += ' <button class="btn-play" title="Read aloud">🔊</button>';
-        }
-        div.innerHTML = html;
-        if (role === 'Agent' && ttsText) {
-            var btn = div.querySelector('.btn-play');
-            btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                debugLog('BTN play TTS');
-                speakText(ttsText);
-            });
-        }
-        els.messages.appendChild(div);
-
+    function handleCollapse() {
         if (messageCount > MAX_VISIBLE_MSGS) {
             els.earlierMarker.classList.remove('hidden');
             var children = els.messages.children;
@@ -189,11 +342,10 @@
                 children[i].classList.add('collapsed');
             }
         }
-
-        els.chatArea.scrollTop = els.chatArea.scrollHeight;
     }
 
     function updateTokenBar(usage) {
+        if (usage == null) return;
         var pct = Math.min(100, Math.round(usage * 100));
         els.tokenBar.style.width = pct + '%';
         els.tokenPct.textContent = pct + '%';
@@ -228,6 +380,8 @@
         els.tokenPct.textContent = '0%';
         els.textInputBar.classList.add('hidden');
         els.textInput.value = '';
+        els.textInput.placeholder = 'Type or use 🎤 on keyboard...';
+        streamBubbles = {};
         synth.cancel();
     }
 
@@ -295,8 +449,10 @@
     els.newSessionBtn.addEventListener('click', function () {
         els.reportModal.classList.add('hidden');
         els.messages.innerHTML = '';
+        els.correctionSidebarContent.innerHTML = '<div class="correction-sidebar-empty">No corrections yet.</div>';
         els.earlierMarker.classList.add('hidden');
         messageCount = 0;
+        streamBubbles = {};
         sendStart();
     });
 
@@ -311,6 +467,10 @@
 
     els.debugClear.addEventListener('click', function () {
         els.debugLog.innerHTML = '';
+    });
+
+    els.correctionSidebarToggle.addEventListener('click', function () {
+        els.correctionSidebar.classList.toggle('collapsed');
     });
 
     connect();
