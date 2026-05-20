@@ -4,11 +4,13 @@ import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.CorrectionData;
 import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.model.AgentType;
 import com.hugosol.webagent.model.PersonaType;
 import com.hugosol.webagent.model.ScenarioType;
 import com.hugosol.webagent.model.Session;
 import com.hugosol.webagent.service.GraphExecutionService;
 import com.hugosol.webagent.service.SessionService;
+import com.hugosol.webagent.service.TokenTracker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,19 +30,20 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CoachWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(CoachWebSocketHandler.class);
-    private static final int TOKEN_LIMIT = 128000;
-    private static final double WARN_RATIO = 0.8;
 
     private final GraphExecutionService graphService;
     private final SessionService sessionService;
+    private final TokenTracker tokenTracker;
     private final ObjectMapper objectMapper;
     private final Map<String, String> wsToSession = new ConcurrentHashMap<>();
 
     public CoachWebSocketHandler(GraphExecutionService graphService,
                                   SessionService sessionService,
+                                  TokenTracker tokenTracker,
                                   ObjectMapper objectMapper) {
         this.graphService = graphService;
         this.sessionService = sessionService;
+        this.tokenTracker = tokenTracker;
         this.objectMapper = objectMapper;
     }
 
@@ -124,7 +127,7 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
 
         int messageId = msg.get("messageId") instanceof Number n ? n.intValue() : 0;
 
-        sendStateUpdate(wsSession, "PROCESSING", tokenUsage(sessionId));
+        sendStateUpdate(wsSession, "PROCESSING", tokenTracker.getUsageRatio(sessionId, AgentType.CONVERSATION));
 
         graphService.processTurn(sessionId, userInput, messageId, new GraphExecutionService.TurnCallback() {
             @Override
@@ -138,7 +141,7 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
 
             @Override
             public void onConversationComplete(String fullText, int msgId, int tokenCount) {
-                double usage = tokenUsage(sessionId);
+                double usage = tokenTracker.getUsageRatio(sessionId, AgentType.CONVERSATION);
                 sendSynced(wsSession, Map.of(
                         "type", "AGENT_STREAM_END",
                         "text", fullText,
@@ -147,7 +150,7 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
                 ));
                 sendStateSynced(wsSession, "SPEAKING", usage);
 
-                if (usage >= WARN_RATIO) {
+                if (tokenTracker.isWarning(sessionId, AgentType.CONVERSATION)) {
                     sendSynced(wsSession, Map.of(
                             "type", "TOKEN_WARNING",
                             "usage", usage,
@@ -184,7 +187,7 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        sendStateUpdate(wsSession, "PROCESSING", tokenUsage(sessionId));
+        sendStateUpdate(wsSession, "PROCESSING", tokenTracker.getUsageRatio(sessionId, AgentType.CONVERSATION));
 
         try {
             CoachState state = graphService.getSessionState(sessionId);
@@ -227,7 +230,7 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
         }
 
         wsToSession.put(wsSession.getId(), sessionId);
-        double usage = tokenUsage(sessionId);
+        double usage = tokenTracker.getUsageRatio(sessionId, AgentType.CONVERSATION);
 
         sendMessage(wsSession, Map.of(
                 "type", "SESSION_RESUMED",
@@ -298,10 +301,5 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
                 "type", "ERROR",
                 "message", errorMessage
         ));
-    }
-
-    private double tokenUsage(String sessionId) {
-        int tokens = graphService.getTokenCount(sessionId);
-        return (double) tokens / TOKEN_LIMIT;
     }
 }
