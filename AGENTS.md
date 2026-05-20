@@ -29,7 +29,7 @@ mvn spring-boot:run
 - **MemorySaver checkpoints**: survive page refresh, **lost on server restart**. No persistence until session ends.
 - **Session resume**: WS disconnect no longer destroys `activeStates`. Frontend stores `sessionId` in `localStorage` and sends `RESUME_SESSION` on reconnect.
 - **Frontend**: vanilla HTML/JS/CSS in `src/main/resources/static/`. No npm, no webpack, no build tools. Correction sidebar toggled via `×` button.
-- **Correction display**: summary bubble (`original → corrected`) inserted after user message in chat flow; detailed items in sidebar (type + explanation).
+- **Correction display**: numbered summary bubble (`1. original → corrected` / `2. ...`) inserted after user message in chat flow; detailed items in sidebar (type + explanation). Sidebar is an absolute overlay (no longer squeezes chat) and starts collapsed. Header "Corrections N" button toggles visibility.
 - **WebSocket endpoint**: `/ws/coach` — JSON protocol.
 - **Architecture document**: `architecture.md` is the design blueprint + decision log. Read before structural changes; **do not edit casually**.
 
@@ -59,7 +59,7 @@ com.hugosol.webagent/
 ├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent
 ├── websocket/       # CoachWebSocketHandler (WS + JSON router + resume logic)
 ├── service/         # GraphExecutionService (parallel orchestration), SessionService (JPA)
-├── model/           # JPA entities + enums
+├── model/           # JPA entities + enums (ScenarioType, PersonaType, ErrorType, etc.)
 ├── repository/      # Spring Data JPA repos
 ├── config/          # LangChain4jConfig (2 beans), WebSocketConfig, PromptLoader
 └── speech/          # STT/TTS interfaces (V1 stubs, V2 will implement Whisper)
@@ -91,8 +91,9 @@ Server → Client:
 - **No tests.** `mvn test` runs nothing. Use `mvn compile` for verification.
 - **Token limit**: 128000 hardcoded in `CoachWebSocketHandler`. Warning at 80%. Uses actual token count from `ChatResponse.tokenUsage().totalTokenCount()` (not estimated).
 - **Error types**: 5 categories — GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY.
-- **iOS quirks**: TTS requires user-gesture-triggered 🔊 button click (no autoplay).
+- **iOS quirks**: TTS requires user-gesture-triggered 🔊 button click (no autoplay). Safe-area CSS (`env(safe-area-inset-top)`) for notch/status-bar spacing on Safari.
+- **Null guard**: `GraphExecutionService.onCompleteResponse` checks `response != null` before accessing `tokenUsage()` — LangChain4j may callback with null on network errors.
 - **Session ID flow**: `SessionService` creates a Session (JPA generates a UUID `id`), `CoachWebSocketHandler` tracks `wsToSession` mapping, `GraphExecutionService` uses it as `RunnableConfig.threadId`. All three layers (H2, WebSocket, checkpoint) share the same ID.
-- **`CoachState extends AgentState`**: accessed via `this.<Type>value(KEY).orElse(default)` — type-safe accessors are in `CoachState.java`, always use them instead of raw `data()` map access.
+- **Scenario & Persona enums**: `ScenarioType` and `PersonaType` carry `displayName` + `description`/`roleDescription`/`fullDescription` fields. `ConversationAgent` resolves prompt placeholders via enum accessors (no hardcoded switch). Persona is validated at WebSocket entry via `PersonaType.valueOf()`.
 - **Streaming WebSocket sends**: always use `synchronized(wsSession)` when sending from async threads (callback context). `sendSynced()` helper wraps IOException.
 - **Session resume**: disconnect only removes `wsToSession` mapping, never calls `removeSession()`. State stays in `activeStates` until explicit `END_SESSION`.

@@ -182,14 +182,23 @@ practice workplace English. Your persona: {persona_description}
 Rules:
 - Engage in natural, flowing conversation in English.
 - Match your language level to the user's (intermediate).
-- Stay in character as a {scenario_role}.
-- Keep responses under 3 sentences for natural spoken flow.
-- Do NOT explicitly correct errors yet — just model correct English naturally.
+- Stay in character as {persona_role}.
+- Keep responses concise and natural for spoken conversation (2-4 sentences).
+- Do NOT explicitly list or number errors. Instead, model correct English naturally.
+- If the user makes a significant error, rephrase their meaning correctly within your response.
+- Be encouraging and supportive.
 
 Current scenario: {scenario}
-Conversation history: {history}
+Recent conversation history: {history}
 User just said: "{userInput}"
+
+Respond naturally as your persona. Do not use markdown or special formatting.
 ```
+
+> `{persona_description}` = `PersonaType.getFullDescription()` (e.g. "You are a friendly teammate...")  
+> `{persona_role}` = `PersonaType.getRoleDescription()` (e.g. "a team colleague")  
+> `{scenario}` = `ScenarioType.getDescription()` (e.g. "a daily standup meeting...")  
+> Placeholder values come from enum fields, not raw enum names. No hardcoded switch statements.
 
 ### 2. CorrectionAgent (`prompts/correction.txt`)
 
@@ -268,6 +277,8 @@ Errors: {allCorrections}
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
 Enum: SessionStatus { ACTIVE, COMPLETED }
+Enum: ScenarioType { WORKPLACE_STANDUP("Standup Meeting", "a daily standup meeting..."), WORKPLACE_ONE_ON_ONE(...) }
+Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You are a friendly teammate..."), MANAGER(...) }
 ```
 
 ---
@@ -340,29 +351,29 @@ AgentState 释放，checkpoint 清除
 ## 九、前端 UI 布局（实现版本）
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  English Coach                        [Token: ████░]│ ← 顶部栏 (场景+token用量)
-│─────────────────────────────────────────────────────│
-│  ┌───────────────────────────────────────────────┐  │
-│  │                                               │  │
-│  │   [Conversation scroll area]                  │  │
-│  │   Agent: Good morning! How was your weekend?🔊│  │ ← Agent 消息 + 🔊 播放按钮
-│  │   You: I went to park with my family.         │  │ ← 用户消息 (右对齐)
-│  │   Agent: Sounds lovely! ...               🔊  │  │
-│  │   ─── [Show earlier messages] ───             │  │ ← 折叠旧消息
-│  │                                               │  │
-│  └───────────────────────────────────────────────┘  │
-│─────────────────────────────────────────────────────│
-│  Status: Type your message                          │ ← 状态栏
-│─────────────────────────────────────────────────────│
-│  [Type or use 🎤 on keyboard...              ] [Send]│ ← 文本输入栏
-│─────────────────────────────────────────────────────│
-│  [Start Session] [End & Report]                      │ ← 控制按钮栏
-├─────────────────────────────────────────────────────┤
-│  [Log] [Clear]                                       │ ← Debug 面板（折叠式）
-│  [12:03:01] connect()                                │
-│  [12:03:02] ws.onopen                                │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  English Coach    [Token: ████░]              [Corrections 3]        │ ← 顶部栏 (场景+tokens+correction按钮)
+│──────────────────────────────────────────────────────────────────────│
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │                                                                │  │
+│  │   [Conversation scroll area]                         ┌───────┐ │  │ ← correction sidebar
+│  │   Agent: Good morning! How was your weekend?🔊       │ Corre-│ │ │    绝对定位浮层
+│  │   You: I went to park with my family.                │ ctions│ │ │    不挤压对话区
+│  │   Correction: 1. went to park → went to the park     │ ───── │ │ │
+│  │                2. ...                                │ 1.GRAM│ │ │
+│  │   Agent: Sounds lovely! ...               🔊        │  ...  │ │ │
+│  │   ─── [Show earlier messages] ───                    │ 2.CHIN│ │ │
+│  │                                                      │  ...  │ │ │
+│  └──────────────────────────────────────────────────────└───────┘ │ │
+│────────────────────────────────────────────────────────────────────│
+│  Status: Type your message                                         │
+│────────────────────────────────────────────────────────────────────│
+│  [Type or use 🎤 on keyboard...              ] [Send]              │
+│────────────────────────────────────────────────────────────────────│
+│  [Standup Meeting ▼] [Team Colleague ▼] [Start] [End & Report]    │
+├────────────────────────────────────────────────────────────────────┤
+│  [Log] [Clear]                                                     │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 关键交互细节
@@ -373,7 +384,10 @@ AgentState 释放，checkpoint 清除
 | TTS 播放 | 每条 Agent 消息右上角 🔊 按钮。**用户点击手势触发**（规避 iOS Safari 禁止无需用户手势的音频播放） |
 | Token 用量 | 顶部进度条，≥80% 红色警告 |
 | 旧消息 | 前 10 条可见，更早的折叠在 "Show earlier" 后 |
+| Correction 侧边栏 | 绝对定位浮层（不挤压对话区），默认隐藏。Header "Corrections N" 按钮/侧边栏 × 按钮双向 toggle |
+| Correction 聊天气泡 | 插入用户消息下方，多条时分行编号展示（`1. original → corrected`），`white-space: pre-line` |
 | Debug | 页面底部半透明面板，实时打印所有 WebSocket/状态/错误事件，可折叠/清空 |
+| Safe Area | `padding-top: env(safe-area-inset-top)` — iOS 刘海/状态栏留白 |
 
 ### 报告弹层（会话结束后弹出）
 
@@ -437,7 +451,8 @@ web-agent/
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED
-│   │   └── ScenarioType.java               // 枚举: WORKPLACE_STANDUP / WORKPLACE_ONE_ON_ONE
+│   │   ├── ScenarioType.java               // 枚举: WORKPLACE_STANDUP / WORKPLACE_ONE_ON_ONE (含 displayName + description)
+│   │   └── PersonaType.java                // 枚举: TEAM_COLLEAGUE / MANAGER (含 displayName + roleDescription + fullDescription)
 │   │
 │   ├── repository/                         // Spring Data JPA
 │   │   ├── SessionRepository.java
@@ -495,14 +510,18 @@ web-agent/
 | 偏差 | 原始设计 | 实现 | 原因 |
 |------|---------|------|------|
 | 图结构 | 8 节点循环图（含 HITL awaitInput） | 3 节点线性图（单轮处理） | 避免 langgraph4j 复杂中断机制；会话循环由 Service 层管理更可控 |
-| 语音输入 | Web Speech API（`SpeechRecognition`） | 文本输入框 + iOS 键盘听写 | iOS Safari/Chrome 均不支持 `SpeechRecognition` API（Apple 未实现 W3C 标准） |
+| 语音输入 | Web Speech API（`SpeechRecognition`） | 文本输入框 + iOS 键盘听写 | iOS Safari/Chrome 均不支持 `SpeechRecognition` API |
 | TTS 触发 | 收到回复后自动播放 | 🔊 按钮手动触发 | iOS Safari 禁止非用户手势触发的音频播放 |
-| TTS onend 恢复 | `utterance.onend` → `showTextInput()` | `showTextInput()` 在 `AGENT_RESPONSE` 收到后立即调用 | iOS `SpeechSynthesis.onend` 经常不触发 |
+| TTS onend 恢复 | `utterance.onend` → `showTextInput()` | `showTextInput()` 在 `AGENT_STREAM_END` 后调用 | iOS `SpeechSynthesis.onend` 经常不触发 |
 | 按住说话按钮 | `pointerdown` 启动 / `pointerup` 停止 | 移除 | 依赖已被移除的 `SpeechRecognition` |
 | Mute 按钮 | 存在 | 移除 | 语音输入已改为文本，无需静音麦克风 |
 | Channels API | `Channels.of()` | `Channels.base()` | langgraph4j 1.8.16 实际 API 是 `base(Supplier)` |
 | langgraph4j 集成层 | `langgraph4j-langchain4j` 依赖 | 直接使用 `langchain4j` + `langchain4j-open-ai` | 减少间接依赖，直接调用 `ChatLanguageModel` |
 | Debug 工具 | 无 | 内嵌 Debug 面板（页面底部半透明日志） | 移动端调试 console 不可见，需要屏幕日志 |
+| Correction 侧边栏 | 固定宽度 flex 挤压对话区 | 绝对定位浮层，默认隐藏，header 按钮 toggle | 移动端不挤压对话空间 |
+| Scenario/Persona 描述 | switch 硬编码 + 裸枚举名传入 prompt | `ScenarioType`/`PersonaType` 枚举字段 + enum 访问器 | 自然语言描述、方便扩展、入口校验 |
+| Prompt 占位符 | `{scenario_role}` 填入枚举名 | `{persona_role}` 填入 `PersonaType.getRoleDescription()` | 修正语义混淆，LLM 看到自然语言 |
+| LISTENING 状态 | session 启动后发送 STATE_UPDATE "LISTENING" | 移除，showTextInput() 设置 "Type your message" | 与键盘语音输入模式不匹配 |
 
 ### 实现阶段
 
@@ -517,3 +536,5 @@ web-agent/
 | **7. 前端 V1** | 文本输入栏 + Send 按钮 + TTS 🔊 按钮 + Token 进度条 + Debug 面板 | 可用 UI |
 | **8. 移动端适配** | iOS Safari 兼容：🔊 按钮手势触发 TTS、输入框键盘原生听写、Debug 面板 | iPhone 13 可用 |
 | **9. 端到端验证** | `mvn compile` BUILD SUCCESS（40 个源文件） | 编译通过 |
+| **10. Correction UX 优化** | 侧边栏绝对定位浮层 + 默认隐藏 + header toggle；correction 气泡分行编号；Safe-area CSS；移除 LISTENING 状态 | 移动端体验提升 |
+| **11. Scenario/Persona 枚举重构** | `ScenarioType` + `PersonaType` 加描述字段；`ConversationAgent` 用 enum 访问器；`CoachWebSocketHandler` persona 入口校验；prompt 占位符修正 | 自然语言 prompt、可扩展、类型安全 |
