@@ -192,6 +192,11 @@ main {
     color: #e94560;
 }
 
+.message.correction-bubble .content-text {
+    white-space: pre-line;
+    line-height: 1.6;
+}
+
 .stream-cursor {
     display: inline-block;
     width: 2px;

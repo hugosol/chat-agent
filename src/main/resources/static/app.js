@@ -182,9 +182,9 @@
             return;
         }
 
-        var summary = corrections.map(function (c) {
-            return c.original + ' \u2192 ' + c.corrected;
-        }).join('  |  ');
+        var summary = corrections.map(function (c, i) {
+            return (i + 1) + '. ' + c.original + ' \u2192 ' + c.corrected;
+        }).join('\n');
 
         var corrBubble = createCorrectionBubble(summary, msgId);
         userBubble.insertAdjacentElement('afterend', corrBubble);
@@ -492,8 +492,9 @@
     });
 
     els.correctionShowBtn.addEventListener('click', function () {
-        els.correctionSidebar.classList.remove('collapsed');
-        els.correctionShowBtn.classList.add('hidden');
+        els.correctionSidebar.classList.toggle('collapsed');
+        var collapsed = els.correctionSidebar.classList.contains('collapsed');
+        els.correctionShowBtn.classList.toggle('hidden', !collapsed);
     });
 
     connect();
