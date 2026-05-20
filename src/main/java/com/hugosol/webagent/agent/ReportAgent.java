@@ -3,6 +3,7 @@ package com.hugosol.webagent.agent;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.graph.CorrectionData;
 import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.model.MessageRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.slf4j.Logger;
@@ -60,7 +61,7 @@ public class ReportAgent {
     private String buildConversationText(List<MessageData> messages) {
         StringBuilder sb = new StringBuilder();
         for (MessageData msg : messages) {
-            if (!"CORRECTION".equals(msg.getRole())) {
+            if (msg.getRole() != MessageRole.CORRECTION) {
                 sb.append(msg.getRole()).append(": ").append(msg.getContent()).append("\n");
             }
         }

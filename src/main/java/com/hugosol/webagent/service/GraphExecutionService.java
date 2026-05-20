@@ -8,6 +8,7 @@ import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.CorrectionData;
 import com.hugosol.webagent.graph.MessageData;
 import com.hugosol.webagent.model.AgentType;
+import com.hugosol.webagent.model.MessageRole;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import org.bsc.langgraph4j.CompiledGraph;
@@ -65,7 +66,7 @@ public class GraphExecutionService {
             return;
         }
 
-        MessageData userMessage = new MessageData("USER", userInput);
+        MessageData userMessage = new MessageData(MessageRole.USER, userInput);
         state.messages().add(userMessage);
         int correctionsBefore = state.corrections().size();
 
@@ -89,7 +90,7 @@ public class GraphExecutionService {
                                     ? response.tokenUsage().totalTokenCount() : 0;
 
                             synchronized (state) {
-                                state.messages().add(new MessageData("AGENT", agentText));
+                                state.messages().add(new MessageData(MessageRole.AGENT, agentText));
                                 tokenTracker.addTokens(sessionId, AgentType.CONVERSATION, tokens);
                             }
 

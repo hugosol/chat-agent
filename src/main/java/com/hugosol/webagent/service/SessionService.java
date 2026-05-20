@@ -57,20 +57,14 @@ public class SessionService {
         sessionRepository.save(session);
 
         for (MessageData md : messages) {
-            MessageRole role = switch (md.getRole()) {
-                case "USER" -> MessageRole.USER;
-                case "AGENT" -> MessageRole.AGENT;
-                case "CORRECTION" -> MessageRole.CORRECTION;
-                default -> MessageRole.AGENT;
-            };
+            MessageRole role = md.getRole();
             Message msg = new Message(sessionId, role, md.getContent());
             messageRepository.save(msg);
 
             if (role == MessageRole.USER) {
                 for (CorrectionData cd : corrections) {
-                    ErrorType type = parseErrorType(cd.getType());
                     ErrorRecord er = new ErrorRecord(
-                            sessionId, msg.getId(), type,
+                            sessionId, msg.getId(), cd.getType(),
                             cd.getOriginal(), cd.getCorrected(), cd.getExplanation());
                     errorRecordRepository.save(er);
                 }
@@ -93,14 +87,6 @@ public class SessionService {
 
     public List<Session> getHistory() {
         return sessionRepository.findAllByOrderByStartTimeDesc();
-    }
-
-    private ErrorType parseErrorType(String type) {
-        try {
-            return ErrorType.valueOf(type.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return ErrorType.GRAMMAR;
-        }
     }
 
     private void updateUserProgress(Session session) {

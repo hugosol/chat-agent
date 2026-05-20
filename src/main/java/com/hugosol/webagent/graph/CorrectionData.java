@@ -1,9 +1,11 @@
 package com.hugosol.webagent.graph;
 
+import com.hugosol.webagent.model.ErrorType;
+
 import java.io.Serializable;
 
 public class CorrectionData implements Serializable {
-    private String type;
+    private ErrorType type;
     private String original;
     private String corrected;
     private String explanation;
@@ -11,15 +13,15 @@ public class CorrectionData implements Serializable {
 
     public CorrectionData() {}
 
-    public CorrectionData(String type, String original, String corrected, String explanation) {
+    public CorrectionData(ErrorType type, String original, String corrected, String explanation) {
         this.type = type;
         this.original = original;
         this.corrected = corrected;
         this.explanation = explanation;
     }
 
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public ErrorType getType() { return type; }
+    public void setType(ErrorType type) { this.type = type; }
 
     public String getOriginal() { return original; }
     public void setOriginal(String original) { this.original = original; }

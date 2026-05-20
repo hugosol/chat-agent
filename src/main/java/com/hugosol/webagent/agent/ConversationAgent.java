@@ -47,7 +47,7 @@ public class ConversationAgent {
         int start = Math.max(0, history.size() - 20);
         for (int i = start; i < history.size(); i++) {
             MessageData msg = history.get(i);
-            sb.append(msg.getRole()).append(": ").append(msg.getContent()).append("\n");
+            sb.append(msg.getRole().name()).append(": ").append(msg.getContent()).append("\n");
         }
         return sb.toString();
     }
