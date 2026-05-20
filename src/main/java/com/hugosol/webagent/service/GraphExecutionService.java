@@ -122,6 +122,10 @@ public class GraphExecutionService {
                             Math.min(correctionsBefore, allCorrections.size()),
                             allCorrections.size());
 
+                    for (CorrectionData c : newOnly) {
+                        c.setMessageId(messageId);
+                    }
+
                     synchronized (state) {
                         state.corrections().addAll(newOnly);
                     }
