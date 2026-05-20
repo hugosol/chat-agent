@@ -82,7 +82,7 @@ public class GraphExecutionService {
                         @Override
                         public void onCompleteResponse(ChatResponse response) {
                             String agentText = fullText.toString();
-                            int tokens = response.tokenUsage() != null
+                            int tokens = (response != null && response.tokenUsage() != null)
                                     ? response.tokenUsage().totalTokenCount() : 0;
 
                             synchronized (state) {
