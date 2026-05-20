@@ -4,6 +4,7 @@ import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.CorrectionData;
 import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.model.PersonaType;
 import com.hugosol.webagent.model.ScenarioType;
 import com.hugosol.webagent.model.Session;
 import com.hugosol.webagent.service.GraphExecutionService;
@@ -75,7 +76,7 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
 
     private void handleStartSession(WebSocketSession wsSession, Map<String, Object> msg) throws IOException {
         String scenarioStr = (String) msg.getOrDefault("scenario", "WORKPLACE_STANDUP");
-        String persona = (String) msg.getOrDefault("persona", "TEAM_COLLEAGUE");
+        String personaStr = (String) msg.getOrDefault("persona", "TEAM_COLLEAGUE");
 
         ScenarioType scenario;
         try {
@@ -85,8 +86,16 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        Session session = sessionService.createSession(scenario, persona);
-        graphService.initSession(session.getId(), scenario.name(), persona);
+        PersonaType persona;
+        try {
+            persona = PersonaType.valueOf(personaStr);
+        } catch (IllegalArgumentException e) {
+            sendError(wsSession, "Invalid persona: " + personaStr);
+            return;
+        }
+
+        Session session = sessionService.createSession(scenario, persona.name());
+        graphService.initSession(session.getId(), scenario.name(), persona.name());
         wsToSession.put(wsSession.getId(), session.getId());
 
         log.info("Started session {} for WebSocket {}", session.getId(), wsSession.getId());
@@ -95,7 +104,7 @@ public class CoachWebSocketHandler extends TextWebSocketHandler {
                 "type", "SESSION_STARTED",
                 "sessionId", session.getId(),
                 "scenario", scenario.name(),
-                "persona", persona
+                "persona", persona.name()
         ));
 
     }
