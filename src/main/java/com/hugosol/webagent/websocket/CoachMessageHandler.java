@@ -10,7 +10,7 @@ import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.MessageHandler;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
-import com.hugosol.webagent.service.ReportGenerator;
+import com.hugosol.webagent.agent.ReportAgent;
 import com.hugosol.webagent.service.SessionService;
 import com.hugosol.webagent.service.SessionStateStore;
 import com.hugosol.webagent.service.TurnProcessor;
@@ -29,18 +29,18 @@ public class CoachMessageHandler implements MessageHandler {
 
     private final SessionStateStore stateStore;
     private final TurnProcessor turnProcessor;
-    private final ReportGenerator reportGenerator;
+    private final ReportAgent reportAgent;
     private final SessionService sessionService;
     private final ProtocolDispatcher protocol;
 
     public CoachMessageHandler(SessionStateStore stateStore,
                                TurnProcessor turnProcessor,
-                               ReportGenerator reportGenerator,
+                               ReportAgent reportAgent,
                                SessionService sessionService,
                                ProtocolDispatcher protocol) {
         this.stateStore = stateStore;
         this.turnProcessor = turnProcessor;
-        this.reportGenerator = reportGenerator;
+        this.reportAgent = reportAgent;
         this.sessionService = sessionService;
         this.protocol = protocol;
     }
@@ -140,7 +140,7 @@ public class CoachMessageHandler implements MessageHandler {
         try {
             List<MessageData> messages = stateStore.getMessages(sessionId);
             List<CorrectionData> corrections = stateStore.getCorrections(sessionId);
-            ReportResult report = reportGenerator.generate(messages, corrections);
+            ReportResult report = reportAgent.generate(messages, corrections);
 
             sessionService.completeSession(sessionId, messages, corrections, report);
 
