@@ -1,5 +1,7 @@
 package com.hugosol.webagent.graph;
 
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
 import org.bsc.langgraph4j.state.Channels;
@@ -65,6 +67,13 @@ public class CoachState extends AgentState {
         return this.<List<MessageData>>value(MESSAGES).orElse(List.of());
     }
 
+    public void addMessage(MessageData msg) {
+        List<MessageData> list = this.<List<MessageData>>value(MESSAGES).orElse(null);
+        if (list != null) {
+            list.add(msg);
+        }
+    }
+
     public String userInput() {
         return this.<String>value(USER_INPUT).orElse("");
     }
@@ -72,5 +81,12 @@ public class CoachState extends AgentState {
     @SuppressWarnings("unchecked")
     public List<CorrectionData> corrections() {
         return this.<List<CorrectionData>>value(CORRECTIONS).orElse(List.of());
+    }
+
+    public void addCorrections(List<CorrectionData> corrections) {
+        List<CorrectionData> list = this.<List<CorrectionData>>value(CORRECTIONS).orElse(null);
+        if (list != null) {
+            list.addAll(corrections);
+        }
     }
 }

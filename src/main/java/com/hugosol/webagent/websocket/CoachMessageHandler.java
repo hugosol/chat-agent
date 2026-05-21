@@ -1,8 +1,8 @@
 package com.hugosol.webagent.websocket;
 
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.PersonaType;
 import com.hugosol.webagent.model.ScenarioType;
 import com.hugosol.webagent.model.Session;
@@ -10,9 +10,9 @@ import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.MessageHandler;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
-import com.hugosol.webagent.service.ReportGenerator;
+import com.hugosol.webagent.agent.ReportAgent;
+import com.hugosol.webagent.service.SessionStore;
 import com.hugosol.webagent.service.SessionService;
-import com.hugosol.webagent.service.SessionStateStore;
 import com.hugosol.webagent.service.TurnProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,21 +27,21 @@ public class CoachMessageHandler implements MessageHandler {
 
     private static final Logger log = LoggerFactory.getLogger(CoachMessageHandler.class);
 
-    private final SessionStateStore stateStore;
-    private final TurnProcessor turnProcessor;
-    private final ReportGenerator reportGenerator;
     private final SessionService sessionService;
+    private final TurnProcessor turnProcessor;
+    private final ReportAgent reportAgent;
+    private final SessionStore sessionStore;
     private final ProtocolDispatcher protocol;
 
-    public CoachMessageHandler(SessionStateStore stateStore,
+    public CoachMessageHandler(SessionService sessionService,
                                TurnProcessor turnProcessor,
-                               ReportGenerator reportGenerator,
-                               SessionService sessionService,
+                               ReportAgent reportAgent,
+                               SessionStore sessionStore,
                                ProtocolDispatcher protocol) {
-        this.stateStore = stateStore;
-        this.turnProcessor = turnProcessor;
-        this.reportGenerator = reportGenerator;
         this.sessionService = sessionService;
+        this.turnProcessor = turnProcessor;
+        this.reportAgent = reportAgent;
+        this.sessionStore = sessionStore;
         this.protocol = protocol;
     }
 
@@ -66,8 +66,8 @@ public class CoachMessageHandler implements MessageHandler {
             return;
         }
 
-        Session session = sessionService.createSession(scenario, persona.name());
-        stateStore.init(session.getId(), scenario.name(), persona.name(), ws.getId());
+        Session session = sessionStore.createSession(scenario, persona.name());
+        sessionService.init(session.getId(), scenario.name(), persona.name(), ws.getId());
 
         log.info("Started session {} for WebSocket {}", session.getId(), ws.getId());
 
@@ -77,7 +77,7 @@ public class CoachMessageHandler implements MessageHandler {
 
     @Override
     public void onUserInput(WebSocketSession ws, ClientMessage.UserInput msg) throws IOException {
-        String sessionId = stateStore.getSessionId(ws.getId());
+        String sessionId = sessionService.getSessionId(ws.getId());
         if (sessionId == null) {
             protocol.send(ws, new ServerMessage.ErrorMessage("No active session. Send START_SESSION first."));
             return;
@@ -92,7 +92,7 @@ public class CoachMessageHandler implements MessageHandler {
         int messageId = msg.messageId();
 
         protocol.send(ws, new ServerMessage.StateUpdate("PROCESSING",
-                stateStore.getUsageRatio(sessionId)));
+                sessionService.getUsageRatio(sessionId)));
 
         turnProcessor.processTurn(sessionId, userInput, messageId, new TurnProcessor.TurnCallback() {
             @Override
@@ -102,11 +102,11 @@ public class CoachMessageHandler implements MessageHandler {
 
             @Override
             public void onConversationComplete(String fullText, int msgId, int tokenCount) {
-                double usage = stateStore.getUsageRatio(sessionId);
+                double usage = sessionService.getUsageRatio(sessionId);
                 protocol.sendSynced(ws, new ServerMessage.AgentStreamEnd(fullText, msgId, usage));
                 protocol.sendSynced(ws, new ServerMessage.StateUpdate("SPEAKING", usage));
 
-                if (stateStore.isTokenWarning(sessionId)) {
+                if (sessionService.isTokenWarning(sessionId)) {
                     protocol.sendSynced(ws, new ServerMessage.TokenWarning(usage,
                             "Approaching context limit. Consider ending the session soon."));
                 }
@@ -128,23 +128,23 @@ public class CoachMessageHandler implements MessageHandler {
 
     @Override
     public void onEndSession(WebSocketSession ws) throws IOException {
-        String sessionId = stateStore.getSessionId(ws.getId());
+        String sessionId = sessionService.getSessionId(ws.getId());
         if (sessionId == null) {
             protocol.send(ws, new ServerMessage.ErrorMessage("No active session to end."));
             return;
         }
 
         protocol.send(ws, new ServerMessage.StateUpdate("PROCESSING",
-                stateStore.getUsageRatio(sessionId)));
+                sessionService.getUsageRatio(sessionId)));
 
         try {
-            List<MessageData> messages = stateStore.getMessages(sessionId);
-            List<CorrectionData> corrections = stateStore.getCorrections(sessionId);
-            ReportResult report = reportGenerator.generate(messages, corrections);
+            List<MessageData> messages = sessionService.getMessages(sessionId);
+            List<CorrectionData> corrections = sessionService.getCorrections(sessionId);
+            ReportResult report = reportAgent.generate(messages, corrections);
 
-            sessionService.completeSession(sessionId, messages, corrections, report);
+            sessionStore.completeSession(sessionId, messages, corrections, report);
 
-            stateStore.remove(sessionId);
+            sessionService.remove(sessionId);
 
             var reportData = new ServerMessage.ReportData(
                     report.overallAssessment(),
@@ -168,20 +168,20 @@ public class CoachMessageHandler implements MessageHandler {
             return;
         }
 
-        if (!stateStore.exists(sessionId)) {
+        if (!sessionService.exists(sessionId)) {
             protocol.send(ws, new ServerMessage.ErrorMessage("Session expired. Please start a new one."));
             return;
         }
 
-        stateStore.bind(ws.getId(), sessionId);
-        double usage = stateStore.getUsageRatio(sessionId);
+        sessionService.bind(ws.getId(), sessionId);
+        double usage = sessionService.getUsageRatio(sessionId);
 
         protocol.send(ws, new ServerMessage.SessionResumed(
                 sessionId,
-                stateStore.getScenario(sessionId),
-                stateStore.getPersona(sessionId),
-                stateStore.getMessages(sessionId),
-                stateStore.getCorrections(sessionId),
+                sessionService.getScenario(sessionId),
+                sessionService.getPersona(sessionId),
+                sessionService.getMessages(sessionId),
+                sessionService.getCorrections(sessionId),
                 usage
         ));
 
@@ -190,7 +190,7 @@ public class CoachMessageHandler implements MessageHandler {
 
     @Override
     public void onLoadHistory(WebSocketSession ws) throws IOException {
-        List<Session> sessions = sessionService.getHistory();
+        List<Session> sessions = sessionStore.getHistory();
         List<ServerMessage.SessionSummary> history = sessions.stream()
                 .map(s -> new ServerMessage.SessionSummary(
                         s.getId(),

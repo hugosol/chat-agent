@@ -2,8 +2,8 @@ package com.hugosol.webagent.protocol;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 
 import java.util.List;
 

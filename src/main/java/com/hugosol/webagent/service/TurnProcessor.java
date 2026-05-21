@@ -3,8 +3,8 @@ package com.hugosol.webagent.service;
 import com.hugosol.webagent.agent.ConversationAgent;
 import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentType;
 import com.hugosol.webagent.model.MessageRole;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -27,7 +27,7 @@ public class TurnProcessor {
 
     private final CompiledGraph<CoachState> graph;
     private final ConversationAgent conversationAgent;
-    private final SessionStateStore stateStore;
+    private final SessionService sessionService;
 
     public interface TurnCallback {
         void onConversationToken(String delta, int messageId);
@@ -38,19 +38,19 @@ public class TurnProcessor {
 
     public TurnProcessor(CoachGraphBuilder graphBuilder,
                          ConversationAgent conversationAgent,
-                         SessionStateStore stateStore) {
+                         SessionService sessionService) {
         this.graph = graphBuilder.getCompiledGraph();
         this.conversationAgent = conversationAgent;
-        this.stateStore = stateStore;
+        this.sessionService = sessionService;
     }
 
     public void processTurn(String sessionId, String userInput, int messageId, TurnCallback callback) {
-        stateStore.addMessage(sessionId, MessageRole.USER, userInput, messageId);
+        sessionService.addMessage(sessionId, MessageRole.USER, userInput, messageId);
 
-        int correctionsBefore = stateStore.getCorrectionCount(sessionId);
-        List<MessageData> historySnapshot = stateStore.getMessages(sessionId);
-        String scenario = stateStore.getScenario(sessionId);
-        String persona = stateStore.getPersona(sessionId);
+        int correctionsBefore = sessionService.getCorrectionCount(sessionId);
+        List<MessageData> historySnapshot = sessionService.getMessages(sessionId);
+        String scenario = sessionService.getScenario(sessionId);
+        String persona = sessionService.getPersona(sessionId);
 
         CompletableFuture.runAsync(() -> {
             StringBuilder fullText = new StringBuilder();
@@ -69,8 +69,8 @@ public class TurnProcessor {
                             int tokens = (response != null && response.tokenUsage() != null)
                                     ? response.tokenUsage().totalTokenCount() : 0;
 
-                            stateStore.addMessage(sessionId, MessageRole.AGENT, agentText, messageId);
-                            stateStore.recordTokens(sessionId, AgentType.CONVERSATION, tokens);
+                            sessionService.addMessage(sessionId, MessageRole.AGENT, agentText, messageId);
+                            sessionService.recordTokens(sessionId, AgentType.CONVERSATION, tokens);
 
                             callback.onConversationComplete(agentText, messageId, tokens);
                         }
@@ -105,7 +105,7 @@ public class TurnProcessor {
                         c.setMessageId(messageId);
                     }
 
-                    stateStore.addCorrections(sessionId, newOnly);
+                    sessionService.addCorrections(sessionId, newOnly);
 
                     callback.onCorrections(new ArrayList<>(newOnly), messageId);
                 }

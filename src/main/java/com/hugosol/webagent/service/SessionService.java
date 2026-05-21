@@ -1,98 +1,120 @@
 package com.hugosol.webagent.service;
 
-import com.hugosol.webagent.agent.ReportAgent.ReportResult;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
-import com.hugosol.webagent.model.*;
-import com.hugosol.webagent.repository.*;
+import com.hugosol.webagent.graph.CoachState;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
+import com.hugosol.webagent.model.AgentType;
+import com.hugosol.webagent.model.MessageRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Component;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-@Service
+@Component
 public class SessionService {
 
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
-    private final SessionArchiver archiver;
-    private final SessionRepository sessionRepository;
-    private final MessageRepository messageRepository;
-    private final ErrorRecordRepository errorRecordRepository;
-    private final SessionReportRepository sessionReportRepository;
-    private final UserProgressRepository userProgressRepository;
+    private final Map<String, CoachState> activeStates = new ConcurrentHashMap<>();
+    private final Map<String, String> wsToSession = new ConcurrentHashMap<>();
+    private final TokenTracker tokenTracker;
 
-    public SessionService(SessionArchiver archiver,
-                          SessionRepository sessionRepository,
-                          MessageRepository messageRepository,
-                          ErrorRecordRepository errorRecordRepository,
-                          SessionReportRepository sessionReportRepository,
-                          UserProgressRepository userProgressRepository) {
-        this.archiver = archiver;
-        this.sessionRepository = sessionRepository;
-        this.messageRepository = messageRepository;
-        this.errorRecordRepository = errorRecordRepository;
-        this.sessionReportRepository = sessionReportRepository;
-        this.userProgressRepository = userProgressRepository;
+    public SessionService(TokenTracker tokenTracker) {
+        this.tokenTracker = tokenTracker;
     }
 
-    @Transactional
-    public Session createSession(ScenarioType scenario, String persona) {
-        Session session = new Session(scenario, persona);
-        session = sessionRepository.save(session);
-        log.info("SessionService: created session {} with scenario={}", session.getId(), scenario);
-        return session;
+    public void init(String sessionId, String scenario, String persona, String wsId) {
+        Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona);
+        var state = new CoachState(initData);
+        activeStates.put(sessionId, state);
+        tokenTracker.initSession(sessionId);
+        wsToSession.put(wsId, sessionId);
+        log.info("SessionService: initialized session {}", sessionId);
     }
 
-    @Transactional
-    public SessionReport completeSession(String sessionId,
-                                          List<MessageData> messages,
-                                          List<CorrectionData> corrections,
-                                          ReportResult report) {
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
-
-        session.complete();
-        sessionRepository.save(session);
-
-        List<Message> savedMessages = archiver.buildMessages(sessionId, messages);
-        messageRepository.saveAll(savedMessages);
-
-        List<ErrorRecord> errorRecords = archiver.buildErrorRecords(sessionId, corrections, savedMessages);
-        errorRecordRepository.saveAll(errorRecords);
-
-        SessionReport sessionReport = archiver.buildReport(sessionId, report);
-        sessionReportRepository.save(sessionReport);
-
-        updateUserProgress(session);
-
-        log.info("SessionService: completed session {}", sessionId);
-        return sessionReport;
+    public boolean exists(String sessionId) {
+        return activeStates.containsKey(sessionId);
     }
 
-    public List<Session> getHistory() {
-        return sessionRepository.findAllByOrderByStartTimeDesc();
+    public void remove(String sessionId) {
+        activeStates.remove(sessionId);
+        tokenTracker.removeSession(sessionId);
+        wsToSession.values().removeIf(sessionId::equals);
+        log.info("SessionService: removed session {}", sessionId);
     }
 
-    private void updateUserProgress(Session session) {
-        List<UserProgress> progressList = userProgressRepository.findAll();
-        UserProgress progress;
-        if (progressList.isEmpty()) {
-            progress = new UserProgress();
-        } else {
-            progress = progressList.get(0);
+    public void bind(String wsId, String sessionId) {
+        wsToSession.put(wsId, sessionId);
+        log.info("SessionService: bound WebSocket {} to session {}", wsId, sessionId);
+    }
+
+    public void unbind(String wsId) {
+        String sessionId = wsToSession.remove(wsId);
+        if (sessionId != null) {
+            log.info("SessionService: unbound WebSocket {} (session {} kept alive for resume)", wsId, sessionId);
         }
+    }
 
-        progress.setTotalSessions(progress.getTotalSessions() + 1);
+    public String getSessionId(String wsId) {
+        return wsToSession.get(wsId);
+    }
 
-        long sessionMinutes = Duration.between(session.getStartTime(), session.getEndTime()).toMinutes();
-        progress.setTotalMinutes(progress.getTotalMinutes() + sessionMinutes);
-        progress.setUpdatedAt(LocalDateTime.now());
+    public void addMessage(String sessionId, MessageRole role, String content, int messageId) {
+        CoachState state = activeStates.get(sessionId);
+        if (state != null) {
+            synchronized (state) {
+                state.addMessage(new MessageData(role, content, messageId));
+            }
+        }
+    }
 
-        userProgressRepository.save(progress);
+    public void addCorrections(String sessionId, List<CorrectionData> corrections) {
+        CoachState state = activeStates.get(sessionId);
+        if (state != null) {
+            synchronized (state) {
+                state.addCorrections(corrections);
+            }
+        }
+    }
+
+    public void recordTokens(String sessionId, AgentType agentType, int count) {
+        tokenTracker.addTokens(sessionId, agentType, count);
+    }
+
+    public List<MessageData> getMessages(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? new ArrayList<>(state.messages()) : List.of();
+    }
+
+    public List<CorrectionData> getCorrections(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? new ArrayList<>(state.corrections()) : List.of();
+    }
+
+    public String getScenario(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.scenario() : "";
+    }
+
+    public String getPersona(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.persona() : "";
+    }
+
+    public int getCorrectionCount(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.corrections().size() : 0;
+    }
+
+    public double getUsageRatio(String sessionId) {
+        return tokenTracker.getUsageRatio(sessionId, AgentType.CONVERSATION);
+    }
+
+    public boolean isTokenWarning(String sessionId) {
+        return tokenTracker.isWarning(sessionId, AgentType.CONVERSATION);
     }
 }

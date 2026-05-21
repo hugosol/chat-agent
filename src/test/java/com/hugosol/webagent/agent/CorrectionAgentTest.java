@@ -1,0 +1,119 @@
+package com.hugosol.webagent.agent;
+
+import com.hugosol.webagent.config.PromptLoader;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.model.ErrorType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.output.Response;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.DefaultResourceLoader;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class CorrectionAgentTest {
+
+    private CorrectionAgent agent;
+    private StubChatModel chatModel;
+
+    private static class StubChatModel implements ChatLanguageModel {
+        String lastPrompt;
+        private String response;
+
+        void setResponse(String response) {
+            this.response = response;
+        }
+
+        @Override
+        public String chat(String prompt) {
+            this.lastPrompt = prompt;
+            return response;
+        }
+
+        @Override
+        public Response<AiMessage> generate(List<ChatMessage> messages) {
+            return null;
+        }
+    }
+
+    @BeforeEach
+    void setUp() {
+        chatModel = new StubChatModel();
+        PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
+        agent = new CorrectionAgent(chatModel, promptLoader, new ObjectMapper());
+    }
+
+    @Test
+    void nullInputReturnsEmptyList() {
+        List<CorrectionData> result = agent.analyze(null);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void blankInputReturnsEmptyList() {
+        List<CorrectionData> result = agent.analyze("   ");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void validJsonArrayReturnsCorrections() {
+        chatModel.setResponse("""
+                [
+                  {"type": "GRAMMAR", "original": "he go", "corrected": "he goes", "explanation": "s"},\s
+                  {"type": "CHINGLISH", "original": "open the light", "corrected": "turn on the light", "explanation": "c"}
+                ]""");
+
+        List<CorrectionData> result = agent.analyze("he go to open the light");
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getType()).isEqualTo(ErrorType.GRAMMAR);
+        assertThat(result.get(0).getOriginal()).isEqualTo("he go");
+        assertThat(result.get(1).getType()).isEqualTo(ErrorType.CHINGLISH);
+        assertThat(result.get(1).getOriginal()).isEqualTo("open the light");
+    }
+
+    @Test
+    void jsonWrappedInSurroundingTextIsExtracted() {
+        chatModel.setResponse("Here are the corrections:\n" +
+                "[{\"type\":\"GRAMMAR\",\"original\":\"x\",\"corrected\":\"y\",\"explanation\":\"z\"}]\n" +
+                "Hope that helps!");
+
+        List<CorrectionData> result = agent.analyze("test input");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getType()).isEqualTo(ErrorType.GRAMMAR);
+    }
+
+    @Test
+    void noBracketsReturnsEmptyList() {
+        chatModel.setResponse("No corrections needed today.");
+        List<CorrectionData> result = agent.analyze("test");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void invalidJsonReturnsEmptyList() {
+        chatModel.setResponse("[{\"type\":\"GRAMMAR\", broken json");
+        List<CorrectionData> result = agent.analyze("test");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void emptyJsonArrayReturnsEmptyList() {
+        chatModel.setResponse("[]");
+        List<CorrectionData> result = agent.analyze("test");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void userInputIsSubstitutedIntoPrompt() {
+        chatModel.setResponse("[]");
+        agent.analyze("I go to school");
+        assertThat(chatModel.lastPrompt).isEqualTo("Correction prompt: I go to school");
+    }
+}

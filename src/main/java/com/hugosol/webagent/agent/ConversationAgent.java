@@ -1,7 +1,7 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.PersonaType;
 import com.hugosol.webagent.model.ScenarioType;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
