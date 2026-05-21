@@ -15,11 +15,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionServiceTest {
 
     private SessionService service;
-    private TokenTracker tokenTracker;
 
     @BeforeEach
     void setUp() {
-        tokenTracker = new TokenTracker(128000, 0.8);
+        TokenTracker tokenTracker = new TokenTracker(128000, 0.8);
         service = new SessionService(tokenTracker);
     }
 
