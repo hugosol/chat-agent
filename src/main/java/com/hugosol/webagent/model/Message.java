@@ -24,14 +24,19 @@ public class Message {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
+    @Column(name = "message_id")
+    private Integer messageId;
+
     private Integer tokenCount;
 
     public Message() {}
 
-    public Message(String sessionId, MessageRole role, String content) {
+    public Message(String sessionId, MessageRole role, String content, Integer messageId, Integer tokenCount) {
         this.sessionId = sessionId;
         this.role = role;
         this.content = content;
+        this.messageId = messageId;
+        this.tokenCount = tokenCount;
         this.timestamp = LocalDateTime.now();
     }
 
@@ -49,6 +54,9 @@ public class Message {
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    public Integer getMessageId() { return messageId; }
+    public void setMessageId(Integer messageId) { this.messageId = messageId; }
 
     public Integer getTokenCount() { return tokenCount; }
     public void setTokenCount(Integer tokenCount) { this.tokenCount = tokenCount; }

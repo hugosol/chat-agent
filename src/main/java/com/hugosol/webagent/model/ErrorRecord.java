@@ -13,8 +13,8 @@ public class ErrorRecord {
     @Column(nullable = false)
     private String sessionId;
 
-    @Column(nullable = false)
-    private String messageId;
+    @Column(nullable = false, name = "message_db_id")
+    private String messageDbId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -31,10 +31,10 @@ public class ErrorRecord {
 
     public ErrorRecord() {}
 
-    public ErrorRecord(String sessionId, String messageId, ErrorType type,
+    public ErrorRecord(String sessionId, String messageDbId, ErrorType type,
                        String originalText, String correctedText, String explanation) {
         this.sessionId = sessionId;
-        this.messageId = messageId;
+        this.messageDbId = messageDbId;
         this.type = type;
         this.originalText = originalText;
         this.correctedText = correctedText;
@@ -47,8 +47,8 @@ public class ErrorRecord {
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 
-    public String getMessageId() { return messageId; }
-    public void setMessageId(String messageId) { this.messageId = messageId; }
+    public String getMessageDbId() { return messageDbId; }
+    public void setMessageDbId(String messageDbId) { this.messageDbId = messageDbId; }
 
     public ErrorType getType() { return type; }
     public void setType(ErrorType type) { this.type = type; }

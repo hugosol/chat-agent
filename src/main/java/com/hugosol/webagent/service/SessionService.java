@@ -63,11 +63,13 @@ public class SessionService {
         return wsToSession.get(wsId);
     }
 
-    public void addMessage(String sessionId, MessageRole role, String content, int messageId) {
+    public void addMessage(String sessionId, MessageRole role, String content, int messageId, Integer tokenCount) {
         CoachState state = activeStates.get(sessionId);
         if (state != null) {
             synchronized (state) {
-                state.addMessage(new MessageData(role, content, messageId));
+                MessageData md = new MessageData(role, content, messageId);
+                md.setTokenCount(tokenCount);
+                state.addMessage(md);
             }
         }
     }

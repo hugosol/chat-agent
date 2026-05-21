@@ -67,7 +67,7 @@ class EntityMapperTest {
     @Test
     void buildErrorRecordsEmptyCorrections() {
         List<Message> savedMessages = List.of(
-                new Message("s1", MessageRole.USER, "Hi")
+                new Message("s1", MessageRole.USER, "Hi", null, null)
         );
         List<ErrorRecord> result = mapper.buildErrorRecords("s1", List.of(), savedMessages);
 
@@ -77,7 +77,7 @@ class EntityMapperTest {
     @Test
     void buildErrorRecordsSingleCorrectionMapsToUserMessage() {
         List<Message> savedMessages = List.of(
-                new Message("s1", MessageRole.USER, "he go")
+                new Message("s1", MessageRole.USER, "he go", 1, null)
         );
 
         CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "he go", "he goes", "第三人称");
@@ -92,15 +92,15 @@ class EntityMapperTest {
         assertThat(record.getOriginalText()).isEqualTo("he go");
         assertThat(record.getCorrectedText()).isEqualTo("he goes");
         assertThat(record.getExplanation()).isEqualTo("第三人称");
-        assertThat(record.getMessageId()).isEqualTo(savedMessages.get(0).getId());
+        assertThat(record.getMessageDbId()).isEqualTo(savedMessages.get(0).getId());
     }
 
     @Test
     void buildErrorRecordsSkipsNonUserMessages() {
         List<Message> savedMessages = List.of(
-                new Message("s1", MessageRole.AGENT, "How are you?"),
-                new Message("s1", MessageRole.USER, "I fine"),
-                new Message("s1", MessageRole.AGENT, "Great!")
+                new Message("s1", MessageRole.AGENT, "How are you?", null, null),
+                new Message("s1", MessageRole.USER, "I fine", 1, null),
+                new Message("s1", MessageRole.AGENT, "Great!", null, null)
         );
 
         CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "I fine", "I'm fine", "缺少be动词");
@@ -109,13 +109,13 @@ class EntityMapperTest {
         List<ErrorRecord> result = mapper.buildErrorRecords("s1", List.of(cd), savedMessages);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getMessageId()).isEqualTo(savedMessages.get(1).getId());
+        assertThat(result.get(0).getMessageDbId()).isEqualTo(savedMessages.get(1).getId());
     }
 
     @Test
     void buildErrorRecordsMessageIdOutOfRangeSkipped() {
         List<Message> savedMessages = List.of(
-                new Message("s1", MessageRole.USER, "First")
+                new Message("s1", MessageRole.USER, "First", null, null)
         );
 
         CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "x", "y", "z");
@@ -128,7 +128,7 @@ class EntityMapperTest {
     @Test
     void buildErrorRecordsMessageIdZeroSkipped() {
         List<Message> savedMessages = List.of(
-                new Message("s1", MessageRole.USER, "First")
+                new Message("s1", MessageRole.USER, "First", null, null)
         );
 
         CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "x", "y", "z");
@@ -141,7 +141,7 @@ class EntityMapperTest {
     @Test
     void buildErrorRecordsNoUserMessagesAllSkipped() {
         List<Message> savedMessages = List.of(
-                new Message("s1", MessageRole.AGENT, "Hi")
+                new Message("s1", MessageRole.AGENT, "Hi", null, null)
         );
 
         CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "x", "y", "z");
@@ -154,7 +154,7 @@ class EntityMapperTest {
     @Test
     void buildErrorRecordsMultipleCorrectionsToOneMessage() {
         List<Message> savedMessages = List.of(
-                new Message("s1", MessageRole.USER, "I go to park")
+                new Message("s1", MessageRole.USER, "I go to park", 1, null)
         );
 
         CorrectionData cd1 = new CorrectionData(ErrorType.GRAMMAR, "go", "went", "时态");
@@ -166,8 +166,26 @@ class EntityMapperTest {
 
         assertThat(result).hasSize(2);
         String msgId = savedMessages.get(0).getId();
-        assertThat(result.get(0).getMessageId()).isEqualTo(msgId);
-        assertThat(result.get(1).getMessageId()).isEqualTo(msgId);
+        assertThat(result.get(0).getMessageDbId()).isEqualTo(msgId);
+        assertThat(result.get(1).getMessageDbId()).isEqualTo(msgId);
+    }
+
+    @Test
+    void buildErrorRecordsMatchesByMessageIdDirectly() {
+        List<Message> savedMessages = List.of(
+                new Message("s1", MessageRole.USER, "First", 3, null),
+                new Message("s1", MessageRole.AGENT, "Reply", 3, null),
+                new Message("s1", MessageRole.USER, "Second", 1, null),
+                new Message("s1", MessageRole.AGENT, "Reply", 1, null)
+        );
+
+        CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "x", "y", "z");
+        cd.setMessageId(3);
+
+        List<ErrorRecord> result = mapper.buildErrorRecords("s1", List.of(cd), savedMessages);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMessageDbId()).isEqualTo(savedMessages.get(0).getId());
     }
 
     @Test
@@ -188,6 +206,34 @@ class EntityMapperTest {
         assertThat(sr.getVocabularySuggestions()).isEqualTo("vocab1\nvocab2");
         assertThat(sr.getFluencyScore()).isEqualTo(7);
         assertThat(sr.getKeyTakeaway()).isEqualTo("Practice articles");
+    }
+
+    @Test
+    void buildMessagesPreservesMessageId() {
+        MessageData md = new MessageData(MessageRole.USER, "Hello", 42);
+        List<Message> result = mapper.buildMessages("s1", List.of(md));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMessageId()).isEqualTo(42);
+    }
+
+    @Test
+    void buildMessagesPreservesTokenCountWhenSet() {
+        MessageData md = new MessageData(MessageRole.AGENT, "Hello", 1);
+        md.setTokenCount(520);
+        List<Message> result = mapper.buildMessages("s1", List.of(md));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTokenCount()).isEqualTo(520);
+    }
+
+    @Test
+    void buildMessagesTokenCountNullWhenNotSet() {
+        MessageData md = new MessageData(MessageRole.USER, "Hello", 1);
+        List<Message> result = mapper.buildMessages("s1", List.of(md));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTokenCount()).isNull();
     }
 
     @Test

@@ -15,11 +15,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionServiceTest {
 
     private SessionService service;
-    private TokenTracker tokenTracker;
 
     @BeforeEach
     void setUp() {
-        tokenTracker = new TokenTracker(128000, 0.8);
+        TokenTracker tokenTracker = new TokenTracker(128000, 0.8);
         service = new SessionService(tokenTracker);
     }
 
@@ -87,7 +86,7 @@ class SessionServiceTest {
     @Test
     void addMessageStoresCorrectly() {
         service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
-        service.addMessage("s1", MessageRole.USER, "Hello", 1);
+        service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
 
         List<MessageData> messages = service.getMessages("s1");
         assertThat(messages).hasSize(1);
@@ -97,14 +96,34 @@ class SessionServiceTest {
     }
 
     @Test
+    void addMessageStoresTokenCount() {
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.addMessage("s1", MessageRole.AGENT, "Reply", 1, 520);
+
+        List<MessageData> messages = service.getMessages("s1");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getTokenCount()).isEqualTo(520);
+    }
+
+    @Test
+    void addMessageAllowsNullTokenCount() {
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
+
+        List<MessageData> messages = service.getMessages("s1");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getTokenCount()).isNull();
+    }
+
+    @Test
     void addMessageDoesNotThrowForNonexistentSession() {
-        service.addMessage("unknown", MessageRole.USER, "test", 1);
+        service.addMessage("unknown", MessageRole.USER, "test", 1, null);
     }
 
     @Test
     void getMessagesReturnsDefensiveCopy() {
         service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
-        service.addMessage("s1", MessageRole.USER, "Hello", 1);
+        service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
 
         List<MessageData> messages = service.getMessages("s1");
         messages.clear();

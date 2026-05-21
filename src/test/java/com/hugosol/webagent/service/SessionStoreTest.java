@@ -1,7 +1,6 @@
 package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
-import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.*;
 import com.hugosol.webagent.repository.*;
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -68,7 +66,7 @@ class SessionStoreTest {
         when(sessionRepository.findById("s1")).thenReturn(Optional.of(session));
         when(sessionRepository.save(session)).thenReturn(session);
 
-        List<Message> savedMessages = List.of(new Message("s1", MessageRole.USER, "Hi"));
+        List<Message> savedMessages = List.of(new Message("s1", MessageRole.USER, "Hi", null, null));
         when(mapper.buildMessages(any(), anyList())).thenReturn(savedMessages);
         when(messageRepository.saveAll(savedMessages)).thenReturn(savedMessages);
 

@@ -19,7 +19,8 @@ class EntityMapper {
     List<Message> buildMessages(String sessionId, List<MessageData> data) {
         List<Message> messages = new ArrayList<>();
         for (MessageData md : data) {
-            messages.add(new Message(sessionId, md.getRole(), md.getContent()));
+            messages.add(new Message(sessionId, md.getRole(), md.getContent(),
+                    md.getMessageId(), md.getTokenCount()));
         }
         return messages;
     }
@@ -27,21 +28,17 @@ class EntityMapper {
     List<ErrorRecord> buildErrorRecords(String sessionId,
                                          List<CorrectionData> corrections,
                                          List<Message> savedMessages) {
-        List<Message> userMessages = new ArrayList<>();
-        for (Message msg : savedMessages) {
-            if (msg.getRole() == MessageRole.USER) {
-                userMessages.add(msg);
-            }
-        }
-
         List<ErrorRecord> records = new ArrayList<>();
         for (CorrectionData cd : corrections) {
-            int idx = cd.getMessageId() - 1;
-            if (idx >= 0 && idx < userMessages.size()) {
-                String targetMessageDbId = userMessages.get(idx).getId();
-                records.add(new ErrorRecord(
-                        sessionId, targetMessageDbId, cd.getType(),
-                        cd.getOriginal(), cd.getCorrected(), cd.getExplanation()));
+            for (Message msg : savedMessages) {
+                if (msg.getMessageId() != null
+                        && msg.getMessageId() == cd.getMessageId()
+                        && msg.getRole() == MessageRole.USER) {
+                    records.add(new ErrorRecord(
+                            sessionId, msg.getId(), cd.getType(),
+                            cd.getOriginal(), cd.getCorrected(), cd.getExplanation()));
+                    break;
+                }
             }
         }
         return records;
