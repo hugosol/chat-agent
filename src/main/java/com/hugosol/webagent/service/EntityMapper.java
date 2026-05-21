@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-class SessionArchiver {
+class EntityMapper {
 
     List<Message> buildMessages(String sessionId, List<MessageData> data) {
         List<Message> messages = new ArrayList<>();
