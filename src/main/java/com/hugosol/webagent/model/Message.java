@@ -1,11 +1,10 @@
 package com.hugosol.webagent.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "messages")
-public class Message {
+public class Message extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -21,9 +20,6 @@ public class Message {
     @Column(nullable = false, length = 4000)
     private String content;
 
-    @Column(nullable = false)
-    private LocalDateTime timestamp;
-
     @Column(name = "message_id")
     private Integer messageId;
 
@@ -37,7 +33,6 @@ public class Message {
         this.content = content;
         this.messageId = messageId;
         this.tokenCount = tokenCount;
-        this.timestamp = LocalDateTime.now();
     }
 
     public String getId() { return id; }
@@ -51,9 +46,6 @@ public class Message {
 
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
-
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
 
     public Integer getMessageId() { return messageId; }
     public void setMessageId(Integer messageId) { this.messageId = messageId; }
