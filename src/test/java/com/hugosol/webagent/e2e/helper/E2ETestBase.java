@@ -49,6 +49,7 @@ public abstract class E2ETestBase {
     static {
         wireMockServer = new WireMockServer(WireMockConfiguration.options().port(WIREMOCK_PORT));
         wireMockServer.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(wireMockServer::stop));
     }
 
     @BeforeAll
@@ -60,7 +61,6 @@ public abstract class E2ETestBase {
     @AfterAll
     static void closeBrowser() {
         if (browser != null) browser.close();
-        if (wireMockServer != null) wireMockServer.stop();
     }
 
     @BeforeEach
