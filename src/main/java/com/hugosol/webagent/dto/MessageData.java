@@ -1,4 +1,4 @@
-package com.hugosol.webagent.graph;
+package com.hugosol.webagent.dto;
 
 import com.hugosol.webagent.model.MessageRole;
 

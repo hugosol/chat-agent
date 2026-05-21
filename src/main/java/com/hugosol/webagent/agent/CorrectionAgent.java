@@ -1,7 +1,7 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
-import com.hugosol.webagent.graph.CorrectionData;
+import com.hugosol.webagent.dto.CorrectionData;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.model.chat.ChatLanguageModel;

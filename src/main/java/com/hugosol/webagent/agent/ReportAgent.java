@@ -1,8 +1,8 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.MessageRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.model.chat.ChatLanguageModel;

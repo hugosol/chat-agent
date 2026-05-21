@@ -1,8 +1,8 @@
 package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.*;
 import com.hugosol.webagent.repository.*;
 import org.slf4j.Logger;

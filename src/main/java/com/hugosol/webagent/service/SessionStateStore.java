@@ -1,8 +1,8 @@
 package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.graph.CoachState;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentType;
 import com.hugosol.webagent.model.MessageRole;
 import org.slf4j.Logger;

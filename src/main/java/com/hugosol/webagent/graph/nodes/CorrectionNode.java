@@ -2,7 +2,7 @@ package com.hugosol.webagent.graph.nodes;
 
 import com.hugosol.webagent.agent.CorrectionAgent;
 import com.hugosol.webagent.graph.CoachState;
-import com.hugosol.webagent.graph.CorrectionData;
+import com.hugosol.webagent.dto.CorrectionData;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

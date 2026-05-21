@@ -1,8 +1,8 @@
 package com.hugosol.webagent.websocket;
 
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
-import com.hugosol.webagent.graph.CorrectionData;
-import com.hugosol.webagent.graph.MessageData;
+import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.PersonaType;
 import com.hugosol.webagent.model.ScenarioType;
 import com.hugosol.webagent.model.Session;
