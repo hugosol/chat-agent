@@ -68,7 +68,7 @@ class SessionStoreTest {
         when(sessionRepository.findById("s1")).thenReturn(Optional.of(session));
         when(sessionRepository.save(session)).thenReturn(session);
 
-        List<Message> savedMessages = List.of(new Message("s1", MessageRole.USER, "Hi"));
+        List<Message> savedMessages = List.of(new Message("s1", MessageRole.USER, "Hi", null, null));
         when(mapper.buildMessages(any(), anyList())).thenReturn(savedMessages);
         when(messageRepository.saveAll(savedMessages)).thenReturn(savedMessages);
 

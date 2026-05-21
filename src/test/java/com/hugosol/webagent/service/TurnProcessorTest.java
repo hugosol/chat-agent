@@ -85,7 +85,7 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(sessionService).addMessage("s1", MessageRole.AGENT, "Hi", 1);
+        verify(sessionService).addMessage("s1", MessageRole.AGENT, "Hi", 1, 6);
         verify(sessionService).recordTokens("s1", AgentType.CONVERSATION, 6);
     }
 
@@ -173,7 +173,7 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(sessionService).addMessage("s1", MessageRole.USER, "user text", 3);
+        verify(sessionService).addMessage("s1", MessageRole.USER, "user text", 3, null);
     }
 
     @Test

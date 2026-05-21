@@ -9,6 +9,7 @@ public class MessageData implements Serializable {
     private MessageRole role;
     private String content;
     private long timestamp;
+    private Integer tokenCount;
 
     public MessageData() {}
 
@@ -30,4 +31,7 @@ public class MessageData implements Serializable {
 
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+
+    public Integer getTokenCount() { return tokenCount; }
+    public void setTokenCount(Integer tokenCount) { this.tokenCount = tokenCount; }
 }

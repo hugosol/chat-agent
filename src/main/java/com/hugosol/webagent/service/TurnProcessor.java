@@ -45,7 +45,7 @@ public class TurnProcessor {
     }
 
     public void processTurn(String sessionId, String userInput, int messageId, TurnCallback callback) {
-        sessionService.addMessage(sessionId, MessageRole.USER, userInput, messageId);
+        sessionService.addMessage(sessionId, MessageRole.USER, userInput, messageId, null);
 
         int correctionsBefore = sessionService.getCorrectionCount(sessionId);
         List<MessageData> historySnapshot = sessionService.getMessages(sessionId);
@@ -69,7 +69,7 @@ public class TurnProcessor {
                             int tokens = (response != null && response.tokenUsage() != null)
                                     ? response.tokenUsage().totalTokenCount() : 0;
 
-                            sessionService.addMessage(sessionId, MessageRole.AGENT, agentText, messageId);
+                            sessionService.addMessage(sessionId, MessageRole.AGENT, agentText, messageId, tokens);
                             sessionService.recordTokens(sessionId, AgentType.CONVERSATION, tokens);
 
                             callback.onConversationComplete(agentText, messageId, tokens);
