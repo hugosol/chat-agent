@@ -67,6 +67,13 @@ public class CoachState extends AgentState {
         return this.<List<MessageData>>value(MESSAGES).orElse(List.of());
     }
 
+    public void addMessage(MessageData msg) {
+        List<MessageData> list = this.<List<MessageData>>value(MESSAGES).orElse(null);
+        if (list != null) {
+            list.add(msg);
+        }
+    }
+
     public String userInput() {
         return this.<String>value(USER_INPUT).orElse("");
     }
@@ -74,5 +81,12 @@ public class CoachState extends AgentState {
     @SuppressWarnings("unchecked")
     public List<CorrectionData> corrections() {
         return this.<List<CorrectionData>>value(CORRECTIONS).orElse(List.of());
+    }
+
+    public void addCorrections(List<CorrectionData> corrections) {
+        List<CorrectionData> list = this.<List<CorrectionData>>value(CORRECTIONS).orElse(null);
+        if (list != null) {
+            list.addAll(corrections);
+        }
     }
 }

@@ -63,15 +63,11 @@ public class SessionStateStore {
         return wsToSession.get(wsId);
     }
 
-    CoachState getForExecution(String sessionId) {
-        return activeStates.get(sessionId);
-    }
-
     public void addMessage(String sessionId, MessageRole role, String content, int messageId) {
         CoachState state = activeStates.get(sessionId);
         if (state != null) {
             synchronized (state) {
-                state.messages().add(new MessageData(role, content, messageId));
+                state.addMessage(new MessageData(role, content, messageId));
             }
         }
     }
@@ -80,7 +76,7 @@ public class SessionStateStore {
         CoachState state = activeStates.get(sessionId);
         if (state != null) {
             synchronized (state) {
-                state.corrections().addAll(corrections);
+                state.addCorrections(corrections);
             }
         }
     }
