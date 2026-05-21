@@ -1,11 +1,10 @@
 package com.hugosol.webagent.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "session_reports")
-public class SessionReport {
+public class SessionReport extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -28,14 +27,10 @@ public class SessionReport {
     @Column(length = 5000)
     private String errorSummary;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
     public SessionReport() {}
 
     public SessionReport(String sessionId) {
         this.sessionId = sessionId;
-        this.createdAt = LocalDateTime.now();
     }
 
     public String getId() { return id; }
@@ -58,7 +53,4 @@ public class SessionReport {
 
     public String getErrorSummary() { return errorSummary; }
     public void setErrorSummary(String errorSummary) { this.errorSummary = errorSummary; }
-
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

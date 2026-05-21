@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -91,7 +90,6 @@ public class SessionStore {
 
         long sessionMinutes = Duration.between(session.getStartTime(), session.getEndTime()).toMinutes();
         progress.setTotalMinutes(progress.getTotalMinutes() + sessionMinutes);
-        progress.setUpdatedAt(LocalDateTime.now());
 
         userProgressRepository.save(progress);
     }

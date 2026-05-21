@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "error_records")
-public class ErrorRecord {
+public class ErrorRecord extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

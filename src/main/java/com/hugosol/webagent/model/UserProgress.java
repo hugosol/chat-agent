@@ -1,11 +1,10 @@
 package com.hugosol.webagent.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_progress")
-public class UserProgress {
+public class UserProgress extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -20,11 +19,7 @@ public class UserProgress {
     @Column(length = 5000)
     private String errorStats;
 
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
-
     public UserProgress() {
-        this.updatedAt = LocalDateTime.now();
     }
 
     public String getId() { return id; }
@@ -38,7 +33,4 @@ public class UserProgress {
 
     public String getErrorStats() { return errorStats; }
     public void setErrorStats(String errorStats) { this.errorStats = errorStats; }
-
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
