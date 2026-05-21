@@ -1,0 +1,1 @@
+Report prompt. Conversation: {fullConversation} Errors: {allCorrections}
