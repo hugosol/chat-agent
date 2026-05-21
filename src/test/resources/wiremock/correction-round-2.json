@@ -1,0 +1,19 @@
+{
+  "id": "mock-corr-2",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "[{\"type\":\"CHINGLISH\",\"original\":\"I think is very hard\",\"corrected\":\"I think it is very difficult\",\"explanation\":\"缺少主语it，hard可以用更正式的difficult\"},{\"type\":\"WORD_CHOICE\",\"original\":\"enough people\",\"corrected\":\"enough staff\",\"explanation\":\"工作环境中，用staff比people更专业\"}]"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 40,
+    "total_tokens": 140
+  }
+}

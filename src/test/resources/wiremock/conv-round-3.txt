@@ -1,0 +1,9 @@
+data: {"id":"mock-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"That is great "},"finish_reason":null}]}
+
+data: {"id":"mock-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"to hear! "},"finish_reason":null}]}
+
+data: {"id":"mock-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Keep up the good momentum, you are making excellent progress."},"finish_reason":null}]}
+
+data: {"id":"mock-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":280,"completion_tokens":22,"total_tokens":302}}
+
+data: [DONE]

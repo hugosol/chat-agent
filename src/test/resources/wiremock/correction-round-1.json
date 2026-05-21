@@ -1,0 +1,19 @@
+{
+  "id": "mock-corr-1",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "[{\"type\":\"GRAMMAR\",\"original\":\"I go\",\"corrected\":\"I went\",\"explanation\":\"昨天发生的事情要用过去时\"},{\"type\":\"GRAMMAR\",\"original\":\"He say\",\"corrected\":\"He said\",\"explanation\":\"第三人称且过去发生，用said\"},{\"type\":\"GRAMMAR\",\"original\":\"need finish\",\"corrected\":\"need to finish\",\"explanation\":\"need to do something，需要加to\"}]"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 50,
+    "total_tokens": 150
+  }
+}

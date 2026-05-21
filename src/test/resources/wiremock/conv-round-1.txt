@@ -1,0 +1,9 @@
+data: {"id":"mock-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Good morning! "},"finish_reason":null}]}
+
+data: {"id":"mock-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Sounds like you had a productive day. "},"finish_reason":null}]}
+
+data: {"id":"mock-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Did you mean you went to the office yesterday and your colleague said you need to finish the project this week?"},"finish_reason":null}]}
+
+data: {"id":"mock-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":150,"completion_tokens":35,"total_tokens":185}}
+
+data: [DONE]

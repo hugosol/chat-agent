@@ -1,0 +1,19 @@
+{
+  "id": "mock-report",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "{\"overallAssessment\":\"Good job! You communicated effectively in this workplace scenario. You showed willingness to express yourself in English despite some grammar mistakes. --- 做得不错！你在工作场景中有效沟通。尽管有一些语法错误，你展现了用英语表达自己的意愿。\",\"errorSummary\":\"GRAMMAR: 4 errors (past tense, subject-verb agreement, infinitive)\nCHINGLISH: 1 error (missing subject 'it')\nWORD_CHOICE: 1 error (people should be staff)\",\"vocabularySuggestions\":\"1. 'staff' instead of 'people' for workplace context\n2. 'difficult' instead of 'hard' for more formal tone\n3. 'completed' instead of 'finished' for professional settings\",\"fluencyScore\":7,\"keyTakeaway\":\"Focus on past tense consistency when talking about yesterday's events. Pay attention to subject-verb agreement in third person. --- 重点练习过去时态的一致性，以及第三人称的主谓一致。\"}"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 200,
+    "completion_tokens": 100,
+    "total_tokens": 300
+  }
+}
