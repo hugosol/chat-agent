@@ -147,6 +147,9 @@
     }
 
     function handleStreamDelta(msgId, delta) {
+        var existing = els.messages.querySelector('[data-message-id="' + msgId + '"].agent');
+        if (existing && !streamBubbles[msgId]) return;
+
         var bubble = streamBubbles[msgId];
         if (!bubble) {
             bubble = createMessageElement('Agent', '', msgId, true);
@@ -520,6 +523,13 @@
         els.correctionSidebar.classList.toggle('collapsed');
         var collapsed = els.correctionSidebar.classList.contains('collapsed');
         els.correctionShowBtn.classList.toggle('hidden', !collapsed);
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && sessionId && ws && ws.readyState === WebSocket.OPEN) {
+            debugLog('visibilitychange: resuming session ' + sessionId);
+            ws.send(JSON.stringify({ type: 'RESUME_SESSION', sessionId: sessionId }));
+        }
     });
 
     connect();

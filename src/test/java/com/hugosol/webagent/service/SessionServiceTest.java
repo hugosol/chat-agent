@@ -24,8 +24,19 @@ class SessionServiceTest {
 
     @Test
     void initCreatesSession() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         assertThat(service.exists("s1")).isTrue();
+    }
+
+    @Test
+    void initStoresUserId() {
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
+        assertThat(service.getUserId("s1")).isEqualTo("user1");
+    }
+
+    @Test
+    void getUserIdReturnsNullForNonexistentSession() {
+        assertThat(service.getUserId("unknown")).isNull();
     }
 
     @Test
@@ -35,21 +46,21 @@ class SessionServiceTest {
 
     @Test
     void existsReturnsFalseAfterRemove() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.remove("s1");
         assertThat(service.exists("s1")).isFalse();
     }
 
     @Test
     void initInitializesTokenTracker() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.recordTokens("s1", AgentType.CONVERSATION, 500);
         assertThat(service.getUsageRatio("s1")).isGreaterThan(0);
     }
 
     @Test
     void removeClearsTokenTracker() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.recordTokens("s1", AgentType.CONVERSATION, 500);
         service.remove("s1");
         assertThat(service.getUsageRatio("s1")).isZero();
@@ -57,13 +68,13 @@ class SessionServiceTest {
 
     @Test
     void bindAndGetSessionId() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         assertThat(service.getSessionId("ws1")).isEqualTo("s1");
     }
 
     @Test
     void unbindKeepsStateAlive() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.unbind("ws1");
         assertThat(service.getSessionId("ws1")).isNull();
         assertThat(service.exists("s1")).isTrue();
@@ -71,8 +82,16 @@ class SessionServiceTest {
 
     @Test
     void rebindAfterUnbind() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.unbind("ws1");
+        service.bind("ws2", "s1");
+        assertThat(service.getSessionId("ws2")).isEqualTo("s1");
+        assertThat(service.getSessionId("ws1")).isNull();
+    }
+
+    @Test
+    void bindOverwritesPreviousBinding() {
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.bind("ws2", "s1");
         assertThat(service.getSessionId("ws2")).isEqualTo("s1");
         assertThat(service.getSessionId("ws1")).isNull();
@@ -84,8 +103,32 @@ class SessionServiceTest {
     }
 
     @Test
+    void getWsForSessionReturnsBoundWsId() {
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
+        assertThat(service.getWsForSession("s1")).isEqualTo("ws1");
+    }
+
+    @Test
+    void getWsForSessionReturnsNullForNonexistent() {
+        assertThat(service.getWsForSession("unknown")).isNull();
+    }
+
+    @Test
+    void removeAllForUserClearsOnlyThatUser() {
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
+        service.init("s2", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user2", "ws2");
+
+        service.removeAllForUser("user1");
+
+        assertThat(service.exists("s1")).isFalse();
+        assertThat(service.exists("s2")).isTrue();
+        assertThat(service.getSessionId("ws1")).isNull();
+        assertThat(service.getSessionId("ws2")).isEqualTo("s2");
+    }
+
+    @Test
     void addMessageStoresCorrectly() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
 
         List<MessageData> messages = service.getMessages("s1");
@@ -97,7 +140,7 @@ class SessionServiceTest {
 
     @Test
     void addMessageStoresTokenCount() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.addMessage("s1", MessageRole.AGENT, "Reply", 1, 520);
 
         List<MessageData> messages = service.getMessages("s1");
@@ -107,7 +150,7 @@ class SessionServiceTest {
 
     @Test
     void addMessageAllowsNullTokenCount() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
 
         List<MessageData> messages = service.getMessages("s1");
@@ -122,7 +165,7 @@ class SessionServiceTest {
 
     @Test
     void getMessagesReturnsDefensiveCopy() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
 
         List<MessageData> messages = service.getMessages("s1");
@@ -138,7 +181,7 @@ class SessionServiceTest {
 
     @Test
     void addCorrectionsStoresCorrectly() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "orig", "corr", "expl");
         service.addCorrections("s1", List.of(cd));
 
@@ -149,7 +192,7 @@ class SessionServiceTest {
 
     @Test
     void addCorrectionsAccumulates() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.addCorrections("s1", List.of(
                 new CorrectionData(ErrorType.GRAMMAR, "a", "b", "c")
         ));
@@ -162,7 +205,7 @@ class SessionServiceTest {
 
     @Test
     void getCorrectionsReturnsDefensiveCopy() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.addCorrections("s1", List.of(
                 new CorrectionData(ErrorType.GRAMMAR, "a", "b", "c")
         ));
@@ -180,7 +223,7 @@ class SessionServiceTest {
 
     @Test
     void getCorrectionCountReturnsSize() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         assertThat(service.getCorrectionCount("s1")).isZero();
 
         service.addCorrections("s1", List.of(
@@ -197,7 +240,7 @@ class SessionServiceTest {
 
     @Test
     void getScenarioAndPersonaReturnStoredValues() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         assertThat(service.getScenario("s1")).isEqualTo("WORKPLACE_STANDUP");
         assertThat(service.getPersona("s1")).isEqualTo("TEAM_COLLEAGUE");
     }
@@ -210,7 +253,7 @@ class SessionServiceTest {
 
     @Test
     void recordTokensDelegatesToTokenTracker() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         service.recordTokens("s1", AgentType.CONVERSATION, 1000);
 
         double ratio = service.getUsageRatio("s1");
@@ -219,7 +262,7 @@ class SessionServiceTest {
 
     @Test
     void isTokenWarningDelegatesToTokenTracker() {
-        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        service.init("s1", "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
         assertThat(service.isTokenWarning("s1")).isFalse();
 
         service.recordTokens("s1", AgentType.CONVERSATION, 120000);

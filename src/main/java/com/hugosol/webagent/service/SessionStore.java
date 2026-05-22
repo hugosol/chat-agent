@@ -40,18 +40,19 @@ public class SessionStore {
     }
 
     @Transactional
-    public Session createSession(ScenarioType scenario, String persona) {
+    public Session createSession(ScenarioType scenario, String persona, String userId) {
         Session session = new Session(scenario, persona);
+        session.setUserId(userId);
         session = sessionRepository.save(session);
-        log.info("SessionStore: created session {} with scenario={}", session.getId(), scenario);
+        log.info("SessionStore: created session {} for user {}", session.getId(), userId);
         return session;
     }
 
     @Transactional
     public SessionReport completeSession(String sessionId,
-                                          List<MessageData> messages,
-                                          List<CorrectionData> corrections,
-                                          ReportResult report) {
+                                           List<MessageData> messages,
+                                           List<CorrectionData> corrections,
+                                           ReportResult report) {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
 
@@ -73,18 +74,14 @@ public class SessionStore {
         return sessionReport;
     }
 
-    public List<Session> getHistory() {
-        return sessionRepository.findAllByOrderByStartTimeDesc();
+    public List<Session> getHistory(String userId) {
+        return sessionRepository.findByUserIdOrderByStartTimeDesc(userId);
     }
 
     private void updateUserProgress(Session session) {
-        List<UserProgress> progressList = userProgressRepository.findAll();
-        UserProgress progress;
-        if (progressList.isEmpty()) {
-            progress = new UserProgress();
-        } else {
-            progress = progressList.get(0);
-        }
+        UserProgress progress = userProgressRepository.findByUserId(session.getUserId())
+                .orElseGet(UserProgress::new);
+        progress.setUserId(session.getUserId());
 
         progress.setTotalSessions(progress.getTotalSessions() + 1);
 

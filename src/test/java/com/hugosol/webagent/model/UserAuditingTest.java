@@ -13,20 +13,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 @Import(JpaConfig.class)
-class SessionAuditingTest {
+class UserAuditingTest {
 
     @Autowired
     private TestEntityManager entityManager;
 
     @Test
-    void shouldSetCreateTimeAndKeepBusinessTimestamps() {
-        Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
-        session.setUserId("test-user");
+    void shouldPersistUserWithTimestamps() {
+        User user = new User("testuser", "$2a$10$hashedpassword");
 
-        Session saved = entityManager.persistFlushFind(session);
+        User saved = entityManager.persistFlushFind(user);
 
+        assertThat(saved.getId()).isNotNull();
+        assertThat(saved.getUsername()).isEqualTo("testuser");
+        assertThat(saved.getPassword()).isEqualTo("$2a$10$hashedpassword");
         assertThat(saved.getCreateTime()).isNotNull();
-        assertThat(saved.getStartTime()).isNotNull();
-        assertThat(saved.getEndTime()).isNull();
+        assertThat(saved.getUpdateTime()).isNotNull();
     }
 }

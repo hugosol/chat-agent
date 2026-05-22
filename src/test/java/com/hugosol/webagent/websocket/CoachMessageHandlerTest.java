@@ -19,9 +19,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CoachMessageHandlerTest {
 
     @Mock
@@ -55,23 +59,28 @@ class CoachMessageHandlerTest {
     @Mock
     private WebSocketSession ws;
 
+    @Mock
+    private Principal principal;
+
     private CoachMessageHandler handler;
 
     @BeforeEach
     void setUp() {
         handler = new CoachMessageHandler(sessionService, turnProcessor,
                 reportAgent, sessionStore, protocol);
+        when(ws.getPrincipal()).thenReturn(principal);
+        when(principal.getName()).thenReturn("user1");
     }
 
     @Test
     void onStartSessionCreatesSessionAndSendsStarted() throws IOException {
         when(ws.getId()).thenReturn("ws1");
         Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
-        when(sessionStore.createSession(any(), anyString())).thenReturn(session);
+        when(sessionStore.createSession(any(), anyString(), anyString())).thenReturn(session);
 
         handler.onStartSession(ws, new ClientMessage.StartSession("WORKPLACE_STANDUP", "TEAM_COLLEAGUE"));
 
-        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);
         verify(protocol).send(eq(ws), captor.capture());
@@ -82,11 +91,11 @@ class CoachMessageHandlerTest {
     void onStartSessionWithNullValuesUsesDefaults() throws IOException {
         when(ws.getId()).thenReturn("ws1");
         Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
-        when(sessionStore.createSession(any(), anyString())).thenReturn(session);
+        when(sessionStore.createSession(any(), anyString(), anyString())).thenReturn(session);
 
         handler.onStartSession(ws, new ClientMessage.StartSession(null, null));
 
-        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "ws1");
+        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
     }
 
     @Test
@@ -286,13 +295,13 @@ class CoachMessageHandlerTest {
         verify(protocol).send(eq(ws), captor.capture());
         ServerMessage msg = captor.getValue();
         assertThat(msg).isInstanceOf(ServerMessage.ErrorMessage.class);
-        assertThat(((ServerMessage.ErrorMessage) msg).message()).contains("expired");
+        assertThat(((ServerMessage.ErrorMessage) msg).message()).contains("not found");
     }
 
     @Test
     void onLoadHistoryReturnsSessionSummaries() throws IOException {
         Session s1 = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
-        when(sessionStore.getHistory()).thenReturn(List.of(s1));
+        when(sessionStore.getHistory(anyString())).thenReturn(List.of(s1));
 
         handler.onLoadHistory(ws);
 
@@ -303,7 +312,7 @@ class CoachMessageHandlerTest {
 
     @Test
     void onLoadHistoryEmptyReturnsEmptyList() throws IOException {
-        when(sessionStore.getHistory()).thenReturn(List.of());
+        when(sessionStore.getHistory(anyString())).thenReturn(List.of());
 
         handler.onLoadHistory(ws);
 

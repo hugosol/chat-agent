@@ -27,3 +27,6 @@ app:
   token-limit: 128000
   token-limit-ratio: 0.8
   prompt-directory: classpath:prompts
+  security:
+    permit-all-paths:
+      - /**

@@ -15,6 +15,7 @@ public class CoachState extends AgentState {
     public static final String SESSION_ID   = "sessionId";
     public static final String SCENARIO     = "scenario";
     public static final String PERSONA      = "persona";
+    public static final String USER_ID      = "userId";
     public static final String STATE_STATUS = "stateStatus";
     public static final String MESSAGES     = "messages";
     public static final String USER_INPUT   = "userInput";
@@ -24,6 +25,7 @@ public class CoachState extends AgentState {
             SESSION_ID,   Channels.base(() -> ""),
             SCENARIO,     Channels.base(() -> ""),
             PERSONA,      Channels.base(() -> ""),
+            USER_ID,      Channels.base(() -> ""),
             STATE_STATUS, Channels.base(() -> "IDLE"),
             MESSAGES,     Channels.appender(ArrayList::new),
             USER_INPUT,   Channels.base(() -> ""),
@@ -34,11 +36,12 @@ public class CoachState extends AgentState {
         super(initData);
     }
 
-    public static Map<String, Object> initialState(String sessionId, String scenario, String persona) {
+    public static Map<String, Object> initialState(String sessionId, String scenario, String persona, String userId) {
         return Map.of(
                 SESSION_ID, sessionId,
                 SCENARIO, scenario,
                 PERSONA, persona,
+                USER_ID, userId,
                 STATE_STATUS, "IDLE",
                 MESSAGES, new ArrayList<>(),
                 USER_INPUT, "",
@@ -56,6 +59,10 @@ public class CoachState extends AgentState {
 
     public String persona() {
         return this.<String>value(PERSONA).orElse("");
+    }
+
+    public String userId() {
+        return this.<String>value(USER_ID).orElse("");
     }
 
     public String stateStatus() {

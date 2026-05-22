@@ -21,6 +21,7 @@ class UserProgressAuditingTest {
     @Test
     void shouldSetCreateTimeAndUpdateTimeOnPersist() {
         UserProgress progress = new UserProgress();
+        progress.setUserId("test-user");
 
         UserProgress saved = entityManager.persistFlushFind(progress);
 

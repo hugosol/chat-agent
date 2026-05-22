@@ -10,6 +10,9 @@ public class UserProgress extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    @Column(nullable = false, unique = true)
+    private String userId;
+
     @Column(nullable = false)
     private Integer totalSessions = 0;
 
@@ -24,6 +27,9 @@ public class UserProgress extends BaseEntity {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
     public Integer getTotalSessions() { return totalSessions; }
     public void setTotalSessions(Integer totalSessions) { this.totalSessions = totalSessions; }

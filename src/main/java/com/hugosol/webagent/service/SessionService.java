@@ -20,19 +20,19 @@ public class SessionService {
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     private final Map<String, CoachState> activeStates = new ConcurrentHashMap<>();
-    private final Map<String, String> wsToSession = new ConcurrentHashMap<>();
+    private final Map<String, String> sessionToWs = new ConcurrentHashMap<>();
     private final TokenTracker tokenTracker;
 
     public SessionService(TokenTracker tokenTracker) {
         this.tokenTracker = tokenTracker;
     }
 
-    public void init(String sessionId, String scenario, String persona, String wsId) {
-        Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona);
+    public void init(String sessionId, String scenario, String persona, String userId, String wsId) {
+        Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona, userId);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
         tokenTracker.initSession(sessionId);
-        wsToSession.put(wsId, sessionId);
+        sessionToWs.put(sessionId, wsId);
         log.info("SessionService: initialized session {}", sessionId);
     }
 
@@ -43,24 +43,49 @@ public class SessionService {
     public void remove(String sessionId) {
         activeStates.remove(sessionId);
         tokenTracker.removeSession(sessionId);
-        wsToSession.values().removeIf(sessionId::equals);
+        sessionToWs.remove(sessionId);
         log.info("SessionService: removed session {}", sessionId);
     }
 
     public void bind(String wsId, String sessionId) {
-        wsToSession.put(wsId, sessionId);
+        sessionToWs.put(sessionId, wsId);
         log.info("SessionService: bound WebSocket {} to session {}", wsId, sessionId);
     }
 
     public void unbind(String wsId) {
-        String sessionId = wsToSession.remove(wsId);
-        if (sessionId != null) {
-            log.info("SessionService: unbound WebSocket {} (session {} kept alive for resume)", wsId, sessionId);
-        }
+        sessionToWs.values().removeIf(wsId::equals);
+        log.info("SessionService: unbound WebSocket {}", wsId);
     }
 
     public String getSessionId(String wsId) {
-        return wsToSession.get(wsId);
+        for (var entry : sessionToWs.entrySet()) {
+            if (entry.getValue().equals(wsId)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    public String getWsForSession(String sessionId) {
+        return sessionToWs.get(sessionId);
+    }
+
+    public String getUserId(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.userId() : null;
+    }
+
+    public void removeAllForUser(String userId) {
+        activeStates.entrySet().removeIf(entry -> {
+            if (userId.equals(entry.getValue().userId())) {
+                String sessionId = entry.getKey();
+                tokenTracker.removeSession(sessionId);
+                sessionToWs.remove(sessionId);
+                return true;
+            }
+            return false;
+        });
+        log.info("SessionService: removed all sessions for user {}", userId);
     }
 
     public void addMessage(String sessionId, MessageRole role, String content, int messageId, Integer tokenCount) {
