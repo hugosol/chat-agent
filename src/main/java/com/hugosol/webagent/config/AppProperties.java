@@ -14,6 +14,7 @@ public class AppProperties {
     private double tokenLimitRatio = 0.8;
     private String promptDirectory = "classpath:prompts";
     private List<InitialUser> initialUsers = new ArrayList<>();
+    private Security security = new Security();
 
     public int getTokenLimit() { return tokenLimit; }
     public void setTokenLimit(int tokenLimit) { this.tokenLimit = tokenLimit; }
@@ -27,5 +28,20 @@ public class AppProperties {
     public List<InitialUser> getInitialUsers() { return initialUsers; }
     public void setInitialUsers(List<InitialUser> initialUsers) { this.initialUsers = initialUsers; }
 
+    public Security getSecurity() {
+        if (security == null) {
+            security = new Security();
+        }
+        return security;
+    }
+    public void setSecurity(Security security) { this.security = security; }
+
     public record InitialUser(String username, String password) {}
+
+    public static class Security {
+        private List<String> permitAllPaths = new ArrayList<>(List.of("/login/**"));
+
+        public List<String> getPermitAllPaths() { return permitAllPaths; }
+        public void setPermitAllPaths(List<String> permitAllPaths) { this.permitAllPaths = permitAllPaths; }
+    }
 }

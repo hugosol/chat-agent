@@ -26,19 +26,25 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final SessionCleanupLogoutHandler sessionCleanupLogoutHandler;
+    private final AppProperties appProperties;
 
-    public SecurityConfig(SessionCleanupLogoutHandler sessionCleanupLogoutHandler) {
+    public SecurityConfig(SessionCleanupLogoutHandler sessionCleanupLogoutHandler,
+                          AppProperties appProperties) {
         this.sessionCleanupLogoutHandler = sessionCleanupLogoutHandler;
+        this.appProperties = appProperties;
     }
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/login/**").permitAll()
-                    .requestMatchers("/h2-console/**").authenticated()
-                    .anyRequest().authenticated()
+            .headers(headers -> headers
+                    .frameOptions(frameOptions -> frameOptions.sameOrigin())
             )
+            .authorizeHttpRequests(auth -> {
+                    appProperties.getSecurity().getPermitAllPaths()
+                            .forEach(path -> auth.requestMatchers(path).permitAll());
+                    auth.anyRequest().authenticated();
+            })
             .formLogin(form -> form
                     .loginPage("/login/main.html")
                     .loginProcessingUrl("/login")

@@ -13,3 +13,7 @@ app:
   initial-users:
     - username: admin
       password: admin123
+  security:
+    permit-all-paths:
+      - /login/**
+      - /h2-console/**
