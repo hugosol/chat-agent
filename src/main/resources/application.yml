@@ -13,11 +13,6 @@ spring:
     username: sa
     password:
 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -42,6 +37,3 @@ app:
   token-limit: 128000
   token-limit-ratio: 0.8
   prompt-directory: classpath:prompts
-  initial-users:
-    - username: admin
-      password: admin123

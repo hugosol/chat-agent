@@ -2,3 +2,14 @@ langchain4j:
   openai:
     chat-model:
       api-key: ${DEEPSEEK_API_KEY:sk-****}
+
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+app:
+  initial-users:
+    - username: admin
+      password: admin123
