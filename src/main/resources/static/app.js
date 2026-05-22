@@ -404,6 +404,7 @@
     function showReport(report) {
         els.reportContent.innerHTML =
             '<div class="report-section"><strong>Overall Assessment:</strong><p>' + escapeHtml(report.summary) + '</p></div>' +
+            '<div class="report-section"><strong>Topic Summary:</strong><p>' + escapeHtml(report.topicSummary || '') + '</p></div>' +
             '<div class="report-section"><strong>Fluency Score:</strong> ' + report.fluencyScore + '/10</div>' +
             '<div class="report-section"><strong>Error Summary:</strong><p>' + escapeHtml(report.errorSummary || '') + '</p></div>' +
             '<div class="report-section"><strong>Vocabulary Suggestions:</strong><p>' + escapeHtml(report.vocabularySuggestions || '') + '</p></div>' +

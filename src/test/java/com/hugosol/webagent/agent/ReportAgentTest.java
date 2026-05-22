@@ -156,4 +156,15 @@ class ReportAgentTest {
         assertThat(result.topicSummary()).isEmpty();
         assertThat(result.keyTakeaway()).isEmpty();
     }
+
+    @Test
+    void nestedObjectValuesAreSerializedToString() {
+        chatModel.setResponse("{\"errorSummary\":{\"GRAMMAR\":3,\"CHINGLISH\":1},\"fluencyScore\":\"7\"}");
+
+        ReportResult result = agent.generate(List.of(), List.of());
+
+        assertThat(result.errorSummary()).contains("GRAMMAR");
+        assertThat(result.errorSummary()).contains("CHINGLISH");
+        assertThat(result.fluencyScore()).isEqualTo(7);
+    }
 }

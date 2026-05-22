@@ -37,6 +37,11 @@ class EnglishCoachMemoryIT extends E2ETestBase {
         endSession();
         takeScreenshot("memory-s1-report");
 
+        // Verify report modal contains topic summary
+        String reportText = getReportModalText();
+        assertTrue(reportText.contains("Topic Summary"), "report should show topic summary section");
+        assertTrue(reportText.contains("Java developer"), "report should show topic content");
+
         // Verify Session1 H2 data
         Session session1 = sessionRepository.findById(sid1).orElseThrow();
         assertEquals(SessionStatus.COMPLETED, session1.getStatus());

@@ -234,6 +234,8 @@ class CoachMessageHandlerTest {
         verify(protocol, atLeastOnce()).send(eq(ws), captor.capture());
         ServerMessage last = captor.getValue();
         assertThat(last).isInstanceOf(ServerMessage.SessionReportMessage.class);
+        var reportMsg = (ServerMessage.SessionReportMessage) last;
+        assertThat(reportMsg.report().topicSummary()).isEqualTo("topics discussed");
     }
 
     @Test

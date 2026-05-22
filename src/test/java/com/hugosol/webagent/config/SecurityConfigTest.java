@@ -1,10 +1,13 @@
 package com.hugosol.webagent.config;
 
 import com.hugosol.webagent.model.User;
+import com.hugosol.webagent.repository.UserMemoryRepository;
 import com.hugosol.webagent.repository.UserRepository;
+import com.hugosol.webagent.service.MemoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -26,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 class SecurityConfigTest {
 
     @Autowired
@@ -33,6 +37,12 @@ class SecurityConfigTest {
 
     @MockBean
     private UserRepository userRepository;
+
+    @MockBean
+    private MemoryService memoryService;
+
+    @MockBean
+    private UserMemoryRepository userMemoryRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
