@@ -54,7 +54,7 @@ class SessionStoreTest {
         Session saved = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
         when(sessionRepository.save(any(Session.class))).thenReturn(saved);
 
-        Session result = store.createSession(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        Session result = store.createSession(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE", "user1");
 
         assertThat(result).isSameAs(saved);
         verify(sessionRepository).save(any(Session.class));
@@ -63,6 +63,7 @@ class SessionStoreTest {
     @Test
     void completeSessionSavesAllEntitiesInSequence() {
         Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        session.setUserId("user1");
         when(sessionRepository.findById("s1")).thenReturn(Optional.of(session));
         when(sessionRepository.save(session)).thenReturn(session);
 
@@ -78,7 +79,7 @@ class SessionStoreTest {
         when(mapper.buildReport(any(), any(ReportResult.class))).thenReturn(report);
         when(sessionReportRepository.save(report)).thenReturn(report);
 
-        when(userProgressRepository.findAll()).thenReturn(List.of());
+        when(userProgressRepository.findByUserId("user1")).thenReturn(Optional.empty());
 
         SessionReport result = store.completeSession("s1",
                 List.of(new MessageData(MessageRole.USER, "Hi", 1)),
@@ -106,6 +107,7 @@ class SessionStoreTest {
     @Test
     void completeSessionUpdatesUserProgress() {
         Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        session.setUserId("user1");
         session.complete();
         when(sessionRepository.findById("s1")).thenReturn(Optional.of(session));
         when(sessionRepository.save(session)).thenReturn(session);
@@ -116,7 +118,7 @@ class SessionStoreTest {
         when(sessionReportRepository.save(sr)).thenReturn(sr);
 
         UserProgress existing = new UserProgress();
-        when(userProgressRepository.findAll()).thenReturn(List.of(existing));
+        when(userProgressRepository.findByUserId("user1")).thenReturn(Optional.of(existing));
         when(userProgressRepository.save(any(UserProgress.class))).thenReturn(existing);
 
         store.completeSession("s1", List.of(), List.of(),
@@ -130,18 +132,18 @@ class SessionStoreTest {
         List<Session> sessions = List.of(
                 new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE")
         );
-        when(sessionRepository.findAllByOrderByStartTimeDesc()).thenReturn(sessions);
+        when(sessionRepository.findByUserIdOrderByStartTimeDesc("user1")).thenReturn(sessions);
 
-        List<Session> result = store.getHistory();
+        List<Session> result = store.getHistory("user1");
 
         assertThat(result).isSameAs(sessions);
     }
 
     @Test
     void getHistoryReturnsEmptyList() {
-        when(sessionRepository.findAllByOrderByStartTimeDesc()).thenReturn(List.of());
+        when(sessionRepository.findByUserIdOrderByStartTimeDesc("user1")).thenReturn(List.of());
 
-        List<Session> result = store.getHistory();
+        List<Session> result = store.getHistory("user1");
 
         assertThat(result).isEmpty();
     }

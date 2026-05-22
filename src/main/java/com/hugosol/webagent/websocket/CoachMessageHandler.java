@@ -17,9 +17,11 @@ import com.hugosol.webagent.service.TurnProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.List;
 
 @Component
@@ -45,8 +47,19 @@ public class CoachMessageHandler implements MessageHandler {
         this.protocol = protocol;
     }
 
+    private String requireUserId(WebSocketSession ws) throws IOException {
+        Principal principal = ws.getPrincipal();
+        if (principal == null) {
+            protocol.send(ws, new ServerMessage.ErrorMessage("Not authenticated"));
+            throw new IOException("No principal");
+        }
+        return principal.getName();
+    }
+
     @Override
     public void onStartSession(WebSocketSession ws, ClientMessage.StartSession msg) throws IOException {
+        String userId = requireUserId(ws);
+
         String scenarioStr = msg.scenario() != null ? msg.scenario() : "WORKPLACE_STANDUP";
         String personaStr = msg.persona() != null ? msg.persona() : "TEAM_COLLEAGUE";
 
@@ -58,34 +71,33 @@ public class CoachMessageHandler implements MessageHandler {
             return;
         }
 
-        PersonaType persona;
         try {
-            persona = PersonaType.valueOf(personaStr);
+            PersonaType.valueOf(personaStr);
         } catch (IllegalArgumentException e) {
             protocol.send(ws, new ServerMessage.ErrorMessage("Invalid persona: " + personaStr));
             return;
         }
 
-        Session session = sessionStore.createSession(scenario, persona.name());
-        sessionService.init(session.getId(), scenario.name(), persona.name(), ws.getId());
+        Session session = sessionStore.createSession(scenario, personaStr, userId);
+        sessionService.init(session.getId(), scenario.name(), personaStr, userId, ws.getId());
 
-        log.info("Started session {} for WebSocket {}", session.getId(), ws.getId());
+        log.info("Started session {} for user {}", session.getId(), userId);
 
         protocol.send(ws, new ServerMessage.SessionStarted(
-                session.getId(), scenario.name(), persona.name()));
+                session.getId(), scenario.name(), personaStr));
     }
 
     @Override
     public void onUserInput(WebSocketSession ws, ClientMessage.UserInput msg) throws IOException {
         String sessionId = sessionService.getSessionId(ws.getId());
         if (sessionId == null) {
-            protocol.send(ws, new ServerMessage.ErrorMessage("No active session. Send START_SESSION first."));
+            protocol.send(ws, new ServerMessage.ErrorMessage("No active session."));
             return;
         }
 
         String userInput = msg.text();
         if (userInput == null || userInput.isBlank()) {
-            protocol.send(ws, new ServerMessage.ErrorMessage("Empty input text"));
+            protocol.send(ws, new ServerMessage.ErrorMessage("Empty message."));
             return;
         }
 
@@ -147,33 +159,39 @@ public class CoachMessageHandler implements MessageHandler {
             sessionService.remove(sessionId);
 
             var reportData = new ServerMessage.ReportData(
-                    report.overallAssessment(),
-                    report.fluencyScore(),
-                    report.errorSummary(),
-                    report.vocabularySuggestions(),
-                    report.keyTakeaway()
+                    report != null ? report.overallAssessment() : "",
+                    report != null ? report.fluencyScore() : 0,
+                    report != null ? report.errorSummary() : "",
+                    report != null ? report.vocabularySuggestions() : "",
+                    report != null ? report.keyTakeaway() : ""
             );
             protocol.send(ws, new ServerMessage.SessionReportMessage(reportData));
         } catch (Exception e) {
             log.error("Error ending session", e);
-            protocol.send(ws, new ServerMessage.ErrorMessage("Error ending session: " + e.getMessage()));
+            protocol.send(ws, new ServerMessage.ErrorMessage("Failed to end session: " + e.getMessage()));
         }
     }
 
     @Override
     public void onResumeSession(WebSocketSession ws, ClientMessage.ResumeSession msg) throws IOException {
+        String userId = requireUserId(ws);
+
         String sessionId = msg.sessionId();
-        if (sessionId == null || sessionId.isBlank()) {
-            protocol.send(ws, new ServerMessage.ErrorMessage("Missing sessionId"));
-            return;
-        }
-
         if (!sessionService.exists(sessionId)) {
-            protocol.send(ws, new ServerMessage.ErrorMessage("Session expired. Please start a new one."));
+            protocol.send(ws, new ServerMessage.ErrorMessage("Session not found"));
             return;
         }
 
+        String ownerId = sessionService.getUserId(sessionId);
+        if (ownerId != null && !ownerId.equals(userId)) {
+            protocol.send(ws, new ServerMessage.ErrorMessage("Session not found"));
+            log.warn("User {} attempted to resume session {} owned by {}", userId, sessionId, ownerId);
+            return;
+        }
+
+        String oldWsId = sessionService.getWsForSession(sessionId);
         sessionService.bind(ws.getId(), sessionId);
+
         double usage = sessionService.getUsageRatio(sessionId);
 
         protocol.send(ws, new ServerMessage.SessionResumed(
@@ -185,12 +203,13 @@ public class CoachMessageHandler implements MessageHandler {
                 usage
         ));
 
-        log.info("Resumed session {} for WebSocket {}", sessionId, ws.getId());
+        log.info("Resumed session {} for user {}", sessionId, userId);
     }
 
     @Override
     public void onLoadHistory(WebSocketSession ws) throws IOException {
-        List<Session> sessions = sessionStore.getHistory();
+        String userId = requireUserId(ws);
+        List<Session> sessions = sessionStore.getHistory(userId);
         List<ServerMessage.SessionSummary> history = sessions.stream()
                 .map(s -> new ServerMessage.SessionSummary(
                         s.getId(),

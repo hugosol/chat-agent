@@ -1,5 +1,10 @@
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
 
 spring:
   datasource:
@@ -37,3 +42,6 @@ app:
   token-limit: 128000
   token-limit-ratio: 0.8
   prompt-directory: classpath:prompts
+  initial-users:
+    - username: admin
+      password: admin123

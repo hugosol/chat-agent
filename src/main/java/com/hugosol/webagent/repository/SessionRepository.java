@@ -8,4 +8,5 @@ import java.util.List;
 public interface SessionRepository extends JpaRepository<Session, String> {
     List<Session> findByStatusOrderByStartTimeDesc(SessionStatus status);
     List<Session> findAllByOrderByStartTimeDesc();
+    List<Session> findByUserIdOrderByStartTimeDesc(String userId);
 }

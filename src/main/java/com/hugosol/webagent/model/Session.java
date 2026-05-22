@@ -23,6 +23,9 @@ public class Session extends BaseEntity {
 
     private LocalDateTime endTime;
 
+    @Column(nullable = false)
+    private String userId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SessionStatus status;
@@ -55,6 +58,9 @@ public class Session extends BaseEntity {
 
     public LocalDateTime getEndTime() { return endTime; }
     public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
+
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
     public SessionStatus getStatus() { return status; }
     public void setStatus(SessionStatus status) { this.status = status; }
