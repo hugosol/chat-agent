@@ -27,9 +27,9 @@ mvn spring-boot:run
 export DEEPSEEK_API_KEY=sk-your-deepseek-api-key
 mvn spring-boot:run
 
-# 4. Open browser
-#    Desktop: http://localhost:8080
-#    Phone:   http://<your-computer-ip>:8080
+# 4. Open browser → http://localhost:8080
+#    Default login: admin / admin123
+#    (credentials configurable via app.initial-users in application.yml)
 ```
 
 > **Note**: `node_modules` / `npm` / `webpack` are not used. The frontend is vanilla HTML + JS served directly by Spring Boot from `src/main/resources/static/`.
@@ -38,15 +38,27 @@ mvn spring-boot:run
 
 | Step | Action |
 |------|--------|
-| 1 | Select **scenario** (Standup / 1-on-1) and **persona** (Colleague / Manager) |
-| 2 | Click **Start Session** |
-| 3 | Type your English message → press **Enter** or click **Send** |
-| 4 | Agent replies with natural English + embedded corrections |
-| 5 | Correction summary appears below your message in chat; tap **"Corrections N"** in header to see details |
-| 6 | Click **🔊** on any Agent message to hear TTS playback |
-| 7 | Click **End & Report** to get a fluency score + error summary |
+| 1 | Log in with username and password at the login page |
+| 2 | Select **scenario** (Standup / 1-on-1) and **persona** (Colleague / Manager) |
+| 3 | Click **Start Session** |
+| 4 | Type your English message → press **Enter** or click **Send** |
+| 5 | Agent replies with natural English + embedded corrections |
+| 6 | Correction summary appears below your message in chat; tap **"Corrections N"** in header to see details |
+| 7 | Click **🔊** on any Agent message to hear TTS playback |
+| 8 | Click **End & Report** to get a fluency score + error summary |
+| 9 | Click **Logout** in header to sign out |
 
 > **iOS tip**: The keyboard microphone (🎤) can be used for system-level dictation — the recognized text appears in the input field, then press Send.
+
+## Profiles
+
+| Profile | Config File | Login Required? | H2 Console |
+|---------|------------|:---:|:---:|
+| `default` | `application.yml` | ✅ Yes | Authenticated only |
+| `local` | `application-local.yml` | ✅ Yes | Open (no auth) |
+| `e2e` | `application-e2e.yml` (test only) | ❌ No | Disabled |
+
+Profiles control authentication via `app.security.permit-all-paths` — a list of URL patterns that bypass login. The `e2e` profile sets `[/**]` to allow unrestricted access for automated tests.
 
 ## Testing
 
@@ -65,7 +77,7 @@ E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari view
 | `EnglishCoachSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
 | `EnglishCoachResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
 
-Test resources: `src/test/resources/wiremock/` (7 mock response files), `src/test/resources/application-test.yml` (in-memory H2).
+Test resources: `src/test/resources/wiremock/` (7 mock response files), `src/test/resources/application-e2e.yml` (in-memory H2, permit all paths).
 
 ## H2 Database Console
 
@@ -78,7 +90,9 @@ Username: sa
 Password: (leave empty)
 ```
 
-Tables: `sessions`, `messages`, `error_records`, `session_reports`, `user_progress`
+> H2 console is open by default with the `local` profile. With the `default` profile, you must log in first.
+
+Tables: `users`, `sessions`, `messages`, `error_records`, `session_reports`, `user_progress`
 
 ## Tech Stack
 
@@ -86,6 +100,7 @@ Tables: `sessions`, `messages`, `error_records`, `session_reports`, `user_progre
 |-------|-----------|
 | Language | Java 17 |
 | Framework | Spring Boot 3.4 |
+| Security | Spring Security (form login, remember-me, BCrypt) |
 | LLM | DeepSeek V4 FAST (via LangChain4j OpenAI-compatible adapter) |
 | Agent orchestration | langgraph4j 1.8.16 (`org.bsc.langgraph4j`) |
 | Database | H2 (file mode) + Spring Data JPA |
@@ -96,21 +111,33 @@ Tables: `sessions`, `messages`, `error_records`, `session_reports`, `user_progre
 ## Architecture
 
 ```
-Browser (text input + 🔊 TTS)
-    │  WebSocket JSON
+Browser (login page → chat page with 🔊 TTS)
+    │  HTTP + WebSocket JSON
+    ▼
+Spring Security  ──►  /login  ──►  /index.html  ──►  /ws/coach
+    │
     ▼
 CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor  ──►  LangGraph (1 node: correction)
     │                              │                        │
     │                              │                        ├── Future A: ConversationAgent → DeepSeek (streaming)
     │                              │                        └── Future B: CorrectionNode → CorrectionAgent → DeepSeek
     │                              │
-    │                              ├── SessionStateStore (runtime state + token tracking)
-    │                              ├── ReportGenerator  → ReportAgent → DeepSeek (session-end)
-    │                              └── SessionService   → H2 (JPA)
+    │                              ├── SessionService (runtime state + token tracking)
+    │                              ├── ReportAgent → DeepSeek (session-end)
+    │                              └── SessionStore → H2 (JPA)
     │
     ▼
 AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 ```
+
+### Authentication & User Module
+
+- **Spring Security** form login with HTTP session cookie + remember-me (14 days).
+- **User data isolation**: `Session` entity has `userId` field. All per-session queries (find by sessionId UUID) are naturally isolated. Only cross-session queries (history, progress) filter by user.
+- **Runtime user context**: `CoachState` stores `userId` as a langgraph channel, accessible to all async processing threads.
+- **Logout**: Explicit logout clears all active sessions via `SessionCleanupLogoutHandler`. Tab close without logout preserves sessions for resume.
+- **Multi-tab**: `sessionToWs` map is one-to-one (sessionId → wsId). Page Visibility API triggers auto-resume on tab activation, keeping UI fresh across tabs.
+- **Config-driven auth**: `app.security.permit-all-paths` controls which URL patterns skip authentication. No conditional annotations on SecurityConfig.
 
 ### 3 AI Agents
 
@@ -126,7 +153,7 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 START → CorrectionNode → END
 ```
 
-The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionStateStore` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
+The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
 
 ## Project Structure
 
@@ -155,17 +182,22 @@ web-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: ScenarioType, PersonaType, ErrorType...)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, ...)
 │   ├── repository/     (Spring Data JPA)
-│   ├── service/        (SessionStateStore, TurnProcessor, ReportGenerator, SessionService, TokenTracker)
-│   └── config/         (LangChain4j, WebSocket, PromptLoader)
+│   ├── service/        (SessionService, TurnProcessor, SessionStore, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
+│   └── config/         (LangChain4jConfig, SecurityConfig, WebSocketConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml
+│   ├── application-local.yml
 │   └── prompts/
 │       ├── conversation.txt
 │       ├── correction.txt
 │       └── report.txt
 ├── src/main/resources/static/
+│   ├── login/
+│   │   ├── main.html
+│   │   ├── main.js
+│   │   └── main.css
 │   ├── index.html
 │   ├── app.js
 │   └── style.css
@@ -177,7 +209,7 @@ web-agent/
     │       ├── E2ETestBase.java
     │       └── WireMockStubs.java
     └── resources/
-        ├── application-test.yml           # Test profile (memory H2, WireMock base-url)
+        ├── application-e2e.yml           # E2E profile (memory H2, WireMock base-url, permit-all-paths: [/**])
         ├── prompts/                       # Test prompt overrides
         └── wiremock/                      # 7 mock response files (SSE streams + JSON)
 ```
@@ -192,7 +224,14 @@ Environment variables (set before running):
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API endpoint |
 | `DEEPSEEK_MODEL` | `deepseek-v4-flash` | Model name |
 
-All other settings are in `src/main/resources/application.yml`.
+App-level configuration in `application.yml`:
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `app.initial-users` | `[{username: admin, password: admin123}]` | Initial user accounts (BCrypt-hashed on startup) |
+| `app.security.permit-all-paths` | `[/login/**]` | URL patterns that skip authentication |
+| `app.token-limit` | `128000` | Max LLM tokens per session |
+| `app.token-limit-ratio` | `0.8` | Warning threshold ratio |
 
 ## Known Limitations
 

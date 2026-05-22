@@ -8,7 +8,7 @@
 
 ---
 
-## 二、全量决策日志（25 项）
+## 二、全量决策日志（32 项）
 
 | # | 决策点 | 选择 |
 |---|--------|------|
@@ -31,13 +31,19 @@
 | 17 | LangGraph 库 | `org.bsc.langgraph4j:langgraph4j-core:1.8.16` |
 | 18 | V1 范围 | 单场景(职场英语) + 三 Agent + 完整报告 |
 | 19 | Prompt 管理 | `resources/prompts/*.txt` 文件 |
-| 20 | WS 消息协议 | JSON：START_SESSION / USER_INPUT / END_SESSION / STATE_UPDATE / AGENT_RESPONSE / SESSION_REPORT |
+| 20 | WS 消息协议 | JSON：START_SESSION / USER_INPUT / END_SESSION / AGENT_STREAM_DELTA / CORRECTION_RESULT / SESSION_REPORT |
 | 21 | Token 窗口 | 手动分段：UI 显示用量，80% 提醒用户结束会话 |
 | 22 | 持久化粒度 | 逐条存储 Message + ErrorRecord |
 | 23 | 会话恢复 | MemorySaver：页面刷新可恢复，服务重启丢失 |
 | 24 | 前端展示 | 全部消息 + 折叠旧消息 |
 | 25 | 持久化时机 | 会话结束时统一写入 H2 |
-| 26 | E2E 回归测试 | Playwright (Java) + WireMock 3.x，DOM 级断言，WireMock 固定端口 19090 拦截 DeepSeek HTTP 调用 |
+| 26 | E2E 回归测试 | Playwright (Java) + WireMock 3.x，DOM 级断言 |
+| 27 | 用户认证 | Spring Security form login + JSESSIONID cookie + Remember-Me |
+| 28 | 密码加密 | BCrypt，通过 `PasswordEncoderConfig` 提供 bean |
+| 29 | 初始用户 | `application.yml` 的 `app.initial-users` 通过 `DataInitializer`（CommandLineRunner）BCrypt 哈希后插入 |
+| 30 | 数据隔离 (多租户) | `Session.userId` (NOT NULL)。按 sessionId (UUID) 隔离所有会话内数据；跨会话查询 (`getHistory`, `UserProgress`) 按 userId 过滤 |
+| 31 | 权限控制策略 | `app.security.permit-all-paths` YAML 配置驱动，SecurityConfig 无条件注解 |
+| 32 | E2E 认证绕过 | `application-e2e.yml` 设 `permit-all-paths: [/**]` 全放行；`requireUserId` fallback 返回 `"anonymous"` |
 
 ---
 
@@ -95,6 +101,11 @@
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
     </dependency>
+    <!-- Spring Security -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
 </dependencies>
 ```
 
@@ -111,10 +122,11 @@ public class CoachState extends AgentState {
     static final String SESSION_ID        = "sessionId";
     static final String SCENARIO          = "scenario";
     static final String PERSONA           = "persona";
-    static final String STATE_STATUS      = "stateStatus";        // IDLE/PROCESSING/SPEAKING
-    static final String MESSAGES          = "messages";           // List<MessageData> (Appender)
-    static final String USER_INPUT        = "userInput";          // 用户输入文本
-    static final String CORRECTIONS       = "corrections";        // List<CorrectionData> (Appender)
+    static final String USER_ID           = "userId";            // 当前用户标识
+    static final String STATE_STATUS      = "stateStatus";       // IDLE/PROCESSING/SPEAKING
+    static final String MESSAGES          = "messages";          // List<MessageData> (Appender)
+    static final String USER_INPUT        = "userInput";         // 用户输入文本
+    static final String CORRECTIONS       = "corrections";       // List<CorrectionData> (Appender)
 }
 ```
 
@@ -139,8 +151,8 @@ START → correction → END
 
 ```
 [用户 Start Session]
-  → SessionService.createSession() → H2 写入 Session
-  → SessionStateStore.init() → 创建 CoachState → activeStates Map + TokenTracker 初始化
+  → SessionStore.createSession(scenario, persona, userId) → H2 写入 Session + userId
+  → SessionService.init(sessionId, scenario, persona, userId, wsId) → 创建 CoachState (含 USER_ID) → activeStates Map + TokenTracker 初始化
 
 [每轮对话]
   → WebSocket 收到 USER_INPUT
@@ -151,9 +163,20 @@ START → correction → END
   → 回调通过 TurnProcessor.TurnCallback 通知 CoachMessageHandler
 
 [用户 End Session]
-  → ReportGenerator.generate(messages, corrections) → 调用 ReportAgent
-  → SessionService.completeSession() → messages + errors + report → H2
-  → SessionStateStore.remove() → 释放 state + TokenTracker
+  → ReportAgent.generate(messages, corrections) → 生成报告
+  → SessionStore.completeSession(sessionId, messages, corrections, report)
+  → SessionService.remove(sessionId, wsId) → 释放 state + TokenTracker + sessionToWs 映射
+
+[会话恢复 RESUME_SESSION]
+  → CoachMessageHandler.onResumeSession() 校验 userId 匹配
+  → sessionToWs.put(sessionId, newWsId) 覆盖旧绑定
+  → 返回 SESSION_RESUMED 包含完整 messages + corrections + tokenUsage
+  → 前端 handleSessionResumed() 全量重建 DOM
+
+[多标签]
+  → sessionToWs 是一对一映射 (sessionId → wsId)
+  → Tab B RESUME_SESSION → put 覆盖 Tab A 绑定
+  → Tab A 重新激活 → Page Visibility API → 自动 RESUME_SESSION → 全量重建 UI
 ```
 
 ### Checkpoint 配置
@@ -249,29 +272,30 @@ Errors: {allCorrections}
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Session   │1───*│   Message    │1───*│ ErrorRecord  │
-│─────────────│     │──────────────│     │──────────────│
-│ id (PK)     │     │ id (PK)      │     │ id (PK)      │
-│ scenario    │     │ sessionId(FK)│     │ messageId(FK)│
-│ persona     │     │ role (Enum)  │     │ type (Enum)  │
-│ startTime   │     │ content      │     │ originalText │
-│ endTime     │     │ timestamp    │     │ correctedText│
-│ status      │     │ tokenCount   │     │ explanation  │
-└─────────────┘     └──────────────┘     └──────────────┘
-      1
-      │
-      ├──────────────┐
-      │              │
-┌──────────────┐  ┌──────────────┐
-│SessionReport │  │ UserProgress │
-│──────────────│  │──────────────│
-│ id (PK)      │  │ id (PK)      │
-│ sessionId(FK)│  │ totalSessions│
-│ summary      │  │ totalMinutes │
-│ fluencyScore │  │ errorStats   │
-│ vocabulary   │  │ (JSON text)  │
-│ keyTakeaway  │  │ updatedAt    │
-└──────────────┘  └──────────────┘
+│    User     │1───*│   Session   │1───*│   Message    │1───*│ ErrorRecord  │
+│─────────────│     │─────────────│     │──────────────│     │──────────────│
+│ id (PK)     │     │ id (PK)     │     │ id (PK)      │     │ id (PK)      │
+│ username    │     │ userId (FK) │     │ sessionId(FK)│     │ messageId(FK)│
+│ password    │     │ scenario    │     │ role (Enum)  │     │ type (Enum)  │
+│ createTime  │     │ persona     │     │ content      │     │ originalText │
+│ updateTime  │     │ startTime   │     │ tokenCount   │     │ correctedText│
+└─────────────┘     │ endTime     │     └──────────────┘     │ explanation  │
+                    │ status      │                          └──────────────┘
+                    └─────────────┘
+                          1
+                          │
+                          ├──────────────┐
+                          │              │
+                    ┌──────────────┐  ┌──────────────┐
+                    │SessionReport │  │ UserProgress │
+                    │──────────────│  │──────────────│
+                    │ id (PK)      │  │ id (PK)      │
+                    │ sessionId(FK)│  │ userId (UQ)  │
+                    │ summary      │  │ totalSessions│
+                    │ fluencyScore │  │ totalMinutes │
+                    │ vocabulary   │  │ errorStats   │
+                    │ keyTakeaway  │  │ createTime   │
+                    └──────────────┘  └──────────────┘
 
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
@@ -279,6 +303,8 @@ Enum: SessionStatus { ACTIVE, COMPLETED }
 Enum: ScenarioType { WORKPLACE_STANDUP("Standup Meeting", "a daily standup meeting..."), WORKPLACE_ONE_ON_ONE(...) }
 Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You are a friendly teammate..."), MANAGER(...) }
 ```
+
+> **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。
 
 ---
 
@@ -292,7 +318,8 @@ Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You ar
 { "type": "START_SESSION", "scenario": "WORKPLACE_STANDUP", "persona": "TEAM_COLLEAGUE" }
 { "type": "USER_INPUT", "text": "Yesterday I worked on the login module..." }
 { "type": "END_SESSION" }
-{ "type": "LOAD_HISTORY", "sessionId": "xxx" }
+{ "type": "RESUME_SESSION", "sessionId": "xxx" }
+{ "type": "LOAD_HISTORY" }
 ```
 
 #### 后端 → 前端
@@ -309,6 +336,8 @@ Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You ar
 }
 { "type": "STATE_UPDATE", "state": "SPEAKING", "tokenUsage": 0.23 }
 { "type": "SESSION_REPORT", "report": { "summary": "...", "fluencyScore": 6, ... } }
+{ "type": "SESSION_RESUMED", "sessionId": "xxx", "scenario": "...", "persona": "...", "messages": [...], "corrections": [...], "tokenUsage": 0.15 }
+{ "type": "SESSION_HISTORY", "sessions": [{ "id": "...", "scenario": "...", "startTime": "...", "status": "..." }] }
 { "type": "TOKEN_WARNING", "usage": 0.80, "message": "Approaching context limit" }
 { "type": "ERROR", "message": "..." }
 ```
@@ -420,7 +449,7 @@ web-agent/
 │   ├── WebAgentApplication.java
 │   │
 │   ├── graph/                              // LangGraph 核心
-│   │   ├── CoachState.java                 // AgentState 定义 + Schema (7 channels)
+│   │   ├── CoachState.java                 // AgentState 定义 + Schema (8 channels, 含 USER_ID)
 │   │   ├── CoachGraphBuilder.java          // StateGraph 构建 + compile (1节点线性图)
 │   │   ├── CorrectionData.java             // 纠错数据结构 (type 为 ErrorType 枚举, Serializable)
 │   │   ├── MessageData.java                // 消息数据结构 (role + content + messageId，Serializable)
@@ -434,59 +463,71 @@ web-agent/
 │   │
 │   ├── websocket/
 │   │   ├── CoachWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)
-│   │   └── CoachMessageHandler.java        // 协议消息处理 + wsToSession 映射 (实现 MessageHandler)
+│   │   └── CoachMessageHandler.java        // 协议消息处理 + sessionToWs 映射 + requireUserId (实现 MessageHandler)
 │   │
 │   ├── protocol/                           // WS 消息协议
 │   │   ├── ClientMessage.java              // 密封接口 + 5 个子类型 (Jackson 多态反序列化)
-│   │   ├── ServerMessage.java              // 密封接口 + 11 个子类型
+│   │   ├── ServerMessage.java              // 密封接口 + 10 个子类型
 │   │   ├── MessageHandler.java             // 接口: 5 个 handler 方法
 │   │   └── ProtocolDispatcher.java         // JSON 解析/序列化 + 消息分发 + synchronized send()
 │   │
 │   ├── speech/                             // STT/TTS（预留，V2 按实际需求定义接口）
 │   │
 │   ├── model/                              // JPA Entity
-│   │   ├── Session.java
+│   │   ├── User.java                       // 用户（username + BCrypt password）
+│   │   ├── Session.java                    // 会话（含 userId）
 │   │   ├── Message.java
 │   │   ├── ErrorRecord.java
 │   │   ├── SessionReport.java
-│   │   ├── UserProgress.java
+│   │   ├── UserProgress.java               // 学习进度（含 userId unique，每用户一行）
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED
 │   │   ├── ScenarioType.java               // 枚举: WORKPLACE_STANDUP / WORKPLACE_ONE_ON_ONE (含 displayName + description)
 │   │   └── PersonaType.java                // 枚举: TEAM_COLLEAGUE / MANAGER (含 displayName + roleDescription + fullDescription)
 │   │
-│   ├── repository/                         // Spring Data JPA
-│   │   ├── SessionRepository.java
+│   ├── repository/                         // Spring Data JPA（6 个）
+│   │   ├── UserRepository.java             // findByUsername
+│   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
 │   │   ├── ErrorRecordRepository.java
 │   │   ├── SessionReportRepository.java
-│   │   └── UserProgressRepository.java
+│   │   └── UserProgressRepository.java     // findByUserId
 │   │
 │   ├── service/                            // 业务服务
-│   │   ├── SessionStateStore.java           // State 生命周期 + TokenTracker 封装 + 所有 state 读写
+│   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
 │   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图)
-│   │   ├── SessionArchiver.java            // 运行时数据 → JPA 实体转换（纯计算，按 messageId 精确关联纠错）
-│   │   ├── ReportGenerator.java            // 报告生成透传
-│   │   ├── SessionService.java             // 会话生命周期 + H2 持久化编排
+│   │   ├── SessionStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
+│   │   ├── SessionCleanupLogoutHandler.java // 登出时清理 activeStates
+│   │   ├── EntityMapper.java              // 运行时数据 → JPA 实体转换
 │   │   └── TokenTracker.java               // 按 AgentType 分计 token
 │   │
 │   └── config/                             // 配置类
-│       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel) Bean 配置
-│       ├── WebSocketConfig.java            // WebSocket Handler 注册
+│       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel + OpenAiStreamingChatModel) Bean 配置
+│       ├── SecurityConfig.java             // Spring Security filter chain + 登录事件日志
+│       ├── WebSocketConfig.java            // WebSocket Handler 注册（同源策略）
+│       ├── AppProperties.java              // @ConfigurationProperties(prefix="app") 包含 security.permit-all-paths
+│       ├── PasswordEncoderConfig.java      // BCryptPasswordEncoder bean（独立配置，非 web 环境可用）
+│       ├── DataInitializer.java            // CommandLineRunner：从 app.initial-users 种子用户
+│       ├── JpaConfig.java                  // JPA Auditing
 │       └── PromptLoader.java               // resources/prompts/*.txt 文件加载
 │
 ├── src/main/resources/
-│   ├── application.yml                     // DeepSeek API key 通过环境变量注入
+│   ├── application.yml                     // 默认配置 + app.security.permit-all-paths: [/login/**]
+│   ├── application-local.yml               // 本地覆盖（H2 console, initial-users, /h2-console/** 放行）
 │   └── prompts/
 │       ├── conversation.txt
 │       ├── correction.txt
 │       └── report.txt
 │
 └── src/main/resources/static/
-    ├── index.html                          // 单页 UI（无构建工具）
-    ├── app.js                              // WebSocket 客户端 + 文本输入 + TTS 控制 + Debug 日志
-    └── style.css                           // 深色主题
+    ├── login/                              // 登录页（公开目录）
+    │   ├── main.html                       // 登录表单 + 暗色主题
+    │   ├── main.js                         // ?error 参数检测
+    │   └── main.css                        // 暗色主题卡片样式
+    ├── index.html                          // 聊天页（认证后访问，header 含 Logout 按钮）
+    ├── app.js                              // WebSocket 客户端 + Visibility API 自动 resume
+    └── style.css                           // 深色主题 + Logout 按钮样式
 ```
 
 > **图结构简化**: `ConversationNode` 和 `MergeResponseNode` 已移除。对话流式生成由 `TurnProcessor` 直接调用 `ConversationAgent`，token 计数由 `TokenTracker` 封装在 `SessionStateStore` 中管理。
@@ -550,3 +591,4 @@ web-agent/
 | **11. Scenario/Persona 枚举重构** | `ScenarioType` + `PersonaType` 加描述字段；`ConversationAgent` 用 enum 访问器；`CoachWebSocketHandler` persona 入口校验；prompt 占位符修正 | 自然语言 prompt、可扩展、类型安全 |
 | **12. 归档深化** | `MessageData` 加 `messageId` 字段；`SessionArchiver` 纯计算模块提取；删除 `speech/` 空壳接口 | 修复 ErrorRecord 重复绑定；实体转换可脱离 DB 测试；消除无 leverage 模块 |
 | **13. E2E 测试** | Playwright + WireMock：`EnglishCoachSessionIT`（完整会话+3轮+sidebar+H2断言）、`EnglishCoachResumeIT`（页面刷新→会话恢复）。WireMock Scenario 状态机轮转 mock 数据，`matchingJsonPath` 区分 conversation/correction/report 请求。DOM 级等待（input 状态、correction bubble 数量、report modal 可见性）。截图自动保存到 `target/e2e-screenshots/`。 | 零外部依赖的全链路回归测试；WireMock 固定端口 19090 + shutdown hook 支持全量并行跑 |
+| **14. User 模块** | Spring Security form login + remember-me + BCrypt。User entity + UserRepository。AppProperties 配置 `permit-all-paths` 驱动权限。CoachState 加 `USER_ID` channel。`Session.userId` 数据隔离。`sessionToWs` 一对一翻转。SessionCleanupLogoutHandler 登出清理。E2E 用 `application-e2e.yml` + `permit-all-paths: [/**]` 绕过认证。`requireUserId` fallback `"anonymous"`。前端登录页 `login/main.html` + Visibility API 多标签自动 resume。 | 多用户认证 + 数据隔离 + 配置驱动权限 |
