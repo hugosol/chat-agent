@@ -13,6 +13,8 @@ public class WireMockStubs {
 
     private static final String SCENARIO_CONV = "conversation-rounds";
     private static final String SCENARIO_CORR = "correction-rounds";
+    private static final String SCENARIO_MEM_TOPIC = "memory-topic-rounds";
+    private static final String SCENARIO_MEM_PROFILE = "memory-profile-rounds";
 
     public static void registerAllStubs(WireMockServer wireMock) {
         configureFor("localhost", wireMock.port());
@@ -21,6 +23,8 @@ public class WireMockStubs {
         registerConversationStubs();
         registerCorrectionStubs();
         registerReportStub();
+        registerMemoryTopicStubs();
+        registerMemoryProfileStubs();
     }
 
     private static void registerConversationStubs() {
@@ -107,6 +111,58 @@ public class WireMockStubs {
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(loadResource("wiremock/report.json"))));
+    }
+
+    private static void registerMemoryTopicStubs() {
+        String keyword = "maintain a compact summary of what topics";
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(keyword)))
+                .inScenario(SCENARIO_MEM_TOPIC)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/memory-topic-init.json")))
+                .willSetStateTo("round-2"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(keyword)))
+                .inScenario(SCENARIO_MEM_TOPIC)
+                .whenScenarioStateIs("round-2")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/memory-topic-merge.json")))
+                .willSetStateTo("round-3"));
+    }
+
+    private static void registerMemoryProfileStubs() {
+        String keyword = "maintain a compact learning profile";
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(keyword)))
+                .inScenario(SCENARIO_MEM_PROFILE)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/memory-profile-init.json")))
+                .willSetStateTo("round-2"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(keyword)))
+                .inScenario(SCENARIO_MEM_PROFILE)
+                .whenScenarioStateIs("round-2")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/memory-profile-merge.json")))
+                .willSetStateTo("round-3"));
     }
 
     private static String loadResource(String path) {

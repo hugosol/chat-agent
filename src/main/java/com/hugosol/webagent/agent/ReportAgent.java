@@ -47,6 +47,7 @@ public class ReportAgent {
             Map<String, Object> sections = objectMapper.readValue(response, Map.class);
             return new ReportResult(
                     (String) sections.getOrDefault("overallAssessment", ""),
+                    (String) sections.getOrDefault("topicSummary", ""),
                     (String) sections.getOrDefault("errorSummary", ""),
                     (String) sections.getOrDefault("vocabularySuggestions", ""),
                     (Integer) sections.getOrDefault("fluencyScore", 0),
@@ -54,7 +55,7 @@ public class ReportAgent {
             );
         } catch (Exception e) {
             log.warn("ReportAgent: failed to parse JSON, using raw response", e);
-            return new ReportResult(response, "", "", 0, "");
+            return new ReportResult(response, "", "", "", 0, "");
         }
     }
 
@@ -79,6 +80,7 @@ public class ReportAgent {
 
     public record ReportResult(
             String overallAssessment,
+            String topicSummary,
             String errorSummary,
             String vocabularySuggestions,
             int fluencyScore,

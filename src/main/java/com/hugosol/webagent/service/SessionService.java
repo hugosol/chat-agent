@@ -22,13 +22,17 @@ public class SessionService {
     private final Map<String, CoachState> activeStates = new ConcurrentHashMap<>();
     private final Map<String, String> sessionToWs = new ConcurrentHashMap<>();
     private final TokenTracker tokenTracker;
+    private final MemoryService memoryService;
 
-    public SessionService(TokenTracker tokenTracker) {
+    public SessionService(TokenTracker tokenTracker, MemoryService memoryService) {
         this.tokenTracker = tokenTracker;
+        this.memoryService = memoryService;
     }
 
     public void init(String sessionId, String scenario, String persona, String userId, String wsId) {
-        Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona, userId);
+        String topicMemory = memoryService.loadLatestContent(userId, "TOPIC_SUMMARY");
+        String learningProfile = memoryService.loadLatestContent(userId, "LEARNING_PROFILE");
+        Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona, userId, topicMemory, learningProfile);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
         tokenTracker.initSession(sessionId);
@@ -135,6 +139,16 @@ public class SessionService {
     public int getCorrectionCount(String sessionId) {
         CoachState state = activeStates.get(sessionId);
         return state != null ? state.corrections().size() : 0;
+    }
+
+    public String getTopicMemory(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.topicMemory() : "";
+    }
+
+    public String getLearningProfile(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.learningProfile() : "";
     }
 
     public double getUsageRatio(String sessionId) {

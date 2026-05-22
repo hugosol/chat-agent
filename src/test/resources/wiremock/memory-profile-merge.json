@@ -1,0 +1,19 @@
+{
+  "id": "mock-memory-profile-merge",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "Past tense errors reduced (25%), article usage good. New focus: presentation fluency and workplace small talk. Intermediate level advancing. Travel vocabulary improving."
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 30,
+    "total_tokens": 150
+  }
+}

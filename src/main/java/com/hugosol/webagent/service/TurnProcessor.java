@@ -51,12 +51,15 @@ public class TurnProcessor {
         List<MessageData> historySnapshot = sessionService.getMessages(sessionId);
         String scenario = sessionService.getScenario(sessionId);
         String persona = sessionService.getPersona(sessionId);
+        String topicSummary = sessionService.getTopicMemory(sessionId);
+        String learningProfile = sessionService.getLearningProfile(sessionId);
+        boolean isFirstTurn = historySnapshot.size() <= 1;
+        boolean hasMemory = !topicSummary.isBlank() || !learningProfile.isBlank();
 
         CompletableFuture.runAsync(() -> {
             StringBuilder fullText = new StringBuilder();
 
-            conversationAgent.generateStream(userInput, historySnapshot, scenario, persona,
-                    new StreamingChatResponseHandler() {
+            StreamingChatResponseHandler handler = new StreamingChatResponseHandler() {
                         @Override
                         public void onPartialResponse(String token) {
                             fullText.append(token);
@@ -80,7 +83,14 @@ public class TurnProcessor {
                             log.error("ConversationAgent error", error);
                             callback.onError("Conversation error: " + error.getMessage());
                         }
-                    });
+                    };
+
+            if (isFirstTurn && hasMemory) {
+                conversationAgent.generateStreamFirstTurn(historySnapshot, scenario, persona,
+                        topicSummary, learningProfile, handler);
+            } else {
+                conversationAgent.generateStream(historySnapshot, scenario, persona, handler);
+            }
         });
 
         CompletableFuture.runAsync(() -> {

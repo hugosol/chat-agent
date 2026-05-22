@@ -7,6 +7,7 @@ import com.hugosol.webagent.model.PersonaType;
 import com.hugosol.webagent.model.ScenarioType;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -23,12 +24,11 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class
-ConversationAgentTest {
+class ConversationAgentTest {
 
     private ConversationAgent agent;
     private List<String> receivedTokens;
-    private String lastPrompt;
+    private List<ChatMessage> lastMessages;
     private CountDownLatch latch;
 
     @BeforeEach
@@ -39,8 +39,19 @@ ConversationAgentTest {
 
         StubStreamingModel model = new StubStreamingModel() {
             @Override
-            public void chat(String prompt, StreamingChatResponseHandler handler) {
-                lastPrompt = prompt;
+            public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                lastMessages = messages;
+                handler.onNext("Sounds");
+                handler.onNext(" great!");
+                handler.onComplete(new dev.langchain4j.model.output.Response<>(
+                        AiMessage.from("Sounds great!"),
+                        new TokenUsage(50, 30, 20),
+                        null));
+            }
+
+            @Override
+            public void chat(List<ChatMessage> messages, StreamingChatResponseHandler handler) {
+                lastMessages = messages;
                 handler.onPartialResponse("Sounds");
                 handler.onPartialResponse(" great!");
                 handler.onCompleteResponse(ChatResponse.builder()
@@ -54,89 +65,85 @@ ConversationAgentTest {
 
     @Test
     void streamingTokensArriveInOrder() throws Exception {
-        agent.generateStream("I finished the task",
+        agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 ScenarioType.WORKPLACE_STANDUP.name(),
                 PersonaType.TEAM_COLLEAGUE.name(),
-                new StreamingChatResponseHandler() {
-                    @Override
-                    public void onPartialResponse(String token) {
-                        receivedTokens.add(token);
-                    }
-
-                    @Override
-                    public void onCompleteResponse(ChatResponse response) {
-                        latch.countDown();
-                    }
-
-                    @Override
-                    public void onError(Throwable error) {
-                    }
-                });
+                new RecordingHandler());
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(receivedTokens).containsExactly("Sounds", " great!");
     }
 
     @Test
-    void promptContainsPersonaRole() {
-        agent.generateStream("test",
+    void systemMessageContainsPersonaRole() {
+        agent.generateStream(
                 List.of(),
                 ScenarioType.WORKPLACE_STANDUP.name(),
                 PersonaType.TEAM_COLLEAGUE.name(),
                 new NoopHandler());
 
-        assertThat(lastPrompt).contains("team colleague");
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("team colleague");
     }
 
     @Test
-    void promptContainsScenarioDescription() {
-        agent.generateStream("test",
+    void systemMessageContainsScenarioDescription() {
+        agent.generateStream(
                 List.of(),
                 ScenarioType.WORKPLACE_STANDUP.name(),
                 PersonaType.TEAM_COLLEAGUE.name(),
                 new NoopHandler());
 
-        assertThat(lastPrompt).contains("standup meeting");
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("standup meeting");
     }
 
     @Test
-    void promptContainsUserInput() {
-        agent.generateStream("I finished the login module",
+    void userMessagesIncludedInMessageList() {
+        List<MessageData> history = List.of(
+                new MessageData(MessageRole.USER, "I finished the login module", 1)
+        );
+
+        agent.generateStream(history,
+                ScenarioType.WORKPLACE_STANDUP.name(),
+                PersonaType.TEAM_COLLEAGUE.name(),
+                new NoopHandler());
+
+        assertThat(lastMessages).isNotNull();
+        assertThat(lastMessages).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(lastMessages.get(0)).isInstanceOf(SystemMessage.class);
+
+        String userContent = lastMessages.get(lastMessages.size() - 1).toString();
+        assertThat(userContent).contains("I finished the login module");
+    }
+
+    @Test
+    void emptyHistoryHasOnlySystemMessage() {
+        agent.generateStream(
                 List.of(),
                 ScenarioType.WORKPLACE_STANDUP.name(),
                 PersonaType.TEAM_COLLEAGUE.name(),
                 new NoopHandler());
 
-        assertThat(lastPrompt).contains("I finished the login module");
+        assertThat(lastMessages).isNotNull();
+        assertThat(lastMessages.get(0)).isInstanceOf(SystemMessage.class);
     }
 
     @Test
-    void emptyHistoryShowsPlaceholder() {
-        agent.generateStream("test",
-                List.of(),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
-                new NoopHandler());
-
-        assertThat(lastPrompt).contains("No previous messages");
-    }
-
-    @Test
-    void historyIsFormattedInPrompt() {
+    void historyMessagesIncludeUserAndAgentRoles() {
         List<MessageData> history = List.of(
                 new MessageData(MessageRole.USER, "Hello", 1),
                 new MessageData(MessageRole.AGENT, "Hi there", 1)
         );
 
-        agent.generateStream("Good",
-                history,
+        agent.generateStream(history,
                 ScenarioType.WORKPLACE_STANDUP.name(),
                 PersonaType.TEAM_COLLEAGUE.name(),
                 new NoopHandler());
 
-        assertThat(lastPrompt).contains("USER: Hello");
-        assertThat(lastPrompt).contains("AGENT: Hi there");
+        assertThat(lastMessages).hasSize(3); // system + user + assistant
+        assertThat(lastMessages.get(0)).isInstanceOf(SystemMessage.class);
     }
 
     @Test
@@ -146,23 +153,25 @@ ConversationAgentTest {
             history.add(new MessageData(MessageRole.USER, "msg-" + String.format("%02d", i), i));
         }
 
-        agent.generateStream("now",
-                history,
+        agent.generateStream(history,
                 ScenarioType.WORKPLACE_STANDUP.name(),
                 PersonaType.TEAM_COLLEAGUE.name(),
                 new NoopHandler());
 
-        assertThat(lastPrompt).doesNotContain("msg-01");
-        assertThat(lastPrompt).doesNotContain("msg-05");
-        assertThat(lastPrompt).contains("msg-06");
-        assertThat(lastPrompt).contains("msg-25");
+        assertThat(lastMessages).hasSize(21); // system + 20 user messages
+        String firstUserContent = lastMessages.get(1).toString();
+        assertThat(firstUserContent).doesNotContain("msg-01");
+        assertThat(firstUserContent).contains("msg-06");
+        String lastUserContent = lastMessages.get(20).toString();
+        assertThat(lastUserContent).contains("msg-25");
     }
 
     @Test
     void errorCallbackFiresOnStreamingError() throws Exception {
         StubStreamingModel errorModel = new StubStreamingModel() {
             @Override
-            public void chat(String prompt, StreamingChatResponseHandler handler) {
+            public void chat(List<ChatMessage> messages, StreamingChatResponseHandler handler) {
+                lastMessages = messages;
                 handler.onError(new RuntimeException("model error"));
             }
         };
@@ -170,17 +179,14 @@ ConversationAgentTest {
                 new PromptLoader(new DefaultResourceLoader()));
 
         latch = new CountDownLatch(1);
-        errorAgent.generateStream("test", List.of(),
+        errorAgent.generateStream(List.of(),
                 ScenarioType.WORKPLACE_STANDUP.name(),
                 PersonaType.TEAM_COLLEAGUE.name(),
                 new StreamingChatResponseHandler() {
                     @Override
-                    public void onPartialResponse(String token) {
-                    }
-
+                    public void onPartialResponse(String token) {}
                     @Override
-                    public void onCompleteResponse(ChatResponse response) {
-                    }
+                    public void onCompleteResponse(ChatResponse response) {}
 
                     @Override
                     public void onError(Throwable error) {
@@ -192,24 +198,91 @@ ConversationAgentTest {
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
     }
 
-    private static class NoopHandler implements StreamingChatResponseHandler {
+    @Test
+    void generateStreamFirstTurn_injectsMemoryContent() {
+        agent.generateStreamFirstTurn(
+                List.of(new MessageData(MessageRole.USER, "Hi", 0)),
+                ScenarioType.WORKPLACE_STANDUP.name(),
+                PersonaType.TEAM_COLLEAGUE.name(),
+                "Talked about travel plans",
+                "Past tense needs work",
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("Conversation Memory");
+        assertThat(systemContent).contains("Talked about travel plans");
+        assertThat(systemContent).contains("Your Learning Profile");
+        assertThat(systemContent).contains("Past tense needs work");
+        assertThat(systemContent).contains("Active Engagement");
+        assertThat(systemContent).contains("unfinished topic");
+    }
+
+    @Test
+    void generateStream_hasNoMemoryContent() {
+        agent.generateStream(
+                List.of(new MessageData(MessageRole.USER, "Hi", 0)),
+                ScenarioType.WORKPLACE_STANDUP.name(),
+                PersonaType.TEAM_COLLEAGUE.name(),
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).doesNotContain("Conversation Memory");
+        assertThat(systemContent).doesNotContain("Active Engagement");
+    }
+
+    @Test
+    void correctionRoleMessagesAreSkipped() {
+        List<MessageData> history = List.of(
+                new MessageData(MessageRole.USER, "Hello", 1),
+                new MessageData(MessageRole.CORRECTION, "correction text", 1)
+        );
+
+        agent.generateStream(history,
+                ScenarioType.WORKPLACE_STANDUP.name(),
+                PersonaType.TEAM_COLLEAGUE.name(),
+                new NoopHandler());
+
+        assertThat(lastMessages).hasSize(2); // system + user only, correction skipped
+    }
+
+    private String getSystemContent() {
+        if (lastMessages != null && !lastMessages.isEmpty()) {
+            ChatMessage first = lastMessages.get(0);
+            if (first instanceof SystemMessage sm) {
+                return sm.text();
+            }
+            return first.toString();
+        }
+        return "";
+    }
+
+    private class RecordingHandler implements StreamingChatResponseHandler {
         @Override
         public void onPartialResponse(String token) {
+            receivedTokens.add(token);
         }
 
         @Override
         public void onCompleteResponse(ChatResponse response) {
+            latch.countDown();
         }
 
         @Override
-        public void onError(Throwable error) {
-        }
+        public void onError(Throwable error) {}
+    }
+
+    private static class NoopHandler implements StreamingChatResponseHandler {
+        @Override
+        public void onPartialResponse(String token) {}
+        @Override
+        public void onCompleteResponse(ChatResponse response) {}
+        @Override
+        public void onError(Throwable error) {}
     }
 
     @SuppressWarnings("removal")
     private abstract static class StubStreamingModel implements StreamingChatLanguageModel {
         @Override
-        public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
-        }
+        public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {}
     }
 }

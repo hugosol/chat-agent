@@ -51,6 +51,9 @@ public abstract class E2ETestBase {
     @Autowired
     protected SessionReportRepository sessionReportRepository;
 
+    @Autowired
+    protected UserMemoryRepository userMemoryRepository;
+
     private int turnNumber = 0;
 
     static {

@@ -4,6 +4,7 @@ Given the full conversation history and all error corrections from this session,
 
 {
   "overallAssessment": "3-4 sentences assessing overall English performance in this session. Include both English and Chinese version separated by ---",
+  "topicSummary": "5-8 sentences summarizing what conversation topics were discussed in this session. Describe the main subjects, specific things the user talked about, questions asked, and any ongoing story or topic threads. Write entirely in English.",
   "errorSummary": "Group errors by type (GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY). Count each type. List top 3 most frequent specific errors with examples.",
   "vocabularySuggestions": "3-5 better words, phrases, or expressions the user could have used, with the original expression shown.",
   "fluencyScore": 7,

@@ -50,6 +50,18 @@
 | **Binding map** | The one-to-one ConcurrentHashMap mapping a Practice session UUID to its Active Tab WebSocket ID | sessionToWs (code name), WS binding, connection map |
 | **Checkpoint** | A langgraph snapshot of CoachState preserved in MemorySaver, enabling state restoration after a WebSocket disconnect | Snapshot, savepoint |
 
+## Memory and Long-Term Context
+
+| Term | Definition | Aliases to avoid |
+|------|------------|-----------------|
+| **User Memory** | A persistent summary record in H2 that captures a Learner's conversation topics or learning progress, surviving across Practice sessions | Memory, memory record, profile |
+| **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a 500-character summary of conversation topics discussed across all past Practice sessions | Topic summary, conversation memory |
+| **Learning Profile** | A User Memory of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
+| **Memory Merge** | An LLM-driven process that combines an old User Memory (version N) with a newly completed session's Report to produce an updated version (N+1) | Incremental update, memory consolidation |
+| **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first Turn's System Prompt so the Agent recalls past context when greeting the Learner | Context injection, memory recall |
+| **Active Engagement** | A System Prompt instruction directing the Agent to proactively bring up unfinished topics and ask questions based on the injected memory | Initiative prompt, engagement instruction |
+| **Memory Version** | A sequential integer on each User Memory record, starting at 1 and incremented by each Memory Merge operation | Version number, revision counter |
+
 ## Data Isolation
 
 | Term | Definition | Aliases to avoid |
@@ -71,6 +83,10 @@
 - A **Practice session** has at most one **Active Tab** at any moment (via the Binding map).
 - A **Tab takeover** occurs when a Learner resumes their own Practice session from a different tab, displacing the previous Active Tab.
 - A **Stale Tab** self-heals via a **Visibility resume** that triggers a **State rebuild**.
+- A **Learner** has zero or more **User Memory** records, each identified by type.
+- A **Practice session** end triggers one **Memory Merge** per **User Memory** type (Topic Memory and Learning Profile), executed asynchronously.
+- The first **Turn** of a new Practice session includes a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt.
+- A **Memory Merge** reads the previous **Memory Version**, generates a new one, and inserts it — old versions remain as immutable history.
 
 ## Flagged Ambiguities
 
@@ -79,6 +95,8 @@
 - **State** was used to mean both the CoachState object (a single Practice session data container) and the Active states map (the collection of all active CoachState instances). **Resolution:** Use "CoachState" for the individual container; use "Active states map" for the collection.
 
 - **Token** was used to mean both an LLM usage unit (counted by TokenTracker) and a CSRF token. **Resolution:** Use "LLM token" or "token usage" for the LLM context; use "CSRF token" for security context. Never say "token" alone.
+
+- **Memory** was used to mean both the in-memory runtime state (CoachState, Active states map) and the persistent cross-session User Memory entity. **Resolution:** Use "In-memory state" or "Active states map" for runtime; use "User Memory" for the persisted H2 record. Never say "memory" alone.
 
 - **Resume** was used for both the WebSocket protocol message (RESUME_SESSION) and the Page Visibility API pattern (Visibility resume). **Resolution:** "Protocol resume" for the WebSocket message; "Visibility resume" for the tab-activation auto-refresh. Both restore UI state but through different triggers.
 
@@ -100,6 +118,18 @@
 >
 > **Domain expert:** "Exactly. And the frontend delta handler skips any msgId that already has a complete Agent message from the State rebuild. No duplicate bubbles."
 >
-> **Dev:** "Clear. One more thing -- does logout clean up the Active states map?"
+> **Dev:** "Does the Agent remember what we talked about last week?"
 >
-> **Domain expert:** "Yes -- the cleanup handler walks the map and removes every Practice session owned by that Learner. A simple tab close without logout only unbinds the binding -- the Practice session stays alive for resume."
+> **Domain expert:** "Yes — at session end, a Memory Merge runs asynchronously. It combines the old Topic Memory with the new Report to produce an updated version. On the next Practice session's first Turn, a Memory Injection puts the Topic Memory and Learning Profile into the System Prompt."
+>
+> **Dev:** "So the Agent just knows 'Hugo went to Japan' without me re-telling it?"
+>
+> **Domain expert:** "Exactly. And the Active Engagement instruction tells the Agent to naturally bring it up: 'So how was that trip to Japan you mentioned last time?'"
+>
+> **Dev:** "What happens to old Memory Versions?"
+>
+> **Domain expert:** "They're kept. Each Memory Merge inserts a new row with version N+1. Old versions are immutable — we can trace how the Learner's profile evolved."
+>
+> **Dev:** "And does logout clean up the Active states map?"
+>
+> **Domain expert:** "Yes — the cleanup handler walks the map and removes every Practice session owned by that Learner. User Memory persists in H2 regardless."
