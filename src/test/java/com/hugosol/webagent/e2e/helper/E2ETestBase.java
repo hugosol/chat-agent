@@ -17,6 +17,12 @@ import org.springframework.test.context.ActiveProfiles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -25,6 +31,7 @@ public abstract class E2ETestBase {
     protected static final int WIREMOCK_PORT = 19090;
     protected static WireMockServer wireMockServer;
     protected static Browser browser;
+    private static final String runTimestamp;
 
     protected BrowserContext context;
     protected Page page;
@@ -50,6 +57,19 @@ public abstract class E2ETestBase {
         wireMockServer = new WireMockServer(WireMockConfiguration.options().port(WIREMOCK_PORT));
         wireMockServer.start();
         Runtime.getRuntime().addShutdownHook(new Thread(wireMockServer::stop));
+
+        var now = LocalDateTime.now();
+        String prefix = now.format(DateTimeFormatter.ofPattern("MM-dd-HHmm"));
+        String suffix;
+        Path dir;
+        do {
+            suffix = ThreadLocalRandom.current().ints(4, 'a', 'z' + 1)
+                    .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                    .toString();
+            dir = Paths.get("target/e2e-screenshots", prefix + "-" + suffix);
+        } while (Files.exists(dir));
+        runTimestamp = prefix + "-" + suffix;
+        housekeepScreenshots();
     }
 
     @BeforeAll
@@ -88,10 +108,10 @@ public abstract class E2ETestBase {
     protected void takeScreenshot(String name) {
         if (page == null) return;
         try {
-            Path dir = Paths.get("target/e2e-screenshots");
+            Path dir = Paths.get("target/e2e-screenshots", runTimestamp);
             Files.createDirectories(dir);
             page.screenshot(new Page.ScreenshotOptions()
-                    .setPath(dir.resolve(getClass().getSimpleName() + "_" + name + ".png")));
+                    .setPath(dir.resolve(name + ".png")));
         } catch (Exception ignored) {
         }
     }
@@ -160,5 +180,43 @@ public abstract class E2ETestBase {
 
     protected String getReportModalText() {
         return page.locator("#reportContent").innerText();
+    }
+
+    private static void housekeepScreenshots() {
+        Path screenshotsDir = Paths.get("target/e2e-screenshots");
+        if (!Files.exists(screenshotsDir)) return;
+
+        Pattern pattern = Pattern.compile("^(\\d{2})-(\\d{2})-(\\d{4})-[a-z]{4}$");
+        var cutoff = LocalDateTime.now().minusHours(24);
+        var today = LocalDate.now();
+
+        try (var dirs = Files.list(screenshotsDir)) {
+            dirs.filter(Files::isDirectory).forEach(dir -> {
+                var matcher = pattern.matcher(dir.getFileName().toString());
+                if (!matcher.matches()) return;
+
+                int month = Integer.parseInt(matcher.group(1));
+                int day = Integer.parseInt(matcher.group(2));
+                String time = matcher.group(3);
+                int hour = Integer.parseInt(time.substring(0, 2));
+                int minute = Integer.parseInt(time.substring(2));
+
+                int year = today.getYear();
+                if (month > today.getMonthValue()
+                        || (month == today.getMonthValue() && day > today.getDayOfMonth())) {
+                    year--;
+                }
+                var ts = LocalDateTime.of(year, month, day, hour, minute);
+
+                if (ts.isBefore(cutoff)) {
+                    try (var walk = Files.walk(dir)) {
+                        walk.sorted(Comparator.reverseOrder())
+                                .forEach(p -> {
+                                    try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+                                });
+                    } catch (Exception ignored) {}
+                }
+            });
+        } catch (Exception ignored) {}
     }
 }
