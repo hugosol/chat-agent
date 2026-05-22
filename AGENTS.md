@@ -3,8 +3,14 @@
 ## Quick Reference
 
 ```bash
-# Verify the build (no tests exist)
+# Verify the build
 mvn compile
+
+# Run unit tests (existing unit tests only)
+mvn test
+
+# Run E2E regression tests (Playwright + WireMock, first run downloads Chromium ~150MB)
+mvn verify
 
 # Run locally with local profile (api-key in application-local.yml)
 mvn spring-boot:run -Dspring-boot.run.profiles=local
@@ -19,7 +25,8 @@ mvn spring-boot:run
 
 ## Key Facts
 
-- **Java 17** / **Spring Boot 3.4.7** / **Maven** — only `mvn compile` matters; there are **no tests** (`src/test/` is empty).
+- **Java 17** / **Spring Boot 3.4.7** / **Maven** — `mvn compile` for build verification, `mvn test` for unit tests, `mvn verify` for E2E tests.
+- **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/webagent/e2e/`. Two IT test classes: `EnglishCoachSessionIT` (full session + sidebar + H2 assertions), `EnglishCoachResumeIT` (page reload → session resume). WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`.
 - **Package**: `com.hugosol.webagent` (note: Maven `groupId` is `com.example` — ignore that, it's vestigial).
 - **DeepSeek via LangChain4j**: uses OpenAI-compatible adapter (`dev.langchain4j:langchain4j-open-ai`). Default model is `deepseek-v4-flash` (see `application.yml`, not README which says `deepseek-chat`).
 - **Two LLM beans**: `ChatLanguageModel` (sync, for CorrectionAgent/ReportAgent) + `StreamingChatLanguageModel` (`OpenAiStreamingChatModel`, for ConversationAgent). Both in `LangChain4jConfig`.
@@ -65,6 +72,18 @@ com.hugosol.webagent/
 ├── repository/      # Spring Data JPA repos
 ├── config/          # LangChain4jConfig (2 beans), WebSocketConfig, PromptLoader
 └── speech/          # (vacant — V2 will add STT/TTS adapters when needed)
+
+src/test/java/com/hugosol/webagent/e2e/
+├── EnglishCoachSessionIT.java   # Full session: 3 turns + sidebar + H2 assertions
+├── EnglishCoachResumeIT.java    # Page reload → session resume verification
+└── helper/
+    ├── E2ETestBase.java         # @SpringBootTest base: WireMock (19090), Playwright, DOM waits
+    └── WireMockStubs.java       # Scenario state machine stubs (7 stubs, JSON Path body matching)
+
+src/test/resources/
+├── application-test.yml         # Test profile: mem H2, base-url → localhost:19090
+├── prompts/                     # Test prompt overrides (correction.txt, report.txt)
+└── wiremock/                    # 7 mock response files (3 conv SSE + 3 corr JSON + 1 report JSON)
 ```
 
 ## WebSocket Protocol
@@ -90,7 +109,11 @@ Server → Client:
 
 ## Conventions & Gotchas
 
-- **No tests.** `mvn test` runs nothing. Use `mvn compile` for verification.
+- **E2E tests**: `*IT.java` suffix. `mvn test` runs unit tests (surefire, excludes IT). `mvn verify` runs E2E (failsafe, includes IT). Test profile `@ActiveProfiles("test")` enables `application-test.yml` (memory H2, WireMock base-url).
+- **WireMock**: Fixed port `19090`. `matchingJsonPath("$.messages[0].content", containing(keyword))` for body matching (avoids JSON encoding issues). Scenario state machine (`STARTED → round-2 → round-3`) controls stub rotation across turns. `Runtime.addShutdownHook` stops WireMock so all IT classes share one server instance.
+- **DOM waits**: No WebSocket frame interception (Playwright Java's `onFrameReceived` unreliable). All waits use `page.waitForFunction()` on DOM state: input bar visibility (session started), input disabled → enabled (streaming done), correction bubble count increase (correction arrived), report modal visibility (session ended).
+- **Playwright**: Headless Chromium with mobile Safari viewport (390×844, Safari UA, `setIsMobile(true)`). Browser launched once per test class in `@BeforeAll`. Screenshots auto-saved in `@AfterEach` to `target/e2e-screenshots/`.
+- **Mock data**: 3 conversation SSE streams (3-5 chunks each), 3 correction JSON arrays, 1 report JSON object. Keywords aligned with test prompt files in `src/test/resources/prompts/` (correction.txt starts with "Correction prompt:", report.txt with "Report prompt.").
 - **Token limit**: 128000 hardcoded in `CoachWebSocketHandler`. Warning at 80%. Uses actual token count from `ChatResponse.tokenUsage().totalTokenCount()` (not estimated).
 - **Error types**: 5 categories — GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY.
 - **iOS quirks**: TTS requires user-gesture-triggered 🔊 button click (no autoplay). Safe-area CSS (`env(safe-area-inset-top)`) for notch/status-bar spacing on Safari.

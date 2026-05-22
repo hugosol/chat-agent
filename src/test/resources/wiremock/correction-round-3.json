@@ -1,0 +1,19 @@
+{
+  "id": "mock-corr-3",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "[{\"type\":\"GRAMMAR\",\"original\":\"Yesterday I already finished\",\"corrected\":\"I already finished it yesterday\",\"explanation\":\"already放在主语后、动词前更自然，yesterday放句末\"}]"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 30,
+    "total_tokens": 130
+  }
+}

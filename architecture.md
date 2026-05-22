@@ -37,6 +37,7 @@
 | 23 | 会话恢复 | MemorySaver：页面刷新可恢复，服务重启丢失 |
 | 24 | 前端展示 | 全部消息 + 折叠旧消息 |
 | 25 | 持久化时机 | 会话结束时统一写入 H2 |
+| 26 | E2E 回归测试 | Playwright (Java) + WireMock 3.x，DOM 级断言，WireMock 固定端口 19090 拦截 DeepSeek HTTP 调用 |
 
 ---
 
@@ -517,6 +518,7 @@ web-agent/
 | 图结构 | 8 节点循环图（含 HITL awaitInput） | 1 节点线性图（仅 correction） | 避免 langgraph4j 复杂中断机制；对话流式由 Service 层管理更可控 |
 | Conversation/Merge 节点 | ConversationNode + MergeResponseNode | 移除，`TurnProcessor` 直接调用 Agent | 流式对话需要异步回调，不适合放在同步图节点中 |
 | 语音输入 | Web Speech API（`SpeechRecognition`） | 文本输入框 + iOS 键盘听写 | iOS Safari/Chrome 均不支持 `SpeechRecognition` API |
+| E2E 测试 | WebSocket 帧拦截（`ws.onFrameReceived`） | DOM 级等待（`page.waitForFunction`） | Playwright Java 的 WS 帧回调不可靠；DOM 变化更贴近"用户看到什么"的验证目标 |
 | TTS 触发 | 收到回复后自动播放 | 🔊 按钮手动触发 | iOS Safari 禁止非用户手势触发的音频播放 |
 | TTS onend 恢复 | `utterance.onend` → `showTextInput()` | `showTextInput()` 在 `AGENT_STREAM_END` 后调用 | iOS `SpeechSynthesis.onend` 经常不触发 |
 | 按住说话按钮 | `pointerdown` 启动 / `pointerup` 停止 | 移除 | 依赖已被移除的 `SpeechRecognition` |
@@ -547,3 +549,4 @@ web-agent/
 | **10. Correction UX 优化** | 侧边栏绝对定位浮层 + 默认隐藏 + header toggle；correction 气泡分行编号；Safe-area CSS；移除 LISTENING 状态 | 移动端体验提升 |
 | **11. Scenario/Persona 枚举重构** | `ScenarioType` + `PersonaType` 加描述字段；`ConversationAgent` 用 enum 访问器；`CoachWebSocketHandler` persona 入口校验；prompt 占位符修正 | 自然语言 prompt、可扩展、类型安全 |
 | **12. 归档深化** | `MessageData` 加 `messageId` 字段；`SessionArchiver` 纯计算模块提取；删除 `speech/` 空壳接口 | 修复 ErrorRecord 重复绑定；实体转换可脱离 DB 测试；消除无 leverage 模块 |
+| **13. E2E 测试** | Playwright + WireMock：`EnglishCoachSessionIT`（完整会话+3轮+sidebar+H2断言）、`EnglishCoachResumeIT`（页面刷新→会话恢复）。WireMock Scenario 状态机轮转 mock 数据，`matchingJsonPath` 区分 conversation/correction/report 请求。DOM 级等待（input 状态、correction bubble 数量、report modal 可见性）。截图自动保存到 `target/e2e-screenshots/`。 | 零外部依赖的全链路回归测试；WireMock 固定端口 19090 + shutdown hook 支持全量并行跑 |

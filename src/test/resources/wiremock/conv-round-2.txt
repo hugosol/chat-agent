@@ -1,0 +1,9 @@
+data: {"id":"mock-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"I understand "},"finish_reason":null}]}
+
+data: {"id":"mock-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"it seems challenging. "},"finish_reason":null}]}
+
+data: {"id":"mock-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Are there any other teams that could help with the workload?"},"finish_reason":null}]}
+
+data: {"id":"mock-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":200,"completion_tokens":25,"total_tokens":225}}
+
+data: [DONE]

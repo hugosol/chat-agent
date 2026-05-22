@@ -48,6 +48,25 @@ mvn spring-boot:run
 
 > **iOS tip**: The keyboard microphone (🎤) can be used for system-level dictation — the recognized text appears in the input field, then press Send.
 
+## Testing
+
+```bash
+# Unit tests only
+mvn test
+
+# E2E regression tests (first run downloads Chromium ~150MB)
+mvn verify
+```
+
+E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari viewport (390×844), and **WireMock** (fixed port `19090`) to mock DeepSeek API responses at the HTTP layer. DOM-based assertions verify the full browser-to-server-to-browser flow:
+
+| Test Class | What It Verifies |
+|-----------|-----------------|
+| `EnglishCoachSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
+| `EnglishCoachResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
+
+Test resources: `src/test/resources/wiremock/` (7 mock response files), `src/test/resources/application-test.yml` (in-memory H2).
+
 ## H2 Database Console
 
 The app uses an embedded H2 file database. Access the console for debugging:
@@ -146,10 +165,21 @@ web-agent/
 │       ├── conversation.txt
 │       ├── correction.txt
 │       └── report.txt
-└── src/main/resources/static/
-    ├── index.html
-    ├── app.js
-    └── style.css
+├── src/main/resources/static/
+│   ├── index.html
+│   ├── app.js
+│   └── style.css
+└── src/test/
+    ├── java/com/hugosol/webagent/e2e/    # E2E regression tests (Playwright + WireMock)
+    │   ├── EnglishCoachSessionIT.java
+    │   ├── EnglishCoachResumeIT.java
+    │   └── helper/
+    │       ├── E2ETestBase.java
+    │       └── WireMockStubs.java
+    └── resources/
+        ├── application-test.yml           # Test profile (memory H2, WireMock base-url)
+        ├── prompts/                       # Test prompt overrides
+        └── wiremock/                      # 7 mock response files (SSE streams + JSON)
 ```
 
 ## Configuration
