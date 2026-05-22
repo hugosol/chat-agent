@@ -12,7 +12,7 @@ spring:
 app:
   initial-users:
     - username: admin
-      password: admin123
+      password: 123
   security:
     permit-all-paths:
       - /login/**
