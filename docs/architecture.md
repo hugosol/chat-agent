@@ -29,8 +29,8 @@
 | 15 | 会话控制 | 纯 UI 按钮（开始/切换/结束） |
 | 16 | 纠错类型 | 5 类全追踪：语法/用词/中式英语/发音/流利度 |
 | 17 | LangGraph 库 | `org.bsc.langgraph4j:langgraph4j-core:1.8.16` |
-| 18 | V1 范围 | 单场景(职场英语) + 三 Agent + 完整报告 |
-| 19 | Prompt 管理 | `resources/prompts/*.txt` 文件 |
+| 18 | V1 范围 | 单 AgentMode (Workplace Standup) + 三 Agent + 完整报告 |
+| 19 | Prompt 管理 | `resources/prompts/` 目录，per-AgentMode 子目录存放 description.txt + rules.txt |
 | 20 | WS 消息协议 | JSON：START_SESSION / USER_INPUT / END_SESSION / AGENT_STREAM_DELTA / CORRECTION_RESULT / SESSION_REPORT |
 | 21 | Token 窗口 | 手动分段：UI 显示用量，80% 提醒用户结束会话 |
 | 22 | 持久化粒度 | 逐条存储 Message + ErrorRecord |
@@ -44,6 +44,7 @@
 | 30 | 数据隔离 (多租户) | `Session.userId` (NOT NULL)。按 sessionId (UUID) 隔离所有会话内数据；跨会话查询 (`getHistory`, `UserProgress`) 按 userId 过滤 |
 | 31 | 权限控制策略 | `app.security.permit-all-paths` YAML 配置驱动，SecurityConfig 无条件注解 |
 | 32 | E2E 认证绕过 | `application-e2e.yml` 设 `permit-all-paths: [/**]` 全放行；`requireUserId` fallback 返回 `"anonymous"` |
+| 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 
 ---
 
@@ -120,13 +121,12 @@
 ```java
 public class CoachState extends AgentState {
     static final String SESSION_ID        = "sessionId";
-    static final String SCENARIO          = "scenario";
-    static final String PERSONA           = "persona";
-    static final String USER_ID           = "userId";            // 当前用户标识
-    static final String STATE_STATUS      = "stateStatus";       // IDLE/PROCESSING/SPEAKING
-    static final String MESSAGES          = "messages";          // List<MessageData> (Appender)
-    static final String USER_INPUT        = "userInput";         // 用户输入文本
-    static final String CORRECTIONS       = "corrections";       // List<CorrectionData> (Appender)
+    static final String MODE              = "mode";               // AgentMode 枚举名 (String)
+    static final String USER_ID           = "userId";             // 当前用户标识
+    static final String STATE_STATUS      = "stateStatus";        // IDLE/PROCESSING/SPEAKING
+    static final String MESSAGES          = "messages";           // List<MessageData> (Appender)
+    static final String USER_INPUT        = "userInput";          // 用户输入文本
+    static final String CORRECTIONS       = "corrections";        // List<CorrectionData> (Appender)
 }
 ```
 
@@ -151,8 +151,8 @@ START → correction → END
 
 ```
 [用户 Start Session]
-  → SessionStore.createSession(scenario, persona, userId) → H2 写入 Session + userId
-  → SessionService.init(sessionId, scenario, persona, userId, wsId) → 创建 CoachState (含 USER_ID) → activeStates Map + TokenTracker 初始化
+  → SessionStore.createSession(mode, userId) → H2 写入 Session + userId
+  → SessionService.init(sessionId, mode, userId, wsId) → 创建 CoachState (含 MODE) → activeStates Map + TokenTracker 初始化
 
 [每轮对话]
   → WebSocket 收到 USER_INPUT
@@ -195,32 +195,32 @@ compiled.stream(input, RunnableConfig.builder()
 
 ## 五、三 Agent Prompt 设计
 
-### 1. ConversationAgent (`prompts/conversation.txt`)
+### 1. ConversationAgent (骨架模板 `prompts/conversation-system.txt` + per-Mode 文件)
 
+**骨架模板** — 所有 AgentMode 共用：
 ```
-You are an English conversation partner helping a Chinese Java developer
-practice workplace English. Your persona: {persona_description}
+{Description}
 
-Rules:
-- Engage in natural, flowing conversation in English.
-- Match your language level to the user's (intermediate).
-- Stay in character as {persona_role}.
-- Keep responses concise and natural for spoken conversation (2-4 sentences).
-- Do NOT explicitly list or number errors. Instead, model correct English naturally.
-- If the user makes a significant error, rephrase their meaning correctly within your response.
-- Be encouraging and supportive.
+{Rules}
 
-Current scenario: {scenario}
-Recent conversation history: {history}
-User just said: "{userInput}"
-
-Respond naturally as your persona. Do not use markdown or special formatting.
+{topicSummary}
+{learningProfile}
+{activeEngagement}
 ```
 
-> `{persona_description}` = `PersonaType.getFullDescription()` (e.g. "You are a friendly teammate...")  
-> `{persona_role}` = `PersonaType.getRoleDescription()` (e.g. "a team colleague")  
-> `{scenario}` = `ScenarioType.getDescription()` (e.g. "a daily standup meeting...")  
-> Placeholder values come from enum fields, not raw enum names. No hardcoded switch statements.
+**Per-Mode 模板** — 存放在 `prompts/{templatePath}/` 子目录下：
+
+```
+prompts/workplace_standup/
+├── description.txt    ← 身份声明 + 场景描述（完整自然语言）
+└── rules.txt          ← 行为约束规则（回复长度、纠错方式、语气等）
+```
+
+**ConversationAgent 构造时**遍历所有 `AgentMode.values()`，通过 `PromptLoader` 加载每个 Mode 的 `description.txt` 和 `rules.txt` 到 `EnumMap`，请求时 O(1) 查取并替换 `{Description}` / `{Rules}` 占位符。
+
+> `{Description}` → `description.txt` 内容（含 "You are..." 身份声明 + 场景）  
+> `{Rules}` → `rules.txt` 内容  
+> 模板内容完全由 `.txt` 文件定义，Java 枚举只携带 `templatePath` 定位子目录。
 
 ### 2. CorrectionAgent (`prompts/correction.txt`)
 
@@ -276,10 +276,10 @@ Errors: {allCorrections}
 │─────────────│     │─────────────│     │──────────────│     │──────────────│
 │ id (PK)     │     │ id (PK)     │     │ id (PK)      │     │ id (PK)      │
 │ username    │     │ userId (FK) │     │ sessionId(FK)│     │ messageId(FK)│
-│ password    │     │ scenario    │     │ role (Enum)  │     │ type (Enum)  │
-│ createTime  │     │ persona     │     │ content      │     │ originalText │
-│ updateTime  │     │ startTime   │     │ tokenCount   │     │ correctedText│
-└─────────────┘     │ endTime     │     └──────────────┘     │ explanation  │
+│ password    │     │ mode        │     │ role (Enum)  │     │ type (Enum)  │
+│ createTime  │     │ startTime   │     │ content      │     │ originalText │
+│ updateTime  │     │ endTime     │     │ tokenCount   │     │ correctedText│
+└─────────────┘     │ status      │     └──────────────┘     │ explanation  │
                     │ status      │                          └──────────────┘
                     └─────────────┘
                           1
@@ -300,8 +300,7 @@ Errors: {allCorrections}
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
 Enum: SessionStatus { ACTIVE, COMPLETED }
-Enum: ScenarioType { WORKPLACE_STANDUP("Standup Meeting", "a daily standup meeting..."), WORKPLACE_ONE_ON_ONE(...) }
-Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You are a friendly teammate..."), MANAGER(...) }
+Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), ... }
 ```
 
 > **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。
@@ -315,7 +314,7 @@ Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You ar
 #### 前端 → 后端
 
 ```json
-{ "type": "START_SESSION", "scenario": "WORKPLACE_STANDUP", "persona": "TEAM_COLLEAGUE" }
+{ "type": "START_SESSION", "mode": "WORKPLACE_STANDUP" }
 { "type": "USER_INPUT", "text": "Yesterday I worked on the login module..." }
 { "type": "END_SESSION" }
 { "type": "RESUME_SESSION", "sessionId": "xxx" }
@@ -336,8 +335,8 @@ Enum: PersonaType { TEAM_COLLEAGUE("Team Colleague", "a team colleague", "You ar
 }
 { "type": "STATE_UPDATE", "state": "SPEAKING", "tokenUsage": 0.23 }
 { "type": "SESSION_REPORT", "report": { "summary": "...", "fluencyScore": 6, ... } }
-{ "type": "SESSION_RESUMED", "sessionId": "xxx", "scenario": "...", "persona": "...", "messages": [...], "corrections": [...], "tokenUsage": 0.15 }
-{ "type": "SESSION_HISTORY", "sessions": [{ "id": "...", "scenario": "...", "startTime": "...", "status": "..." }] }
+{ "type": "SESSION_RESUMED", "sessionId": "xxx", "mode": "...", "messages": [...], "corrections": [...], "tokenUsage": 0.15 }
+{ "type": "SESSION_HISTORY", "sessions": [{ "id": "...", "mode": "...", "startTime": "...", "status": "..." }] }
 { "type": "TOKEN_WARNING", "usage": 0.80, "message": "Approaching context limit" }
 { "type": "ERROR", "message": "..." }
 ```
@@ -398,7 +397,7 @@ AgentState 释放，checkpoint 清除
 │────────────────────────────────────────────────────────────────────│
 │  [Type or use 🎤 on keyboard...              ] [Send]              │
 │────────────────────────────────────────────────────────────────────│
-│  [Standup Meeting ▼] [Team Colleague ▼] [Start] [End & Report]    │
+│  [Standup Meeting ▼]                    [Start] [End & Report]    │
 ├────────────────────────────────────────────────────────────────────┤
 │  [Log] [Clear]                                                     │
 └────────────────────────────────────────────────────────────────────┘
@@ -449,7 +448,7 @@ web-agent/
 │   ├── WebAgentApplication.java
 │   │
 │   ├── graph/                              // LangGraph 核心
-│   │   ├── CoachState.java                 // AgentState 定义 + Schema (8 channels, 含 USER_ID)
+│   │   ├── CoachState.java                 // AgentState 定义 + Schema (7 channels, 含 USER_ID + MODE)
 │   │   ├── CoachGraphBuilder.java          // StateGraph 构建 + compile (1节点线性图)
 │   │   ├── CorrectionData.java             // 纠错数据结构 (type 为 ErrorType 枚举, Serializable)
 │   │   ├── MessageData.java                // 消息数据结构 (role + content + messageId，Serializable)
@@ -483,8 +482,7 @@ web-agent/
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED
-│   │   ├── ScenarioType.java               // 枚举: WORKPLACE_STANDUP / WORKPLACE_ONE_ON_ONE (含 displayName + description)
-│   │   └── PersonaType.java                // 枚举: TEAM_COLLEAGUE / MANAGER (含 displayName + roleDescription + fullDescription)
+│   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP (含 displayName + templatePath)
 │   │
 │   ├── repository/                         // Spring Data JPA（6 个）
 │   │   ├── UserRepository.java             // findByUsername
@@ -516,9 +514,14 @@ web-agent/
 │   ├── application.yml                     // 默认配置 + app.security.permit-all-paths: [/login/**]
 │   ├── application-local.yml               // 本地覆盖（H2 console, initial-users, /h2-console/** 放行）
 │   └── prompts/
-│       ├── conversation.txt
+│       ├── conversation-system.txt         // 骨架模板（{Description}, {Rules} 占位符）
+│       ├── workplace_standup/              // per-AgentMode 子目录
+│       │   ├── description.txt
+│       │   └── rules.txt
 │       ├── correction.txt
-│       └── report.txt
+│       ├── report.txt
+│       ├── memory-topic.txt
+│       └── memory-profile.txt
 │
 └── src/main/resources/static/
     ├── login/                              // 登录页（公开目录）
@@ -538,7 +541,7 @@ web-agent/
 
 | | V1（已实现） | V2 |
 |---|-------------|----|
-| **场景** | 职场英语 (Standup / 1:1) | 技术演讲练习 |
+| **场景** | 职场英语 (Standup) | 技术演讲练习 + 更多 AgentMode |
 | **Agent** | 三 Agent 全协作 | 场景自动切换 |
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
@@ -573,6 +576,7 @@ web-agent/
 | LISTENING 状态 | session 启动后发送 STATE_UPDATE "LISTENING" | 移除，showTextInput() 设置 "Type your message" | 与键盘语音输入模式不匹配 |
 | 归档逻辑 | 双层循环全量绑定（Auto→所有 USER Message） | `SessionArchiver` 按 `messageId` 精确关联 + `MessageData` 携带 `messageId` | 修复 ErrorRecord 重复绑定 bug；实体转换抽成纯计算模块，可脱离 DB 测试 |
 | Speech 接口 | V1 预留接口 `SpeechToTextService` / `TextToSpeechService` | 删除（零实现者，V2 再按需定义） | 空壳接口不产生 leverage，徒增探索成本 |
+| Scenario/Persona 合并 | `ScenarioType` + `PersonaType` 两个独立枚举，前端两个下拉框，prompt 3 个占位符 | `AgentMode` 统一枚举，前端单一下拉框，prompt 拆为 per-Mode `description.txt` + `rules.txt` 文件 | 消除不合理组合、降低用户选择成本、提示词可按 Mode 独立定制、新增 Mode 只需加文件夹和模板文件 |
 
 ### 实现阶段
 
@@ -592,3 +596,4 @@ web-agent/
 | **12. 归档深化** | `MessageData` 加 `messageId` 字段；`SessionArchiver` 纯计算模块提取；删除 `speech/` 空壳接口 | 修复 ErrorRecord 重复绑定；实体转换可脱离 DB 测试；消除无 leverage 模块 |
 | **13. E2E 测试** | Playwright + WireMock：`EnglishCoachSessionIT`（完整会话+3轮+sidebar+H2断言）、`EnglishCoachResumeIT`（页面刷新→会话恢复）。WireMock Scenario 状态机轮转 mock 数据，`matchingJsonPath` 区分 conversation/correction/report 请求。DOM 级等待（input 状态、correction bubble 数量、report modal 可见性）。截图自动保存到 `target/e2e-screenshots/`。 | 零外部依赖的全链路回归测试；WireMock 固定端口 19090 + shutdown hook 支持全量并行跑 |
 | **14. User 模块** | Spring Security form login + remember-me + BCrypt。User entity + UserRepository。AppProperties 配置 `permit-all-paths` 驱动权限。CoachState 加 `USER_ID` channel。`Session.userId` 数据隔离。`sessionToWs` 一对一翻转。SessionCleanupLogoutHandler 登出清理。E2E 用 `application-e2e.yml` + `permit-all-paths: [/**]` 绕过认证。`requireUserId` fallback `"anonymous"`。前端登录页 `login/main.html` + Visibility API 多标签自动 resume。 | 多用户认证 + 数据隔离 + 配置驱动权限 |
+| **15. AgentMode 合并** | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举（`displayName` + `templatePath`）；前端两个下拉框合并为一个；提示词拆分为 per-Mode `description.txt` + `rules.txt`，`conversation-system.txt` 退化为骨架模板；CoachState `SCENARIO` + `PERSONA` → `MODE`；协议 `scenario` + `persona` → `mode`；删除旧枚举类 | 消除不合理组合、降低选择成本、提示词按 Mode 独立定制、新增 Mode 只需加文件夹和模板 |

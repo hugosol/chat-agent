@@ -73,14 +73,14 @@ No `.env` file support — use `local` profile (`application-local.yml`, gitigno
 
 ```
 com.hugosol.webagent/
-├── graph/           # LangGraph: CoachState (8 channels incl. USER_ID) + 1 node + builder
+├── graph/           # LangGraph: CoachState (7 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
 ├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent
 ├── websocket/       # CoachWebSocketHandler (WS entry), CoachMessageHandler (protocol logic)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 │                    # SessionStore (entity persistence), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
-├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, ...
+├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, AgentMode, ...
 ├── repository/      # Spring Data JPA repos (6: User, Session, Message, ErrorRecord, SessionReport, UserProgress)
 ├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
 └── speech/          # (vacant — V2 will add STT/TTS adapters when needed)
@@ -102,17 +102,17 @@ src/test/resources/
 
 ```
 Client → Server:
-  START_SESSION { scenario, persona }
+  START_SESSION { mode }
   USER_INPUT { text: "...", messageId: 1 }
   END_SESSION
   RESUME_SESSION { sessionId: "..." }
 
 Server → Client:
-  SESSION_STARTED { sessionId, scenario, persona }
+  SESSION_STARTED { sessionId, mode }
   AGENT_STREAM_DELTA { delta: "Sounds", messageId }
   AGENT_STREAM_END { text: "full text", messageId, tokenUsage }
   CORRECTION_RESULT { corrections: [...], messageId }
-  SESSION_RESUMED { sessionId, scenario, persona, messages, corrections, tokenUsage }
+  SESSION_RESUMED { sessionId, mode, messages, corrections, tokenUsage }
   STATE_UPDATE { state, tokenUsage }
   TOKEN_WARNING { usage }
   SESSION_REPORT { report: {...} }
@@ -134,7 +134,7 @@ Server → Client:
 - **Session ID flow**: `SessionService` creates a Session (JPA generates a UUID `id`), `CoachMessageHandler` tracks `sessionToWs` mapping, `TurnProcessor` uses it as `RunnableConfig.threadId`. All three layers (H2, WebSocket, checkpoint) share the same ID.
 - **Type safety**: `MessageData.role` and `CorrectionData.type` use Java enums (`MessageRole`, `ErrorType`) directly — no more raw `String` conversion with silent fallbacks. `ErrorType` uses `@JsonCreator` for case-insensitive LLM JSON deserialization.
 - **State encapsulation**: `CoachState` is an internal detail of `SessionService`. `CoachMessageHandler` and `ReportAgent` never import `CoachState` — all reads/writes go through `SessionService` methods.
-- **Scenario & Persona enums**: `ScenarioType` and `PersonaType` carry `displayName` + `description`/`roleDescription`/`fullDescription` fields. `ConversationAgent` resolves prompt placeholders via enum accessors (no hardcoded switch). Persona is validated at WebSocket entry via `PersonaType.valueOf()`.
+- **AgentMode enum**: `AgentMode` carries `displayName` + `templatePath` fields. Each Mode maps to a subdirectory under `prompts/` containing `description.txt` and `rules.txt`. `ConversationAgent` pre-loads all Mode templates at construction and resolves `{Description}` / `{Rules}` placeholders. Mode is validated at WebSocket entry via `AgentMode.valueOf()`.
 - **Streaming WebSocket sends**: always use `synchronized(wsSession)` when sending from async threads (callback context). `sendSynced()` helper wraps IOException.
 - **Session resume**: disconnect only removes `sessionToWs` mapping, never calls `removeSession()`. State stays in `activeStates` until explicit `END_SESSION`. On reconnect, `RESUME_SESSION` validates `userId` ownership.
 - **UserId fallback**: `requireUserId()` returns `"anonymous"` if `ws.getPrincipal()` is null. Production always has a Principal (Spring Security interceptor); E2E profile has no auth so this gracefully bypasses.

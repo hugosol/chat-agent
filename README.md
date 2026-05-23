@@ -39,7 +39,7 @@ mvn spring-boot:run
 | Step | Action |
 |------|--------|
 | 1 | Log in with username and password at the login page |
-| 2 | Select **scenario** (Standup / 1-on-1) and **persona** (Colleague / Manager) |
+| 2 | Select **mode** (e.g. Standup Meeting) from the dropdown |
 | 3 | Click **Start Session** |
 | 4 | Type your English message → press **Enter** or click **Send** |
 | 5 | Agent replies with natural English + embedded corrections |
@@ -143,7 +143,7 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 
 | Agent | Responsibility |
 |-------|---------------|
-| **ConversationAgent** | Role-plays as a workplace colleague/manager, generates natural English dialogue |
+| **ConversationAgent** | Role-plays according to the selected AgentMode (scenario + persona combined), generates natural English dialogue |
 | **CorrectionAgent** | Analyzes user input for 5 error types: grammar, word choice, Chinglish, pronunciation hints, fluency |
 | **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, vocabulary suggestions, key takeaway |
 
@@ -182,7 +182,7 @@ web-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, ...)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, AgentMode, ...)
 │   ├── repository/     (Spring Data JPA)
 │   ├── service/        (SessionService, TurnProcessor, SessionStore, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
 │   └── config/         (LangChain4jConfig, SecurityConfig, WebSocketConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
@@ -190,9 +190,14 @@ web-agent/
 │   ├── application.yml
 │   ├── application-local.yml
 │   └── prompts/
-│       ├── conversation.txt
+│       ├── conversation-system.txt       ← 骨架模板（{Description} / {Rules} 占位符）
+│       ├── workplace_standup/            ← per-AgentMode 子目录
+│       │   ├── description.txt           ← 身份声明 + 场景描述
+│       │   └── rules.txt                 ← 行为规则
 │       ├── correction.txt
-│       └── report.txt
+│       ├── report.txt
+│       ├── memory-topic.txt
+│       └── memory-profile.txt
 ├── src/main/resources/static/
 │   ├── login/
 │   │   ├── main.html
@@ -245,6 +250,7 @@ App-level configuration in `application.yml`:
 ## V2 Roadmap
 
 - [ ] OpenAI Whisper for server-side voice input
+- [ ] Additional AgentMode values (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)
 - [ ] Redis/Postgres checkpoint saver for session persistence across restarts

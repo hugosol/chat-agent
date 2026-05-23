@@ -1,6 +1,6 @@
 # CONTEXT — English Coach
 
-English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择场景（Scenario）和角色（Persona），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（User Memory）。
+English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（User Memory）。
 
 ## People and Identity
 
@@ -17,8 +17,9 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 |------|------------|-----------------|
 | **Practice session** | A single English practice conversation from START to END, identified by a UUID | Session, conversation, chat session |
 | **Turn** | One round-trip: a Learner message followed by the Agent reply and any corrections | Round, exchange, message-pair |
-| **Scenario** | The social context for role-play (e.g., workplace standup, one-on-one meeting) | Setting, scene, topic |
-| **Persona** | The role the AI plays during a Practice session (e.g., team colleague, manager) | Character, role, personality |
+| **AgentMode** | A pre-defined conversation mode that bundles both the social context (what Scenario used to be) and the AI role (what Persona used to be) into a single selection. The Learner picks one from a dropdown to start a Practice session. Example: `WORKPLACE_STANDUP` (a daily standup with a friendly teammate). Each AgentMode carries a `templatePath` pointing to per-Mode prompt files. | Scenario, scene, Persona, role, character, conversation type |
+| **Mode template** | Per-AgentMode prompt files under `prompts/{templatePath}/` — a `description.txt` (identity + scenario) and a `rules.txt` (behavioral constraints). These are pre-loaded by ConversationAgent at startup into an EnumMap for zero-I/O prompt assembly at request time. | Mode prompt, per-mode template |
+| **System Prompt skeleton** | The `conversation-system.txt` file that serves as a structural wrapper, containing only `{Description}` and `{Rules}` placeholders (plus dynamic sections like `{topicSummary}`). Its sole purpose is to let placeholder ordering control LLM attention without modifying per-Mode files. | Skeleton template, prompt wrapper |
 | **Streaming** | Agent reply delivered token-by-token to the frontend in real-time, before the full response is complete | Token streaming, incremental output |
 | **Stale delta** | A streaming token that arrives at a browser tab that no longer owns the Practice session due to multi-tab competition | Belated token, orphaned delta |
 
@@ -47,7 +48,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
-| **CoachState** | The in-memory langgraph container holding a Practice session messages, corrections, scenario, persona, and userId | Session state, graph state |
+| **CoachState** | The in-memory langgraph container holding a Practice session messages, corrections, mode, and userId | Session state, graph state |
 | **Active states map** | The ConcurrentHashMap holding all active CoachState instances, keyed by Practice session UUID | activeStates (code name), session store, state cache |
 | **Binding map** | The one-to-one ConcurrentHashMap mapping a Practice session UUID to its Active Tab WebSocket ID | sessionToWs (code name), WS binding, connection map |
 | **Checkpoint** | A langgraph snapshot of CoachState preserved in MemorySaver, enabling state restoration after a WebSocket disconnect | Snapshot, savepoint |
