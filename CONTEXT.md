@@ -1,4 +1,6 @@
-﻿# Ubiquitous Language
+# CONTEXT — English Coach
+
+English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择场景（Scenario）和角色（Persona），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（User Memory）。
 
 ## People and Identity
 
