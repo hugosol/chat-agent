@@ -23,6 +23,10 @@ public class UserMemory extends BaseEntity {
     @Column(nullable = false)
     private Integer version;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private AgentMode mode;
+
     public UserMemory() {}
 
     public UserMemory(String userId, MemoryType type, String content, Integer version) {
@@ -30,6 +34,14 @@ public class UserMemory extends BaseEntity {
         this.type = type;
         this.content = content;
         this.version = version;
+    }
+
+    public UserMemory(String userId, MemoryType type, String content, Integer version, AgentMode mode) {
+        this.userId = userId;
+        this.type = type;
+        this.content = content;
+        this.version = version;
+        this.mode = mode;
     }
 
     public String getId() { return id; }
@@ -46,4 +58,7 @@ public class UserMemory extends BaseEntity {
 
     public Integer getVersion() { return version; }
     public void setVersion(Integer version) { this.version = version; }
+
+    public AgentMode getMode() { return mode; }
+    public void setMode(AgentMode mode) { this.mode = mode; }
 }

@@ -1,0 +1,11 @@
+data: {"id":"mock-daily-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Hey there! "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Sounds like you had an interesting weekend. "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"By the way, a more natural way to say that is 'I went to a party' instead of 'I go to party'. "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"What else did you do?"},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-1","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":150,"completion_tokens":40,"total_tokens":190}}
+
+data: [DONE]

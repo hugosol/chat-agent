@@ -17,7 +17,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 |------|------------|-----------------|
 | **Practice session** | A single English practice conversation from START to END, identified by a UUID | Session, conversation, chat session |
 | **Turn** | One round-trip: a Learner message followed by the Agent reply and any corrections | Round, exchange, message-pair |
-| **AgentMode** | A pre-defined conversation mode that bundles both the social context (what Scenario used to be) and the AI role (what Persona used to be) into a single selection. The Learner picks one from a dropdown to start a Practice session. Example: `WORKPLACE_STANDUP` (a daily standup with a friendly teammate). Each AgentMode carries a `templatePath` pointing to per-Mode prompt files. | Scenario, scene, Persona, role, character, conversation type |
+| **AgentMode** | A pre-defined conversation mode that bundles both the social context (what Scenario used to be) and the AI role (what Persona used to be) into a single selection. The Learner picks one from a dropdown to start a Practice session. Examples: `WORKPLACE_STANDUP` (a daily standup with a friendly teammate), `DAILY_TALK` (casual chat with Hikaru, a friend / English tutor hybrid). Each AgentMode carries a `templatePath` pointing to per-Mode prompt files. | Scenario, scene, Persona, role, character, conversation type |
 | **Mode template** | Per-AgentMode prompt files under `prompts/{templatePath}/` — a `description.txt` (identity + scenario) and a `rules.txt` (behavioral constraints). These are pre-loaded by ConversationAgent at startup into an EnumMap for zero-I/O prompt assembly at request time. | Mode prompt, per-mode template |
 | **System Prompt skeleton** | The `conversation-system.txt` file that serves as a structural wrapper, containing only `{Description}` and `{Rules}` placeholders (plus dynamic sections like `{topicSummary}`). Its sole purpose is to let placeholder ordering control LLM attention without modifying per-Mode files. | Skeleton template, prompt wrapper |
 | **Streaming** | Agent reply delivered token-by-token to the frontend in real-time, before the full response is complete | Token streaming, incremental output |
@@ -58,7 +58,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
 | **User Memory** | A persistent summary record in H2 that captures a Learner's conversation topics or learning progress, surviving across Practice sessions | Memory, memory record, profile |
-| **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a 500-character summary of conversation topics discussed across all past Practice sessions | Topic summary, conversation memory |
+| **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a 500-character summary of conversation topics discussed across past Practice sessions of the same AgentMode (mode-scoped isolation). | Topic summary, conversation memory |
 | **Learning Profile** | A User Memory of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
 | **Memory Merge** | An LLM-driven process that combines an old User Memory (version N) with a newly completed session's Report to produce an updated version (N+1) | Incremental update, memory consolidation |
 | **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first Turn's System Prompt so the Agent recalls past context when greeting the Learner | Context injection, memory recall |

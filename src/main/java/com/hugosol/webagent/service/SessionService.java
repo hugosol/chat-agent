@@ -3,6 +3,7 @@ package com.hugosol.webagent.service;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.AgentType;
 import com.hugosol.webagent.model.MessageRole;
 import org.slf4j.Logger;
@@ -30,8 +31,9 @@ public class SessionService {
     }
 
     public void init(String sessionId, String mode, String userId, String wsId) {
-        String topicMemory = memoryService.loadLatestContent(userId, "TOPIC_SUMMARY");
-        String learningProfile = memoryService.loadLatestContent(userId, "LEARNING_PROFILE");
+        AgentMode agentMode = AgentMode.valueOf(mode);
+        String topicMemory = memoryService.loadLatestContent(userId, "TOPIC_SUMMARY", agentMode);
+        String learningProfile = memoryService.loadLatestContent(userId, "LEARNING_PROFILE", null);
         Map<String, Object> initData = CoachState.initialState(sessionId, mode, userId, topicMemory, learningProfile);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);

@@ -27,6 +27,17 @@ public class WireMockStubs {
         registerMemoryProfileStubs();
     }
 
+    public static void registerDailyTalkStubs(WireMockServer wireMock) {
+        configureFor("localhost", wireMock.port());
+        wireMock.resetAll();
+
+        registerDailyConversationStubs();
+        registerDailyCorrectionStubs();
+        registerDailyReportStub();
+        registerMemoryTopicStubs();
+        registerMemoryProfileStubs();
+    }
+
     private static void registerConversationStubs() {
         String convKeyword = "English conversation partner";
 
@@ -62,6 +73,92 @@ public class WireMockStubs {
                         .withHeader("Content-Type", "text/event-stream")
                         .withBody(loadResource("wiremock/conv-round-3.txt")))
                 .willSetStateTo("round-4"));
+    }
+
+    private static void registerDailyConversationStubs() {
+        String convKeyword = "Hikaru";
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_CONV)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody(loadResource("wiremock/daily-conv-round-1.txt")))
+                .willSetStateTo("round-2"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_CONV)
+                .whenScenarioStateIs("round-2")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody(loadResource("wiremock/daily-conv-round-2.txt")))
+                .willSetStateTo("round-3"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_CONV)
+                .whenScenarioStateIs("round-3")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody(loadResource("wiremock/daily-conv-round-3.txt")))
+                .willSetStateTo("round-4"));
+    }
+
+    private static void registerDailyCorrectionStubs() {
+        String corrKeyword = "Correction prompt:";
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(corrKeyword)))
+                .inScenario("daily-correction-rounds")
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/daily-correction-round-1.json")))
+                .willSetStateTo("round-2"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(corrKeyword)))
+                .inScenario("daily-correction-rounds")
+                .whenScenarioStateIs("round-2")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/daily-correction-round-2.json")))
+                .willSetStateTo("round-3"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(corrKeyword)))
+                .inScenario("daily-correction-rounds")
+                .whenScenarioStateIs("round-3")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/daily-correction-round-3.json")))
+                .willSetStateTo("round-4"));
+    }
+
+    private static void registerDailyReportStub() {
+        String reportKeyword = "Report prompt.";
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(reportKeyword)))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/daily-report.json"))));
     }
 
     private static void registerCorrectionStubs() {

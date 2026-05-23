@@ -2,6 +2,7 @@ package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.agent.MemoryAgent;
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MemoryType;
 import com.hugosol.webagent.model.UserMemory;
 import com.hugosol.webagent.repository.UserMemoryRepository;
@@ -33,41 +34,41 @@ public class MemoryService {
         this.transactionTemplate = transactionTemplate;
     }
 
-    public void generateMemoryAsync(String userId, ReportResult report) {
-        executor.execute(() -> generateSingle(userId, MemoryType.TOPIC_SUMMARY,
+    public void generateMemoryAsync(String userId, ReportResult report, AgentMode mode) {
+        executor.execute(() -> generateSingle(userId, MemoryType.TOPIC_SUMMARY, mode,
                 () -> memoryAgent.mergeTopic(
-                        loadLatestContent(userId, MemoryType.TOPIC_SUMMARY),
+                        loadLatestContent(userId, MemoryType.TOPIC_SUMMARY, mode),
                         report.topicSummary())));
-        executor.execute(() -> generateSingle(userId, MemoryType.LEARNING_PROFILE,
+        executor.execute(() -> generateSingle(userId, MemoryType.LEARNING_PROFILE, null,
                 () -> memoryAgent.mergeProfile(
-                        loadLatestContent(userId, MemoryType.LEARNING_PROFILE),
+                        loadLatestContent(userId, MemoryType.LEARNING_PROFILE, null),
                         report.errorSummary(),
                         report.vocabularySuggestions())));
     }
 
-    public String loadLatestContent(String userId, MemoryType type) {
-        return repository.findTopByUserIdAndTypeOrderByVersionDesc(userId, type)
+    public String loadLatestContent(String userId, MemoryType type, AgentMode mode) {
+        return repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(userId, type, mode)
                 .map(UserMemory::getContent)
                 .orElse("");
     }
 
-    public String loadLatestContent(String userId, String type) {
-        return loadLatestContent(userId, MemoryType.valueOf(type));
+    public String loadLatestContent(String userId, String type, AgentMode mode) {
+        return loadLatestContent(userId, MemoryType.valueOf(type), mode);
     }
 
-    private void generateSingle(String userId, MemoryType type, MemoryGenerateTask task) {
+    private void generateSingle(String userId, MemoryType type, AgentMode mode, MemoryGenerateTask task) {
         try {
-            UserMemory latest = repository.findTopByUserIdAndTypeOrderByVersionDesc(userId, type).orElse(null);
-            log.info("MemoryService generating {} for user {}, oldVersion={}, oldContent={}",
-                    type, userId, latest != null ? latest.getVersion() : 0,
+            UserMemory latest = repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(userId, type, mode).orElse(null);
+            log.info("MemoryService generating {} for user {}, mode={}, oldVersion={}, oldContent={}",
+                    type, userId, mode, latest != null ? latest.getVersion() : 0,
                     latest != null ? latest.getContent() : "(first session)");
             String merged = task.generate();
             int newVersion = (latest != null) ? latest.getVersion() + 1 : 1;
 
             transactionTemplate.executeWithoutResult(status -> {
-                UserMemory memory = new UserMemory(userId, type, merged, newVersion);
+                UserMemory memory = new UserMemory(userId, type, merged, newVersion, mode);
                 repository.save(memory);
-                log.info("Saved {} v{} for user {}", type, newVersion, userId);
+                log.info("Saved {} v{} for user {}, mode={}", type, newVersion, userId, mode);
             });
         } catch (Exception e) {
             log.warn("Failed to generate {} for user {}: {}", type, userId, e.getMessage());

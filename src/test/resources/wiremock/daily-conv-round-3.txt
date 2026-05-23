@@ -1,0 +1,9 @@
+data: {"id":"mock-daily-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Sounds like a plan! "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"In American culture, we usually say 'hang out' for casual meetups like that. "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"So you're going to 'hang out' with friends next Friday?"},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":170,"completion_tokens":50,"total_tokens":220}}
+
+data: [DONE]
