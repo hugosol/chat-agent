@@ -51,10 +51,10 @@ class SessionStoreTest {
 
     @Test
     void createSessionReturnsSavedSession() {
-        Session saved = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        Session saved = new Session(AgentMode.WORKPLACE_STANDUP);
         when(sessionRepository.save(any(Session.class))).thenReturn(saved);
 
-        Session result = store.createSession(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE", "user1");
+        Session result = store.createSession(AgentMode.WORKPLACE_STANDUP, "user1");
 
         assertThat(result).isSameAs(saved);
         verify(sessionRepository).save(any(Session.class));
@@ -62,7 +62,7 @@ class SessionStoreTest {
 
     @Test
     void completeSessionSavesAllEntitiesInSequence() {
-        Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        Session session = new Session(AgentMode.WORKPLACE_STANDUP);
         session.setUserId("user1");
         when(sessionRepository.findById("s1")).thenReturn(Optional.of(session));
         when(sessionRepository.save(session)).thenReturn(session);
@@ -106,7 +106,7 @@ class SessionStoreTest {
 
     @Test
     void completeSessionUpdatesUserProgress() {
-        Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        Session session = new Session(AgentMode.WORKPLACE_STANDUP);
         session.setUserId("user1");
         session.complete();
         when(sessionRepository.findById("s1")).thenReturn(Optional.of(session));
@@ -130,7 +130,7 @@ class SessionStoreTest {
     @Test
     void getHistoryReturnsRepositoryResults() {
         List<Session> sessions = List.of(
-                new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE")
+                new Session(AgentMode.WORKPLACE_STANDUP)
         );
         when(sessionRepository.findByUserIdOrderByStartTimeDesc("user1")).thenReturn(sessions);
 

@@ -20,8 +20,7 @@
         earlierMarker:   document.getElementById('earlierMarker'),
         showEarlierBtn:  document.getElementById('showEarlierBtn'),
         statusIndicator: document.getElementById('statusIndicator'),
-        scenarioSelect:  document.getElementById('scenarioSelect'),
-        personaSelect:   document.getElementById('personaSelect'),
+        modeSelect:     document.getElementById('modeSelect'),
         startBtn:        document.getElementById('startBtn'),
         endBtn:          document.getElementById('endBtn'),
         reportModal:     document.getElementById('reportModal'),
@@ -85,13 +84,12 @@
     function handleMessage(msg) {
         switch (msg.type) {
             case 'SESSION_STARTED':
-                debugLog('SESSION_STARTED id=' + msg.sessionId + ' scenario=' + msg.scenario);
+                debugLog('SESSION_STARTED id=' + msg.sessionId + ' mode=' + msg.mode);
                 sessionId = msg.sessionId;
                 localStorage.setItem('sessionId', msg.sessionId);
                 els.startBtn.disabled = true;
                 els.endBtn.disabled = false;
-                els.scenarioSelect.disabled = true;
-                els.personaSelect.disabled = true;
+                els.modeSelect.disabled = true;
                 messageCount = 0;
                 turnCounter = 0;
                 streamBubbles = {};
@@ -207,8 +205,8 @@
         localStorage.setItem('sessionId', msg.sessionId);
         els.startBtn.disabled = true;
         els.endBtn.disabled = false;
-        els.scenarioSelect.disabled = true;
-        els.personaSelect.disabled = true;
+        els.modeSelect.disabled = true;
+        els.modeSelect.value = msg.mode;
         messageCount = 0;
         streamBubbles = {};
         els.messages.innerHTML = '';
@@ -417,8 +415,7 @@
         sessionId = null;
         els.startBtn.disabled = false;
         els.endBtn.disabled = true;
-        els.scenarioSelect.disabled = false;
-        els.personaSelect.disabled = false;
+        els.modeSelect.disabled = false;
         els.tokenBar.style.width = '0%';
         els.tokenPct.textContent = '0%';
         els.textInputBar.classList.add('hidden');
@@ -464,11 +461,10 @@
     });
 
     function sendStart() {
-        debugLog('sendStart: ' + els.scenarioSelect.value + ' ' + els.personaSelect.value);
+        debugLog('sendStart: ' + els.modeSelect.value);
         ws.send(JSON.stringify({
             type: 'START_SESSION',
-            scenario: els.scenarioSelect.value,
-            persona: els.personaSelect.value
+            mode: els.modeSelect.value
         }));
     }
 

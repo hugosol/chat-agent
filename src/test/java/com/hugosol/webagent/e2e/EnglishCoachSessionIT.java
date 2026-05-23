@@ -12,7 +12,7 @@ class EnglishCoachSessionIT extends E2ETestBase {
 
     @Test
     void fullSessionWithMultiTurnAndSidebar() {
-        startSession("WORKPLACE_STANDUP", "TEAM_COLLEAGUE");
+        startSession("WORKPLACE_STANDUP");
 
         String sid = sessionId();
         assertNotNull(sid, "sessionId should be in localStorage after session start");
@@ -59,7 +59,7 @@ class EnglishCoachSessionIT extends E2ETestBase {
     private void verifyH2Data(String sid) {
         Session session = sessionRepository.findById(sid).orElseThrow();
         assertEquals(SessionStatus.COMPLETED, session.getStatus(), "session should be completed");
-        assertEquals(ScenarioType.WORKPLACE_STANDUP, session.getScenario());
+        assertEquals(AgentMode.WORKPLACE_STANDUP, session.getMode());
         assertNotNull(session.getEndTime(), "session should have endTime");
 
         List<Message> messages = messageRepository.findBySessionIdOrderByCreateTimeAsc(sid);

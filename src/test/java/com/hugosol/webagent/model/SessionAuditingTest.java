@@ -20,7 +20,7 @@ class SessionAuditingTest {
 
     @Test
     void shouldSetCreateTimeAndKeepBusinessTimestamps() {
-        Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        Session session = new Session(AgentMode.WORKPLACE_STANDUP);
         session.setUserId("test-user");
 
         Session saved = entityManager.persistFlushFind(session);

@@ -3,8 +3,8 @@ package com.hugosol.webagent.websocket;
 import com.hugosol.webagent.agent.ReportAgent;
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.ErrorType;
-import com.hugosol.webagent.model.ScenarioType;
 import com.hugosol.webagent.model.Session;
 import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
@@ -79,12 +79,12 @@ class CoachMessageHandlerTest {
     @Test
     void onStartSessionCreatesSessionAndSendsStarted() throws IOException {
         when(ws.getId()).thenReturn("ws1");
-        Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
-        when(sessionStore.createSession(any(), anyString(), anyString())).thenReturn(session);
+        Session session = new Session(AgentMode.WORKPLACE_STANDUP);
+        when(sessionStore.createSession(any(AgentMode.class), anyString())).thenReturn(session);
 
-        handler.onStartSession(ws, new ClientMessage.StartSession("WORKPLACE_STANDUP", "TEAM_COLLEAGUE"));
+        handler.onStartSession(ws, new ClientMessage.StartSession("WORKPLACE_STANDUP"));
 
-        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
+        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "user1", "ws1");
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);
         verify(protocol).send(eq(ws), captor.capture());
@@ -94,17 +94,17 @@ class CoachMessageHandlerTest {
     @Test
     void onStartSessionWithNullValuesUsesDefaults() throws IOException {
         when(ws.getId()).thenReturn("ws1");
-        Session session = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
-        when(sessionStore.createSession(any(), anyString(), anyString())).thenReturn(session);
+        Session session = new Session(AgentMode.WORKPLACE_STANDUP);
+        when(sessionStore.createSession(any(AgentMode.class), anyString())).thenReturn(session);
 
-        handler.onStartSession(ws, new ClientMessage.StartSession(null, null));
+        handler.onStartSession(ws, new ClientMessage.StartSession(null));
 
-        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "TEAM_COLLEAGUE", "user1", "ws1");
+        verify(sessionService).init(session.getId(), "WORKPLACE_STANDUP", "user1", "ws1");
     }
 
     @Test
-    void onStartSessionInvalidScenarioSendsError() throws IOException {
-        handler.onStartSession(ws, new ClientMessage.StartSession("INVALID", "TEAM_COLLEAGUE"));
+    void onStartSessionInvalidModeSendsError() throws IOException {
+        handler.onStartSession(ws, new ClientMessage.StartSession("INVALID_MODE"));
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);
         verify(protocol).send(eq(ws), captor.capture());
@@ -270,8 +270,7 @@ class CoachMessageHandlerTest {
         when(ws.getId()).thenReturn("ws1");
         when(sessionService.exists("s1")).thenReturn(true);
         when(sessionService.getUsageRatio("s1")).thenReturn(0.1);
-        when(sessionService.getScenario("s1")).thenReturn("WORKPLACE_STANDUP");
-        when(sessionService.getPersona("s1")).thenReturn("TEAM_COLLEAGUE");
+        when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
         when(sessionService.getMessages("s1")).thenReturn(List.of());
         when(sessionService.getCorrections("s1")).thenReturn(List.of());
 
@@ -308,7 +307,7 @@ class CoachMessageHandlerTest {
 
     @Test
     void onLoadHistoryReturnsSessionSummaries() throws IOException {
-        Session s1 = new Session(ScenarioType.WORKPLACE_STANDUP, "TEAM_COLLEAGUE");
+        Session s1 = new Session(AgentMode.WORKPLACE_STANDUP);
         when(sessionStore.getHistory(anyString())).thenReturn(List.of(s1));
 
         handler.onLoadHistory(ws);

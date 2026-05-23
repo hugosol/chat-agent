@@ -26,7 +26,7 @@ public sealed interface ServerMessage
                 ServerMessage.SessionReportMessage, ServerMessage.SessionResumed, ServerMessage.SessionHistory,
                 ServerMessage.ErrorMessage {
 
-    record SessionStarted(String sessionId, String scenario, String persona) implements ServerMessage {
+    record SessionStarted(String sessionId, String mode) implements ServerMessage {
     }
 
     record AgentStreamDelta(String delta, int messageId) implements ServerMessage {
@@ -51,12 +51,12 @@ public sealed interface ServerMessage
     record SessionReportMessage(ReportData report) implements ServerMessage {
     }
 
-    record SessionResumed(String sessionId, String scenario, String persona,
-                          List<MessageData> messages, List<CorrectionData> corrections,
-                          double tokenUsage) implements ServerMessage {
+    record SessionResumed(String sessionId, String mode,
+                           List<MessageData> messages, List<CorrectionData> corrections,
+                           double tokenUsage) implements ServerMessage {
     }
 
-    record SessionSummary(String id, String scenario, String startTime, String endTime, String status) {
+    record SessionSummary(String id, String mode, String startTime, String endTime, String status) {
     }
 
     record SessionHistory(List<SessionSummary> sessions) implements ServerMessage {

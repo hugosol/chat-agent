@@ -128,24 +128,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>com.microsoft.playwright</groupId>
-                <artifactId>playwright-maven-plugin</artifactId>
-                <version>${playwright.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>install</goal>
-                        </goals>
-                        <phase>process-test-classes</phase>
-                    </execution>
-                </executions>
-                <configuration>
-                    <browsers>
-                        <browser>chromium</browser>
-                    </browsers>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
 </project>

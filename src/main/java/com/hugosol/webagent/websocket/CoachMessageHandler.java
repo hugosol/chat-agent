@@ -3,8 +3,7 @@ package com.hugosol.webagent.websocket;
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
-import com.hugosol.webagent.model.PersonaType;
-import com.hugosol.webagent.model.ScenarioType;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.Session;
 import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.MessageHandler;
@@ -65,31 +64,24 @@ public class CoachMessageHandler implements MessageHandler {
     public void onStartSession(WebSocketSession ws, ClientMessage.StartSession msg) throws IOException {
         String userId = requireUserId(ws);
 
-        String scenarioStr = msg.scenario() != null ? msg.scenario() : "WORKPLACE_STANDUP";
-        String personaStr = msg.persona() != null ? msg.persona() : "TEAM_COLLEAGUE";
+        String modeStr = msg.mode() != null ? msg.mode() : "WORKPLACE_STANDUP";
 
-        ScenarioType scenario;
+        AgentMode mode;
         try {
-            scenario = ScenarioType.valueOf(scenarioStr);
+            mode = AgentMode.valueOf(modeStr);
         } catch (IllegalArgumentException e) {
-            protocol.send(ws, new ServerMessage.ErrorMessage("Invalid scenario: " + scenarioStr));
+            protocol.send(ws, new ServerMessage.ErrorMessage(
+                    "Invalid mode: " + modeStr + ". Available: [WORKPLACE_STANDUP]"));
             return;
         }
 
-        try {
-            PersonaType.valueOf(personaStr);
-        } catch (IllegalArgumentException e) {
-            protocol.send(ws, new ServerMessage.ErrorMessage("Invalid persona: " + personaStr));
-            return;
-        }
-
-        Session session = sessionStore.createSession(scenario, personaStr, userId);
-        sessionService.init(session.getId(), scenario.name(), personaStr, userId, ws.getId());
+        Session session = sessionStore.createSession(mode, userId);
+        sessionService.init(session.getId(), mode.name(), userId, ws.getId());
 
         log.info("Started session {} for user {}", session.getId(), userId);
 
         protocol.send(ws, new ServerMessage.SessionStarted(
-                session.getId(), scenario.name(), personaStr));
+                session.getId(), mode.name()));
     }
 
     @Override
@@ -207,8 +199,7 @@ public class CoachMessageHandler implements MessageHandler {
 
         protocol.send(ws, new ServerMessage.SessionResumed(
                 sessionId,
-                sessionService.getScenario(sessionId),
-                sessionService.getPersona(sessionId),
+                sessionService.getMode(sessionId),
                 sessionService.getMessages(sessionId),
                 sessionService.getCorrections(sessionId),
                 usage
@@ -224,7 +215,7 @@ public class CoachMessageHandler implements MessageHandler {
         List<ServerMessage.SessionSummary> history = sessions.stream()
                 .map(s -> new ServerMessage.SessionSummary(
                         s.getId(),
-                        s.getScenario().name(),
+                        s.getMode().name(),
                         s.getStartTime().toString(),
                         s.getEndTime() != null ? s.getEndTime().toString() : null,
                         s.getStatus().name()

@@ -123,9 +123,8 @@ public abstract class E2ETestBase {
         return (String) page.evaluate("localStorage.getItem('sessionId')");
     }
 
-    protected void startSession(String scenario, String persona) {
-        page.locator("#scenarioSelect").selectOption(scenario);
-        page.locator("#personaSelect").selectOption(persona);
+    protected void startSession(String mode) {
+        page.locator("#modeSelect").selectOption(mode);
         page.locator("#startBtn").click();
         page.waitForFunction(
                 "() => !document.getElementById('textInputBar').classList.contains('hidden')");

@@ -38,14 +38,13 @@ class ProtocolDispatcherTest {
 
     @Test
     void parseStartSessionMessage() throws IOException {
-        String json = "{\"type\":\"START_SESSION\",\"scenario\":\"WORKPLACE_STANDUP\",\"persona\":\"TEAM_COLLEAGUE\"}";
+        String json = "{\"type\":\"START_SESSION\",\"mode\":\"WORKPLACE_STANDUP\"}";
 
         ClientMessage msg = dispatcher.parse(json);
 
         assertThat(msg).isInstanceOf(ClientMessage.StartSession.class);
         ClientMessage.StartSession start = (ClientMessage.StartSession) msg;
-        assertThat(start.scenario()).isEqualTo("WORKPLACE_STANDUP");
-        assertThat(start.persona()).isEqualTo("TEAM_COLLEAGUE");
+        assertThat(start.mode()).isEqualTo("WORKPLACE_STANDUP");
     }
 
     @Test
@@ -91,7 +90,7 @@ class ProtocolDispatcherTest {
 
     @Test
     void serializeServerMessageIncludesTypeField() throws IOException {
-        ServerMessage msg = new ServerMessage.SessionStarted("s1", "STANDUP", "COLLEAGUE");
+        ServerMessage msg = new ServerMessage.SessionStarted("s1", "WORKPLACE_STANDUP");
 
         String json = dispatcher.serialize(msg);
 
@@ -102,7 +101,7 @@ class ProtocolDispatcherTest {
 
     @Test
     void dispatchStartSessionCallsHandler() throws IOException {
-        ClientMessage.StartSession msg = new ClientMessage.StartSession("STANDUP", "COLLEAGUE");
+        ClientMessage.StartSession msg = new ClientMessage.StartSession("WORKPLACE_STANDUP");
 
         dispatcher.dispatch(wsSession, msg, handler);
 
@@ -140,7 +139,7 @@ class ProtocolDispatcherTest {
     void sendWhenSessionIsOpen() throws IOException {
         when(wsSession.isOpen()).thenReturn(true);
 
-        dispatcher.send(wsSession, new ServerMessage.SessionStarted("s1", "S", "P"));
+        dispatcher.send(wsSession, new ServerMessage.SessionStarted("s1", "W"));
 
         verify(wsSession).sendMessage(any(TextMessage.class));
     }
@@ -149,7 +148,7 @@ class ProtocolDispatcherTest {
     void sendWhenSessionIsClosedDoesNothing() throws IOException {
         when(wsSession.isOpen()).thenReturn(false);
 
-        dispatcher.send(wsSession, new ServerMessage.SessionStarted("s1", "S", "P"));
+        dispatcher.send(wsSession, new ServerMessage.SessionStarted("s1", "W"));
 
         verify(wsSession, never()).sendMessage(any());
     }
@@ -159,7 +158,7 @@ class ProtocolDispatcherTest {
         when(wsSession.isOpen()).thenReturn(true);
         doThrow(new IOException("connection lost")).when(wsSession).sendMessage(any());
 
-        dispatcher.sendSynced(wsSession, new ServerMessage.SessionStarted("s1", "S", "P"));
+        dispatcher.sendSynced(wsSession, new ServerMessage.SessionStarted("s1", "W"));
     }
 
     @Test
@@ -182,7 +181,7 @@ class ProtocolDispatcherTest {
                 new ServerMessage.CorrectionResult(List.of(), 1),
                 new ServerMessage.SessionReportMessage(
                         new ServerMessage.ReportData("a", "topics", 5, "b", "c", "d")),
-                new ServerMessage.SessionResumed("s1", "S", "P", List.of(), List.of(), 0.0),
+                new ServerMessage.SessionResumed("s1", "W", List.of(), List.of(), 0.0),
                 new ServerMessage.SessionHistory(List.of()),
                 new ServerMessage.ErrorMessage("err")
         );

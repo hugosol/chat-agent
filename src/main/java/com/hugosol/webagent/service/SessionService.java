@@ -29,10 +29,10 @@ public class SessionService {
         this.memoryService = memoryService;
     }
 
-    public void init(String sessionId, String scenario, String persona, String userId, String wsId) {
+    public void init(String sessionId, String mode, String userId, String wsId) {
         String topicMemory = memoryService.loadLatestContent(userId, "TOPIC_SUMMARY");
         String learningProfile = memoryService.loadLatestContent(userId, "LEARNING_PROFILE");
-        Map<String, Object> initData = CoachState.initialState(sessionId, scenario, persona, userId, topicMemory, learningProfile);
+        Map<String, Object> initData = CoachState.initialState(sessionId, mode, userId, topicMemory, learningProfile);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
         tokenTracker.initSession(sessionId);
@@ -126,14 +126,9 @@ public class SessionService {
         return state != null ? new ArrayList<>(state.corrections()) : List.of();
     }
 
-    public String getScenario(String sessionId) {
+    public String getMode(String sessionId) {
         CoachState state = activeStates.get(sessionId);
-        return state != null ? state.scenario() : "";
-    }
-
-    public String getPersona(String sessionId) {
-        CoachState state = activeStates.get(sessionId);
-        return state != null ? state.persona() : "";
+        return state != null ? state.mode() : "";
     }
 
     public int getCorrectionCount(String sessionId) {
