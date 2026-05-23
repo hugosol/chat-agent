@@ -40,8 +40,8 @@ public class SessionStore {
     }
 
     @Transactional
-    public Session createSession(ScenarioType scenario, String persona, String userId) {
-        Session session = new Session(scenario, persona);
+    public Session createSession(AgentMode mode, String userId) {
+        Session session = new Session(mode);
         session.setUserId(userId);
         session = sessionRepository.save(session);
         log.info("SessionStore: created session {} for user {}", session.getId(), userId);

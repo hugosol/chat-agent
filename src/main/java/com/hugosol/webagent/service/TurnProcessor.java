@@ -5,6 +5,7 @@ import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.AgentType;
 import com.hugosol.webagent.model.MessageRole;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -49,8 +50,13 @@ public class TurnProcessor {
 
         int correctionsBefore = sessionService.getCorrectionCount(sessionId);
         List<MessageData> historySnapshot = sessionService.getMessages(sessionId);
-        String scenario = sessionService.getScenario(sessionId);
-        String persona = sessionService.getPersona(sessionId);
+        AgentMode mode;
+        try {
+            mode = AgentMode.valueOf(sessionService.getMode(sessionId));
+        } catch (IllegalArgumentException e) {
+            mode = AgentMode.WORKPLACE_STANDUP;
+        }
+        final AgentMode finalMode = mode;
         String topicSummary = sessionService.getTopicMemory(sessionId);
         String learningProfile = sessionService.getLearningProfile(sessionId);
         boolean isFirstTurn = historySnapshot.size() <= 1;
@@ -86,10 +92,10 @@ public class TurnProcessor {
                     };
 
             if (isFirstTurn && hasMemory) {
-                conversationAgent.generateStreamFirstTurn(historySnapshot, scenario, persona,
+                conversationAgent.generateStreamFirstTurn(historySnapshot, finalMode,
                         topicSummary, learningProfile, handler);
             } else {
-                conversationAgent.generateStream(historySnapshot, scenario, persona, handler);
+                conversationAgent.generateStream(historySnapshot, finalMode, handler);
             }
         });
 

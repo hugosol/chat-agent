@@ -19,7 +19,7 @@ class EnglishCoachMemoryIT extends E2ETestBase {
     @Test
     void memoryGeneratedAtSessionEndAndMergedOnNextSession() {
         // --- Session 1 ---
-        startSession("WORKPLACE_STANDUP", "TEAM_COLLEAGUE");
+        startSession("WORKPLACE_STANDUP");
 
         String sid1 = sessionId();
         assertNotNull(sid1, "sessionId should be in localStorage");

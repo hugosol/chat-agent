@@ -9,7 +9,7 @@ class EnglishCoachResumeIT extends E2ETestBase {
 
     @Test
     void sessionResumesAfterPageReload() {
-        startSession("WORKPLACE_ONE_ON_ONE", "MANAGER");
+        startSession("WORKPLACE_STANDUP");
 
         String sid = sessionId();
         assertNotNull(sid, "sessionId should be in localStorage after session start");

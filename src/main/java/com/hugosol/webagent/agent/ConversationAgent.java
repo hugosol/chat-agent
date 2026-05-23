@@ -2,9 +2,8 @@ package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.MessageData;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MessageRole;
-import com.hugosol.webagent.model.PersonaType;
-import com.hugosol.webagent.model.ScenarioType;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -16,7 +15,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class ConversationAgent {
@@ -29,30 +30,34 @@ public class ConversationAgent {
 
     private final StreamingChatLanguageModel chatModel;
     private final String systemTemplate;
+    private final Map<AgentMode, String> modeDescriptions = new EnumMap<>(AgentMode.class);
+    private final Map<AgentMode, String> modeRules = new EnumMap<>(AgentMode.class);
 
     public ConversationAgent(StreamingChatLanguageModel chatModel, PromptLoader promptLoader) {
         this.chatModel = chatModel;
         this.systemTemplate = promptLoader.load("conversation-system.txt");
+        for (AgentMode mode : AgentMode.values()) {
+            String path = mode.getTemplatePath();
+            modeDescriptions.put(mode, promptLoader.load(path + "/description.txt"));
+            modeRules.put(mode, promptLoader.load(path + "/rules.txt"));
+        }
     }
 
-    public void generateStream(List<MessageData> history, String scenario, String persona,
+    public void generateStream(List<MessageData> history, AgentMode mode,
                                 StreamingChatResponseHandler handler) {
-        generate(history, scenario, persona, null, null, false, handler);
+        generate(history, mode, null, null, false, handler);
     }
 
-    public void generateStreamFirstTurn(List<MessageData> history, String scenario, String persona,
+    public void generateStreamFirstTurn(List<MessageData> history, AgentMode mode,
                                          String topicSummary, String learningProfile,
                                          StreamingChatResponseHandler handler) {
-        generate(history, scenario, persona, topicSummary, learningProfile, true, handler);
+        generate(history, mode, topicSummary, learningProfile, true, handler);
     }
 
-    private void generate(List<MessageData> history, String scenario, String persona,
+    private void generate(List<MessageData> history, AgentMode mode,
                           String topicSummary, String learningProfile, boolean injectMemory,
                           StreamingChatResponseHandler handler) {
-        PersonaType p = PersonaType.valueOf(persona);
-        ScenarioType s = ScenarioType.valueOf(scenario);
-
-        String systemContent = buildSystemContent(p, s, topicSummary, learningProfile, injectMemory);
+        String systemContent = buildSystemContent(mode, topicSummary, learningProfile, injectMemory);
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(systemContent));
@@ -71,12 +76,14 @@ public class ConversationAgent {
         chatModel.chat(messages, handler);
     }
 
-    private String buildSystemContent(PersonaType p, ScenarioType s,
+    private String buildSystemContent(AgentMode mode,
                                        String topicSummary, String learningProfile, boolean injectMemory) {
+        String description = modeDescriptions.getOrDefault(mode, "");
+        String rules = modeRules.getOrDefault(mode, "");
+
         String content = systemTemplate
-                .replace("{persona_description}", p.getFullDescription())
-                .replace("{persona_role}", p.getRoleDescription())
-                .replace("{scenario}", s.getDescription());
+                .replace("{Description}", description)
+                .replace("{Rules}", rules);
 
         if (injectMemory) {
             content = content

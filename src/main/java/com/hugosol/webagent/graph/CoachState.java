@@ -13,8 +13,7 @@ import java.util.Map;
 public class CoachState extends AgentState {
 
     public static final String SESSION_ID   = "sessionId";
-    public static final String SCENARIO     = "scenario";
-    public static final String PERSONA      = "persona";
+    public static final String MODE         = "mode";
     public static final String USER_ID      = "userId";
     public static final String STATE_STATUS = "stateStatus";
     public static final String MESSAGES     = "messages";
@@ -25,8 +24,7 @@ public class CoachState extends AgentState {
 
     static final Map<String, Channel<?>> SCHEMA = Map.of(
             SESSION_ID,   Channels.base(() -> ""),
-            SCENARIO,     Channels.base(() -> ""),
-            PERSONA,      Channels.base(() -> ""),
+            MODE,         Channels.base(() -> ""),
             USER_ID,      Channels.base(() -> ""),
             STATE_STATUS, Channels.base(() -> "IDLE"),
             MESSAGES,     Channels.appender(ArrayList::new),
@@ -40,12 +38,11 @@ public class CoachState extends AgentState {
         super(initData);
     }
 
-    public static Map<String, Object> initialState(String sessionId, String scenario, String persona, String userId,
-                                                     String topicMemory, String learningProfile) {
+    public static Map<String, Object> initialState(String sessionId, String mode, String userId,
+                                                      String topicMemory, String learningProfile) {
         return Map.of(
                 SESSION_ID, sessionId,
-                SCENARIO, scenario,
-                PERSONA, persona,
+                MODE, mode,
                 USER_ID, userId,
                 STATE_STATUS, "IDLE",
                 MESSAGES, new ArrayList<>(),
@@ -60,12 +57,8 @@ public class CoachState extends AgentState {
         return this.<String>value(SESSION_ID).orElse("");
     }
 
-    public String scenario() {
-        return this.<String>value(SCENARIO).orElse("");
-    }
-
-    public String persona() {
-        return this.<String>value(PERSONA).orElse("");
+    public String mode() {
+        return this.<String>value(MODE).orElse("");
     }
 
     public String userId() {

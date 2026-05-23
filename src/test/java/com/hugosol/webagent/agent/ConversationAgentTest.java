@@ -2,9 +2,8 @@ package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.MessageData;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MessageRole;
-import com.hugosol.webagent.model.PersonaType;
-import com.hugosol.webagent.model.ScenarioType;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -67,8 +66,7 @@ class ConversationAgentTest {
     void streamingTokensArriveInOrder() throws Exception {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new RecordingHandler());
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
@@ -76,27 +74,27 @@ class ConversationAgentTest {
     }
 
     @Test
-    void systemMessageContainsPersonaRole() {
+    void systemMessageContainsModeDescription() {
         agent.generateStream(
                 List.of(),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("team colleague");
+        assertThat(systemContent).contains("friendly teammate");
+        assertThat(systemContent).contains("standup meeting");
     }
 
     @Test
-    void systemMessageContainsScenarioDescription() {
+    void systemMessageContainsModeRules() {
         agent.generateStream(
                 List.of(),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("standup meeting");
+        assertThat(systemContent).contains("encouraging and supportive");
+        assertThat(systemContent).contains("2-4 sentences");
     }
 
     @Test
@@ -106,8 +104,7 @@ class ConversationAgentTest {
         );
 
         agent.generateStream(history,
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         assertThat(lastMessages).isNotNull();
@@ -122,8 +119,7 @@ class ConversationAgentTest {
     void emptyHistoryHasOnlySystemMessage() {
         agent.generateStream(
                 List.of(),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         assertThat(lastMessages).isNotNull();
@@ -138,8 +134,7 @@ class ConversationAgentTest {
         );
 
         agent.generateStream(history,
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         assertThat(lastMessages).hasSize(3); // system + user + assistant
@@ -154,8 +149,7 @@ class ConversationAgentTest {
         }
 
         agent.generateStream(history,
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         assertThat(lastMessages).hasSize(21); // system + 20 user messages
@@ -180,8 +174,7 @@ class ConversationAgentTest {
 
         latch = new CountDownLatch(1);
         errorAgent.generateStream(List.of(),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new StreamingChatResponseHandler() {
                     @Override
                     public void onPartialResponse(String token) {}
@@ -202,8 +195,7 @@ class ConversationAgentTest {
     void generateStreamFirstTurn_injectsMemoryContent() {
         agent.generateStreamFirstTurn(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 "Talked about travel plans",
                 "Past tense needs work",
                 new NoopHandler());
@@ -221,8 +213,7 @@ class ConversationAgentTest {
     void generateStream_hasNoMemoryContent() {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
@@ -238,8 +229,7 @@ class ConversationAgentTest {
         );
 
         agent.generateStream(history,
-                ScenarioType.WORKPLACE_STANDUP.name(),
-                PersonaType.TEAM_COLLEAGUE.name(),
+                AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
         assertThat(lastMessages).hasSize(2); // system + user only, correction skipped

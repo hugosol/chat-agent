@@ -13,10 +13,7 @@ public class Session extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ScenarioType scenario;
-
-    @Column(nullable = false)
-    private String persona;
+    private AgentMode mode;
 
     @Column(nullable = false)
     private LocalDateTime startTime;
@@ -32,9 +29,8 @@ public class Session extends BaseEntity {
 
     public Session() {}
 
-    public Session(ScenarioType scenario, String persona) {
-        this.scenario = scenario;
-        this.persona = persona;
+    public Session(AgentMode mode) {
+        this.mode = mode;
         this.startTime = LocalDateTime.now();
         this.status = SessionStatus.ACTIVE;
     }
@@ -47,11 +43,8 @@ public class Session extends BaseEntity {
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
-    public ScenarioType getScenario() { return scenario; }
-    public void setScenario(ScenarioType scenario) { this.scenario = scenario; }
-
-    public String getPersona() { return persona; }
-    public void setPersona(String persona) { this.persona = persona; }
+    public AgentMode getMode() { return mode; }
+    public void setMode(AgentMode mode) { this.mode = mode; }
 
     public LocalDateTime getStartTime() { return startTime; }
     public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }

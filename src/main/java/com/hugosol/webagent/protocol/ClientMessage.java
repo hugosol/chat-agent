@@ -15,7 +15,7 @@ public sealed interface ClientMessage
         permits ClientMessage.StartSession, ClientMessage.UserInput, ClientMessage.EndSession,
                 ClientMessage.ResumeSession, ClientMessage.LoadHistory {
 
-    record StartSession(String scenario, String persona) implements ClientMessage {
+    record StartSession(String mode) implements ClientMessage {
     }
 
     record UserInput(String text, int messageId) implements ClientMessage {
