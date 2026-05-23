@@ -39,7 +39,7 @@ mvn spring-boot:run
 | Step | Action |
 |------|--------|
 | 1 | Log in with username and password at the login page |
-| 2 | Select **mode** (e.g. Standup Meeting) from the dropdown |
+| 2 | Select **mode** (e.g. Standup Meeting, Daily Talk) from the dropdown |
 | 3 | Click **Start Session** |
 | 4 | Type your English message → press **Enter** or click **Send** |
 | 5 | Agent replies with natural English + embedded corrections |
@@ -194,6 +194,9 @@ web-agent/
 │       ├── workplace_standup/            ← per-AgentMode 子目录
 │       │   ├── description.txt           ← 身份声明 + 场景描述
 │       │   └── rules.txt                 ← 行为规则
+│       ├── daily_talk/                   ← per-AgentMode 子目录 (Hikaru)
+│       │   ├── description.txt           ← 身份声明 + 场景描述
+│       │   └── rules.txt                 ← 行为规则
 │       ├── correction.txt
 │       ├── report.txt
 │       ├── memory-topic.txt
@@ -250,7 +253,8 @@ App-level configuration in `application.yml`:
 ## V2 Roadmap
 
 - [ ] OpenAI Whisper for server-side voice input
-- [ ] Additional AgentMode values (e.g. 1-on-1 Meeting, Technical Presentation)
+- [x] Additional AgentMode values (DAILY_TALK with Hikaru persona — casual friend+tutor chat)
+- [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)
 - [ ] Redis/Postgres checkpoint saver for session persistence across restarts

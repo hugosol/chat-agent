@@ -1,0 +1,19 @@
+{
+  "id": "mock-daily-corr-1",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "[{\"type\":\"GRAMMAR\",\"original\":\"I go to party\",\"corrected\":\"I went to a party\",\"explanation\":\"过去发生的事情要用过去时，party前面需要冠词a\"},{\"type\":\"CHINGLISH\",\"original\":\"I very happy\",\"corrected\":\"I was very happy\",\"explanation\":\"需要加be动词was，这是中式英语常见错误\"}]"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 50,
+    "total_tokens": 150
+  }
+}

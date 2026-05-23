@@ -86,6 +86,47 @@ class ConversationAgentTest {
     }
 
     @Test
+    void workplaceStandupIdentityIsInDescriptionNotSkeleton() {
+        agent.generateStream(
+                List.of(),
+                AgentMode.WORKPLACE_STANDUP,
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("English conversation partner");
+        assertThat(systemContent).contains("Chinese Java developer");
+        assertThat(systemContent).contains("practice workplace English");
+    }
+
+    @Test
+    void dailyTalkSystemContentContainsHikaruPersona() {
+        agent.generateStream(
+                List.of(),
+                AgentMode.DAILY_TALK,
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("Hikaru");
+        assertThat(systemContent).contains("American");
+        assertThat(systemContent).contains("cultural");
+        assertThat(systemContent).contains("voice chat");
+    }
+
+    @Test
+    void dailyTalkSystemContentContainsTeachingRules() {
+        agent.generateStream(
+                List.of(),
+                AgentMode.DAILY_TALK,
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("natural way to say");
+        assertThat(systemContent).contains("cultural background");
+        assertThat(systemContent).contains("open-ended questions");
+        assertThat(systemContent).contains("3-5 sentences");
+    }
+
+    @Test
     void systemMessageContainsModeRules() {
         agent.generateStream(
                 List.of(),

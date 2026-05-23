@@ -1,7 +1,8 @@
 package com.hugosol.webagent.model;
 
 public enum AgentMode {
-    WORKPLACE_STANDUP("Standup Meeting", "workplace_standup");
+    WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"),
+    DAILY_TALK("Daily Talk", "daily_talk");
 
     private final String displayName;
     private final String templatePath;

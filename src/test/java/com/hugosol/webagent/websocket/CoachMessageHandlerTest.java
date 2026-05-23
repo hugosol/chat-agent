@@ -108,7 +108,12 @@ class CoachMessageHandlerTest {
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);
         verify(protocol).send(eq(ws), captor.capture());
-        assertThat(captor.getValue()).isInstanceOf(ServerMessage.ErrorMessage.class);
+        ServerMessage msg = captor.getValue();
+        assertThat(msg).isInstanceOf(ServerMessage.ErrorMessage.class);
+        assertThat(((ServerMessage.ErrorMessage) msg).message())
+                .contains("Invalid mode")
+                .contains("WORKPLACE_STANDUP")
+                .contains("DAILY_TALK");
     }
 
     @Test
@@ -220,6 +225,7 @@ class CoachMessageHandlerTest {
         when(sessionService.getCorrections("s1")).thenReturn(List.of());
         when(sessionService.getUsageRatio("s1")).thenReturn(0.2);
         when(sessionService.getUserId("s1")).thenReturn("user1");
+        when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
 
         ReportResult reportResult = new ReportResult("Great", "topics discussed", "none", "try however", 8, "practice");
         when(reportAgent.generate(any(), any())).thenReturn(reportResult);
@@ -227,7 +233,7 @@ class CoachMessageHandlerTest {
         handler.onEndSession(ws);
 
         verify(sessionStore).completeSession(eq("s1"), any(), any(), eq(reportResult));
-        verify(memoryService).generateMemoryAsync("user1", reportResult);
+        verify(memoryService).generateMemoryAsync("user1", reportResult, AgentMode.WORKPLACE_STANDUP);
         verify(sessionService).remove("s1");
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);

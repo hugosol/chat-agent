@@ -31,8 +31,8 @@ class UserMemoryRepositoryTest {
         entityManager.persistFlushFind(new UserMemory("user-1", MemoryType.TOPIC_SUMMARY, "v3 content", 3));
         entityManager.persistFlushFind(new UserMemory("user-1", MemoryType.TOPIC_SUMMARY, "v2 content", 2));
 
-        Optional<UserMemory> result = repository.findTopByUserIdAndTypeOrderByVersionDesc(
-                "user-1", MemoryType.TOPIC_SUMMARY);
+        Optional<UserMemory> result = repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                "user-1", MemoryType.TOPIC_SUMMARY, null);
 
         assertThat(result).isPresent();
         assertThat(result.get().getContent()).isEqualTo("v3 content");
@@ -44,10 +44,10 @@ class UserMemoryRepositoryTest {
         entityManager.persistFlushFind(new UserMemory("user-1", MemoryType.TOPIC_SUMMARY, "topic v1", 1));
         entityManager.persistFlushFind(new UserMemory("user-1", MemoryType.LEARNING_PROFILE, "profile v1", 1));
 
-        Optional<UserMemory> topicResult = repository.findTopByUserIdAndTypeOrderByVersionDesc(
-                "user-1", MemoryType.TOPIC_SUMMARY);
-        Optional<UserMemory> profileResult = repository.findTopByUserIdAndTypeOrderByVersionDesc(
-                "user-1", MemoryType.LEARNING_PROFILE);
+        Optional<UserMemory> topicResult = repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                "user-1", MemoryType.TOPIC_SUMMARY, null);
+        Optional<UserMemory> profileResult = repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                "user-1", MemoryType.LEARNING_PROFILE, null);
 
         assertThat(topicResult).isPresent();
         assertThat(topicResult.get().getContent()).isEqualTo("topic v1");
@@ -57,8 +57,8 @@ class UserMemoryRepositoryTest {
 
     @Test
     void findTopByUserIdAndTypeOrderByVersionDesc_returnsEmptyWhenNoMatches() {
-        Optional<UserMemory> result = repository.findTopByUserIdAndTypeOrderByVersionDesc(
-                "nonexistent", MemoryType.TOPIC_SUMMARY);
+        Optional<UserMemory> result = repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                "nonexistent", MemoryType.TOPIC_SUMMARY, null);
 
         assertThat(result).isEmpty();
     }

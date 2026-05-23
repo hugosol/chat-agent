@@ -2,6 +2,7 @@ package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
+import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.AgentType;
 import com.hugosol.webagent.model.ErrorType;
 import com.hugosol.webagent.model.MessageRole;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -23,7 +25,7 @@ class SessionServiceTest {
     void setUp() {
         TokenTracker tokenTracker = new TokenTracker(128000, 0.8);
         MemoryService memoryService = mock(MemoryService.class);
-        when(memoryService.loadLatestContent(anyString(), anyString())).thenReturn("");
+        when(memoryService.loadLatestContent(anyString(), anyString(), any())).thenReturn("");
         service = new SessionService(tokenTracker, memoryService);
     }
 

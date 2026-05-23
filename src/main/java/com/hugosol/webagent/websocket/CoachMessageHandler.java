@@ -22,7 +22,9 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class CoachMessageHandler implements MessageHandler {
@@ -70,8 +72,11 @@ public class CoachMessageHandler implements MessageHandler {
         try {
             mode = AgentMode.valueOf(modeStr);
         } catch (IllegalArgumentException e) {
+            String available = Arrays.stream(AgentMode.values())
+                    .map(AgentMode::name)
+                    .collect(Collectors.joining(", "));
             protocol.send(ws, new ServerMessage.ErrorMessage(
-                    "Invalid mode: " + modeStr + ". Available: [WORKPLACE_STANDUP]"));
+                    "Invalid mode: " + modeStr + ". Available: [" + available + "]"));
             return;
         }
 
@@ -155,7 +160,8 @@ public class CoachMessageHandler implements MessageHandler {
 
         String userId = sessionService.getUserId(sessionId);
         if (userId != null) {
-            memoryService.generateMemoryAsync(userId, report);
+            AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
+            memoryService.generateMemoryAsync(userId, report, mode);
         }
 
         sessionService.remove(sessionId);

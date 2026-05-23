@@ -47,14 +47,14 @@ class EnglishCoachMemoryIT extends E2ETestBase {
         assertEquals(SessionStatus.COMPLETED, session1.getStatus());
 
         // Verify UserMemory v1 was generated
-        var topicV1 = userMemoryRepository.findTopByUserIdAndTypeOrderByVersionDesc(
-                "anonymous", MemoryType.TOPIC_SUMMARY);
+        var topicV1 = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                "anonymous", MemoryType.TOPIC_SUMMARY, AgentMode.WORKPLACE_STANDUP);
         assertTrue(topicV1.isPresent(), "topic memory should be generated");
         assertEquals(1, topicV1.get().getVersion());
         assertTrue(topicV1.get().getContent().contains("login module"));
 
-        var profileV1 = userMemoryRepository.findTopByUserIdAndTypeOrderByVersionDesc(
-                "anonymous", MemoryType.LEARNING_PROFILE);
+        var profileV1 = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                "anonymous", MemoryType.LEARNING_PROFILE, null);
         assertTrue(profileV1.isPresent(), "learning profile should be generated");
         assertEquals(1, profileV1.get().getVersion());
 
@@ -82,8 +82,8 @@ class EnglishCoachMemoryIT extends E2ETestBase {
         assertEquals(SessionStatus.COMPLETED, session2.getStatus());
 
         // Verify UserMemory merged: both types now have v2
-        List<UserMemory> allTopic = userMemoryRepository.findByUserIdAndTypeOrderByVersionDesc(
-                "anonymous", MemoryType.TOPIC_SUMMARY);
+        List<UserMemory> allTopic = userMemoryRepository.findByUserIdAndTypeAndModeOrderByVersionDesc(
+                "anonymous", MemoryType.TOPIC_SUMMARY, AgentMode.WORKPLACE_STANDUP);
         assertEquals(2, allTopic.size(), "should have 2 topic memory rows (v1 + v2)");
 
         UserMemory topicV1row = allTopic.stream().filter(m -> m.getVersion() == 1).findFirst().orElseThrow();
@@ -91,8 +91,8 @@ class EnglishCoachMemoryIT extends E2ETestBase {
         assertNotEquals(topicV1row.getContent(), topicV2row.getContent(),
                 "merged topic memory should differ from v1");
 
-        List<UserMemory> allProfile = userMemoryRepository.findByUserIdAndTypeOrderByVersionDesc(
-                "anonymous", MemoryType.LEARNING_PROFILE);
+        List<UserMemory> allProfile = userMemoryRepository.findByUserIdAndTypeAndModeOrderByVersionDesc(
+                "anonymous", MemoryType.LEARNING_PROFILE, null);
         assertEquals(2, allProfile.size(), "should have 2 learning profile rows (v1 + v2)");
 
         UserMemory profileV1row = allProfile.stream().filter(m -> m.getVersion() == 1).findFirst().orElseThrow();

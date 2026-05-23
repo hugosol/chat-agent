@@ -1,0 +1,11 @@
+data: {"id":"mock-daily-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"That's awesome! "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"I love Sichuan food too. "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Are you looking for the word 'spicy'? That's a great way to describe it. "},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"Have you tried the hot pot place on Nanjing Road?"},"finish_reason":null}]}
+
+data: {"id":"mock-daily-conv-2","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":160,"completion_tokens":45,"total_tokens":205}}
+
+data: [DONE]

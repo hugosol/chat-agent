@@ -8,7 +8,7 @@
 
 ---
 
-## 二、全量决策日志（32 项）
+## 二、全量决策日志（35 项）
 
 | # | 决策点 | 选择 |
 |---|--------|------|
@@ -29,7 +29,7 @@
 | 15 | 会话控制 | 纯 UI 按钮（开始/切换/结束） |
 | 16 | 纠错类型 | 5 类全追踪：语法/用词/中式英语/发音/流利度 |
 | 17 | LangGraph 库 | `org.bsc.langgraph4j:langgraph4j-core:1.8.16` |
-| 18 | V1 范围 | 单 AgentMode (Workplace Standup) + 三 Agent + 完整报告 |
+| 18 | V1 范围 | 两个 AgentMode (Workplace Standup + Daily Talk) + 三 Agent + 完整报告 |
 | 19 | Prompt 管理 | `resources/prompts/` 目录，per-AgentMode 子目录存放 description.txt + rules.txt |
 | 20 | WS 消息协议 | JSON：START_SESSION / USER_INPUT / END_SESSION / AGENT_STREAM_DELTA / CORRECTION_RESULT / SESSION_REPORT |
 | 21 | Token 窗口 | 手动分段：UI 显示用量，80% 提醒用户结束会话 |
@@ -45,6 +45,8 @@
 | 31 | 权限控制策略 | `app.security.permit-all-paths` YAML 配置驱动，SecurityConfig 无条件注解 |
 | 32 | E2E 认证绕过 | `application-e2e.yml` 设 `permit-all-paths: [/**]` 全放行；`requireUserId` fallback 返回 `"anonymous"` |
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
+| 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Hikaru（30 多岁美国人在中国）为 persona，朋友 + 外教混搭角色。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
+| 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
 
 ---
 
@@ -214,6 +216,10 @@ compiled.stream(input, RunnableConfig.builder()
 prompts/workplace_standup/
 ├── description.txt    ← 身份声明 + 场景描述（完整自然语言）
 └── rules.txt          ← 行为约束规则（回复长度、纠错方式、语气等）
+
+prompts/daily_talk/
+├── description.txt    ← Hikaru 人设：30 多岁美国人住在中国，朋友+外教混搭
+└── rules.txt          ← 10 条：轻松闲聊、教地道表达、补充词汇、文化背景解释等
 ```
 
 **ConversationAgent 构造时**遍历所有 `AgentMode.values()`，通过 `PromptLoader` 加载每个 Mode 的 `description.txt` 和 `rules.txt` 到 `EnumMap`，请求时 O(1) 查取并替换 `{Description}` / `{Rules}` 占位符。
@@ -300,7 +306,7 @@ Errors: {allCorrections}
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
 Enum: SessionStatus { ACTIVE, COMPLETED }
-Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), ... }
+Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAILY_TALK("Daily Talk", "daily_talk") }
 ```
 
 > **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。
@@ -516,6 +522,9 @@ web-agent/
 │   └── prompts/
 │       ├── conversation-system.txt         // 骨架模板（{Description}, {Rules} 占位符）
 │       ├── workplace_standup/              // per-AgentMode 子目录
+│       │   ├── description.txt
+│       │   └── rules.txt
+│       ├── daily_talk/                     // per-AgentMode 子目录 (Hikaru)
 │       │   ├── description.txt
 │       │   └── rules.txt
 │       ├── correction.txt

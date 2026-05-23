@@ -1,0 +1,19 @@
+{
+  "id": "mock-daily-corr-2",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "[{\"type\":\"WORD_CHOICE\",\"original\":\"the food is very delicious\",\"corrected\":\"the food was amazing\",\"explanation\":\"delicious可以用但比较普通，amazing更地道更生动\"}]"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 30,
+    "total_tokens": 130
+  }
+}
