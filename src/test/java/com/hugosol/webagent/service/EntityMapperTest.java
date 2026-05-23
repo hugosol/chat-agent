@@ -192,6 +192,7 @@ class EntityMapperTest {
     void buildReportPopulatesAllFields() {
         ReportResult report = new ReportResult(
                 "Overall assessment text",
+                "Discussed standup topics and travel plans",
                 "Grammar: 3, Word Choice: 2",
                 "vocab1\nvocab2",
                 7,
@@ -238,7 +239,7 @@ class EntityMapperTest {
 
     @Test
     void buildReportHandlesEmptyValues() {
-        ReportResult report = new ReportResult("", "", "", 0, "");
+        ReportResult report = new ReportResult("", "", "", "", 0, "");
 
         SessionReport sr = mapper.buildReport("s1", report);
 

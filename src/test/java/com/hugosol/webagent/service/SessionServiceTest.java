@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class SessionServiceTest {
 
@@ -19,7 +22,9 @@ class SessionServiceTest {
     @BeforeEach
     void setUp() {
         TokenTracker tokenTracker = new TokenTracker(128000, 0.8);
-        service = new SessionService(tokenTracker);
+        MemoryService memoryService = mock(MemoryService.class);
+        when(memoryService.loadLatestContent(anyString(), anyString())).thenReturn("");
+        service = new SessionService(tokenTracker, memoryService);
     }
 
     @Test

@@ -49,6 +49,8 @@ class TurnProcessorTest {
         when(sessionService.getScenario(anyString())).thenReturn("WORKPLACE_STANDUP");
         when(sessionService.getPersona(anyString())).thenReturn("TEAM_COLLEAGUE");
         when(sessionService.getCorrectionCount(anyString())).thenReturn(0);
+        when(sessionService.getTopicMemory(anyString())).thenReturn("");
+        when(sessionService.getLearningProfile(anyString())).thenReturn("");
     }
 
     @Test
@@ -92,10 +94,10 @@ class TurnProcessorTest {
     @Test
     void conversationErrorFiresCallback() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(4);
+            StreamingChatResponseHandler handler = inv.getArgument(3);
             handler.onError(new RuntimeException("model down"));
             return null;
-        }).when(conversationAgent).generateStream(anyString(), any(), anyString(), anyString(), any());
+        }).when(conversationAgent).generateStream(any(), anyString(), anyString(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -210,11 +212,11 @@ class TurnProcessorTest {
     @Test
     void nullChatResponseGuardDoesNotThrow() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(4);
+            StreamingChatResponseHandler handler = inv.getArgument(3);
             handler.onPartialResponse("x");
             handler.onCompleteResponse(null);
             return null;
-        }).when(conversationAgent).generateStream(anyString(), any(), anyString(), anyString(), any());
+        }).when(conversationAgent).generateStream(any(), anyString(), anyString(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -237,14 +239,14 @@ class TurnProcessorTest {
 
     private void setupConversationAgent(String responseText, int totalTokens) {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(4);
+            StreamingChatResponseHandler handler = inv.getArgument(3);
             handler.onPartialResponse(responseText);
             handler.onCompleteResponse(ChatResponse.builder()
                     .aiMessage(dev.langchain4j.data.message.AiMessage.from(responseText))
                     .tokenUsage(new TokenUsage(totalTokens / 2, totalTokens / 2, totalTokens))
                     .build());
             return null;
-        }).when(conversationAgent).generateStream(anyString(), any(), anyString(), anyString(), any());
+        }).when(conversationAgent).generateStream(any(), anyString(), anyString(), any());
     }
 
     private static class StubCallback implements TurnProcessor.TurnCallback {

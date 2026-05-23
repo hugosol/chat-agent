@@ -56,6 +56,7 @@ class ReportAgentTest {
         chatModel.setResponse("""
                 {
                   "overallAssessment": "Good progress",
+                  "topicSummary": "Talked about work and travel",
                   "errorSummary": "Grammar: 2, Chinglish: 1",
                   "vocabularySuggestions": "try however instead of but",
                   "fluencyScore": 7,
@@ -68,6 +69,7 @@ class ReportAgentTest {
         );
 
         assertThat(result.overallAssessment()).isEqualTo("Good progress");
+        assertThat(result.topicSummary()).isEqualTo("Talked about work and travel");
         assertThat(result.errorSummary()).isEqualTo("Grammar: 2, Chinglish: 1");
         assertThat(result.vocabularySuggestions()).isEqualTo("try however instead of but");
         assertThat(result.fluencyScore()).isEqualTo(7);
@@ -80,6 +82,7 @@ class ReportAgentTest {
         ReportResult result = agent.generate(List.of(), List.of());
 
         assertThat(result.overallAssessment()).isEmpty();
+        assertThat(result.topicSummary()).isEmpty();
         assertThat(result.errorSummary()).isEmpty();
         assertThat(result.vocabularySuggestions()).isEmpty();
         assertThat(result.fluencyScore()).isZero();
@@ -150,6 +153,18 @@ class ReportAgentTest {
 
         assertThat(result.fluencyScore()).isEqualTo(5);
         assertThat(result.overallAssessment()).isEmpty();
+        assertThat(result.topicSummary()).isEmpty();
         assertThat(result.keyTakeaway()).isEmpty();
+    }
+
+    @Test
+    void nestedObjectValuesAreSerializedToString() {
+        chatModel.setResponse("{\"errorSummary\":{\"GRAMMAR\":3,\"CHINGLISH\":1},\"fluencyScore\":\"7\"}");
+
+        ReportResult result = agent.generate(List.of(), List.of());
+
+        assertThat(result.errorSummary()).contains("GRAMMAR");
+        assertThat(result.errorSummary()).contains("CHINGLISH");
+        assertThat(result.fluencyScore()).isEqualTo(7);
     }
 }

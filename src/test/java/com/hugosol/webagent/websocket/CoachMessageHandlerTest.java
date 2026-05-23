@@ -11,6 +11,7 @@ import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
 import com.hugosol.webagent.service.SessionService;
 import com.hugosol.webagent.service.SessionStore;
+import com.hugosol.webagent.service.MemoryService;
 import com.hugosol.webagent.service.TurnProcessor;
 import com.hugosol.webagent.service.TurnProcessor.TurnCallback;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +55,9 @@ class CoachMessageHandlerTest {
     private SessionStore sessionStore;
 
     @Mock
+    private MemoryService memoryService;
+
+    @Mock
     private ProtocolDispatcher protocol;
 
     @Mock
@@ -67,7 +71,7 @@ class CoachMessageHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new CoachMessageHandler(sessionService, turnProcessor,
-                reportAgent, sessionStore, protocol);
+                reportAgent, sessionStore, memoryService, protocol);
         when(ws.getPrincipal()).thenReturn(principal);
         when(principal.getName()).thenReturn("user1");
     }
@@ -215,19 +219,23 @@ class CoachMessageHandlerTest {
         when(sessionService.getMessages("s1")).thenReturn(List.of());
         when(sessionService.getCorrections("s1")).thenReturn(List.of());
         when(sessionService.getUsageRatio("s1")).thenReturn(0.2);
+        when(sessionService.getUserId("s1")).thenReturn("user1");
 
-        ReportResult reportResult = new ReportResult("Great", "none", "try however", 8, "practice");
+        ReportResult reportResult = new ReportResult("Great", "topics discussed", "none", "try however", 8, "practice");
         when(reportAgent.generate(any(), any())).thenReturn(reportResult);
 
         handler.onEndSession(ws);
 
         verify(sessionStore).completeSession(eq("s1"), any(), any(), eq(reportResult));
+        verify(memoryService).generateMemoryAsync("user1", reportResult);
         verify(sessionService).remove("s1");
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);
         verify(protocol, atLeastOnce()).send(eq(ws), captor.capture());
         ServerMessage last = captor.getValue();
         assertThat(last).isInstanceOf(ServerMessage.SessionReportMessage.class);
+        var reportMsg = (ServerMessage.SessionReportMessage) last;
+        assertThat(reportMsg.report().topicSummary()).isEqualTo("topics discussed");
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.hugosol.webagent.protocol.ServerMessage;
 import com.hugosol.webagent.agent.ReportAgent;
 import com.hugosol.webagent.service.SessionStore;
 import com.hugosol.webagent.service.SessionService;
+import com.hugosol.webagent.service.MemoryService;
 import com.hugosol.webagent.service.TurnProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,17 +34,20 @@ public class CoachMessageHandler implements MessageHandler {
     private final TurnProcessor turnProcessor;
     private final ReportAgent reportAgent;
     private final SessionStore sessionStore;
+    private final MemoryService memoryService;
     private final ProtocolDispatcher protocol;
 
     public CoachMessageHandler(SessionService sessionService,
                                TurnProcessor turnProcessor,
                                ReportAgent reportAgent,
                                SessionStore sessionStore,
+                               MemoryService memoryService,
                                ProtocolDispatcher protocol) {
         this.sessionService = sessionService;
         this.turnProcessor = turnProcessor;
         this.reportAgent = reportAgent;
         this.sessionStore = sessionStore;
+        this.memoryService = memoryService;
         this.protocol = protocol;
     }
 
@@ -155,12 +159,18 @@ public class CoachMessageHandler implements MessageHandler {
             List<CorrectionData> corrections = sessionService.getCorrections(sessionId);
             ReportResult report = reportAgent.generate(messages, corrections);
 
-            sessionStore.completeSession(sessionId, messages, corrections, report);
+        sessionStore.completeSession(sessionId, messages, corrections, report);
 
-            sessionService.remove(sessionId);
+        String userId = sessionService.getUserId(sessionId);
+        if (userId != null) {
+            memoryService.generateMemoryAsync(userId, report);
+        }
+
+        sessionService.remove(sessionId);
 
             var reportData = new ServerMessage.ReportData(
                     report != null ? report.overallAssessment() : "",
+                    report != null ? report.topicSummary() : "",
                     report != null ? report.fluencyScore() : 0,
                     report != null ? report.errorSummary() : "",
                     report != null ? report.vocabularySuggestions() : "",

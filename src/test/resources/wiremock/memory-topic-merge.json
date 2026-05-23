@@ -1,0 +1,19 @@
+{
+  "id": "mock-memory-topic-merge",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "Discussed login module work, a planned trip to Japan, and travel vocabulary practice. User is also working on presentation delivery skills for upcoming team meetings."
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 32,
+    "total_tokens": 152
+  }
+}

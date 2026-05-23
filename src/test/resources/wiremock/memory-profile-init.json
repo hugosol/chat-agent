@@ -1,0 +1,19 @@
+{
+  "id": "mock-memory-profile-init",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "Past tense errors (30%), article usage improving. Intermediate level. Weakness: travel vocabulary, natural transitions between ideas."
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 25,
+    "total_tokens": 125
+  }
+}

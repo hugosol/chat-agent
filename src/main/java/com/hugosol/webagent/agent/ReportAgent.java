@@ -35,9 +35,9 @@ public class ReportAgent {
                 .replace("{fullConversation}", conversationText)
                 .replace("{allCorrections}", errorsText);
 
-        log.debug("ReportAgent prompt length: {}", prompt.length());
+        log.info("ReportAgent INPUT:\n{}", prompt);
         String response = chatModel.chat(prompt);
-        log.info("ReportAgent: generated report, length={}", response.length());
+        log.info("ReportAgent OUTPUT:\n{}", response);
 
         return parseReport(response);
     }
@@ -46,16 +46,35 @@ public class ReportAgent {
         try {
             Map<String, Object> sections = objectMapper.readValue(response, Map.class);
             return new ReportResult(
-                    (String) sections.getOrDefault("overallAssessment", ""),
-                    (String) sections.getOrDefault("errorSummary", ""),
-                    (String) sections.getOrDefault("vocabularySuggestions", ""),
-                    (Integer) sections.getOrDefault("fluencyScore", 0),
-                    (String) sections.getOrDefault("keyTakeaway", "")
+                    getString(sections, "overallAssessment"),
+                    getString(sections, "topicSummary"),
+                    getString(sections, "errorSummary"),
+                    getString(sections, "vocabularySuggestions"),
+                    getInt(sections, "fluencyScore"),
+                    getString(sections, "keyTakeaway")
             );
         } catch (Exception e) {
-            log.warn("ReportAgent: failed to parse JSON, using raw response", e);
-            return new ReportResult(response, "", "", 0, "");
+            log.warn("ReportAgent: failed to parse JSON, raw response:\n{}", response, e);
+            return new ReportResult(response, "", "", "", 0, "");
         }
+    }
+
+    private String getString(Map<String, Object> map, String key) {
+        Object value = map.getOrDefault(key, "");
+        if (value instanceof String s) return s;
+        if (value instanceof Map || value instanceof List) {
+            try { return objectMapper.writeValueAsString(value); } catch (Exception e) { return ""; }
+        }
+        return value != null ? value.toString() : "";
+    }
+
+    private int getInt(Map<String, Object> map, String key) {
+        Object value = map.getOrDefault(key, 0);
+        if (value instanceof Number n) return n.intValue();
+        if (value instanceof String s) {
+            try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 0; }
+        }
+        return 0;
     }
 
     private String buildConversationText(List<MessageData> messages) {
@@ -79,6 +98,7 @@ public class ReportAgent {
 
     public record ReportResult(
             String overallAssessment,
+            String topicSummary,
             String errorSummary,
             String vocabularySuggestions,
             int fluencyScore,
