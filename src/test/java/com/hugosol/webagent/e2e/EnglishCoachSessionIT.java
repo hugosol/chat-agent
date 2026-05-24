@@ -12,7 +12,7 @@ class EnglishCoachSessionIT extends E2ETestBase {
 
     @Test
     void fullSessionWithMultiTurnAndSidebar() {
-        startSession("WORKPLACE_STANDUP");
+        startSession(AgentMode.WORKPLACE_STANDUP.name());
 
         String sid = sessionId();
         assertNotNull(sid, "sessionId should be in localStorage after session start");

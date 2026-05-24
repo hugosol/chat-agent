@@ -15,7 +15,7 @@ class DailyTalkIT extends E2ETestBase {
     void fullDailyTalkSessionWithTeachingStyle() {
         WireMockStubs.registerDailyTalkStubs(wireMockServer);
 
-        startSession("DAILY_TALK");
+        startSession(AgentMode.DAILY_TALK.name());
 
         String sid = sessionId();
         assertNotNull(sid, "sessionId should be in localStorage after session start");
@@ -67,12 +67,12 @@ class DailyTalkIT extends E2ETestBase {
         assertNotNull(report.getSummary(), "report summary should not be null");
 
         var topicMemory = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
-                "anonymous", MemoryType.TOPIC_SUMMARY, AgentMode.DAILY_TALK);
+                DEFAULT_USER_ID, MemoryType.TOPIC_SUMMARY, AgentMode.DAILY_TALK);
         assertTrue(topicMemory.isPresent(), "TOPIC_SUMMARY should exist with mode=DAILY_TALK");
         assertEquals(AgentMode.DAILY_TALK, topicMemory.get().getMode());
 
         var learningProfile = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
-                "anonymous", MemoryType.LEARNING_PROFILE, null);
+                DEFAULT_USER_ID, MemoryType.LEARNING_PROFILE, null);
         assertTrue(learningProfile.isPresent(), "LEARNING_PROFILE should exist");
         assertNull(learningProfile.get().getMode(), "LEARNING_PROFILE mode should be null (cross-mode shared)");
     }

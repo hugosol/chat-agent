@@ -26,13 +26,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConversationAgentTest {
 
     private ConversationAgent agent;
+    private PromptLoader promptLoader;
     private List<String> receivedTokens;
     private List<ChatMessage> lastMessages;
     private CountDownLatch latch;
 
     @BeforeEach
     void setUp() {
-        PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
+        promptLoader = new PromptLoader(new DefaultResourceLoader());
         receivedTokens = new ArrayList<>();
         latch = new CountDownLatch(1);
 
@@ -80,9 +81,9 @@ class ConversationAgentTest {
                 AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
+        String expected = promptLoader.load("workplace_standup/description.txt");
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("friendly teammate");
-        assertThat(systemContent).contains("daily standup");
+        assertThat(systemContent).contains(expected);
     }
 
     @Test
@@ -92,10 +93,9 @@ class ConversationAgentTest {
                 AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
+        String description = promptLoader.load("workplace_standup/description.txt");
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("friendly teammate");
-        assertThat(systemContent).contains("software engineer");
-        assertThat(systemContent).contains("practice workplace English");
+        assertThat(systemContent).contains(description);
     }
 
     @Test
@@ -105,11 +105,9 @@ class ConversationAgentTest {
                 AgentMode.DAILY_TALK,
                 new NoopHandler());
 
+        String expected = promptLoader.load("daily_talk/description.txt");
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("Chris");
-        assertThat(systemContent).contains("English-speaking");
-        assertThat(systemContent).contains("cultural");
-        assertThat(systemContent).contains("voice call");
+        assertThat(systemContent).contains(expected);
     }
 
     @Test
@@ -119,11 +117,9 @@ class ConversationAgentTest {
                 AgentMode.DAILY_TALK,
                 new NoopHandler());
 
+        String expected = promptLoader.load("daily_talk/rules.txt");
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("unnatural phrase");
-        assertThat(systemContent).contains("culturally specific");
-        assertThat(systemContent).contains("open-ended questions");
-        assertThat(systemContent).contains("varying naturally");
+        assertThat(systemContent).contains(expected);
     }
 
     @Test
@@ -133,9 +129,9 @@ class ConversationAgentTest {
                 AgentMode.WORKPLACE_STANDUP,
                 new NoopHandler());
 
+        String expected = promptLoader.load("workplace_standup/rules.txt");
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("encouraging and supportive");
-        assertThat(systemContent).contains("varying naturally");
+        assertThat(systemContent).contains(expected);
     }
 
     @Test

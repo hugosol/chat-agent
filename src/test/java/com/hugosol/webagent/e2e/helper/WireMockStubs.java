@@ -16,6 +16,11 @@ public class WireMockStubs {
     private static final String SCENARIO_MEM_TOPIC = "memory-topic-rounds";
     private static final String SCENARIO_MEM_PROFILE = "memory-profile-rounds";
 
+    private static final String KEYWORD_CORRECTION = "Correction prompt:";
+    private static final String KEYWORD_REPORT = "Report prompt.";
+    private static final String KEYWORD_MEM_TOPIC = "E2E_MARKER_MEMORY_TOPIC";
+    private static final String KEYWORD_MEM_PROFILE = "E2E_MARKER_MEMORY_PROFILE";
+
     public static void registerAllStubs(WireMockServer wireMock) {
         configureFor("localhost", wireMock.port());
         wireMock.resetAll();
@@ -39,7 +44,7 @@ public class WireMockStubs {
     }
 
     private static void registerConversationStubs() {
-        String convKeyword = "friendly teammate";
+        String convKeyword = "E2E_MARKER_WORKPLACE_STANDUP";
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -86,7 +91,7 @@ public class WireMockStubs {
     }
 
     private static void registerDailyConversationStubs() {
-        String convKeyword = "Chris";
+        String convKeyword = "E2E_MARKER_DAILY_TALK";
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -133,7 +138,7 @@ public class WireMockStubs {
     }
 
     private static void registerDailyCorrectionStubs() {
-        String corrKeyword = "Correction prompt:";
+        String corrKeyword = KEYWORD_CORRECTION;
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -170,7 +175,7 @@ public class WireMockStubs {
     }
 
     private static void registerDailyReportStub() {
-        String reportKeyword = "Report prompt.";
+        String reportKeyword = KEYWORD_REPORT;
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -182,7 +187,7 @@ public class WireMockStubs {
     }
 
     private static void registerCorrectionStubs() {
-        String corrKeyword = "Correction prompt:";
+        String corrKeyword = KEYWORD_CORRECTION;
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -219,7 +224,7 @@ public class WireMockStubs {
     }
 
     private static void registerReportStub() {
-        String reportKeyword = "Report prompt.";
+        String reportKeyword = KEYWORD_REPORT;
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -231,7 +236,7 @@ public class WireMockStubs {
     }
 
     private static void registerMemoryTopicStubs() {
-        String keyword = "maintain a compact summary of what topics";
+        String keyword = KEYWORD_MEM_TOPIC;
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -257,7 +262,7 @@ public class WireMockStubs {
     }
 
     private static void registerMemoryProfileStubs() {
-        String keyword = "maintain a compact learning profile";
+        String keyword = KEYWORD_MEM_PROFILE;
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
