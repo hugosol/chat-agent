@@ -39,7 +39,7 @@ public class WireMockStubs {
     }
 
     private static void registerConversationStubs() {
-        String convKeyword = "English conversation partner";
+        String convKeyword = "friendly teammate";
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -73,10 +73,20 @@ public class WireMockStubs {
                         .withHeader("Content-Type", "text/event-stream")
                         .withBody(loadResource("wiremock/conv-round-3.txt")))
                 .willSetStateTo("round-4"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_CONV)
+                .whenScenarioStateIs("round-4")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody("data: [DONE]\n\n")));
     }
 
     private static void registerDailyConversationStubs() {
-        String convKeyword = "Hikaru";
+        String convKeyword = "Chris";
 
         stubFor(post(urlEqualTo("/chat/completions"))
                 .withRequestBody(matchingJsonPath("$.messages[0].content",
@@ -110,6 +120,16 @@ public class WireMockStubs {
                         .withHeader("Content-Type", "text/event-stream")
                         .withBody(loadResource("wiremock/daily-conv-round-3.txt")))
                 .willSetStateTo("round-4"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_CONV)
+                .whenScenarioStateIs("round-4")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody("data: [DONE]\n\n")));
     }
 
     private static void registerDailyCorrectionStubs() {

@@ -8,7 +8,7 @@
 
 With the addition of `AgentMode.DAILY_TALK`, the English Coach now supports two conversation modes (Workplace Standup + Daily Talk). Topic Memory — the 500-character summary of conversation topics discussed across sessions — was previously shared across all Practice sessions regardless of mode.
 
-This created a problem: work-related topics from standup sessions would "pollute" the casual chat context of Daily Talk sessions, and vice versa. For example, a Learner practicing workplace English about sprint planning would see those topics injected into their Daily Talk session with Hikaru, breaking the casual atmosphere.
+This created a problem: work-related topics from standup sessions would "pollute" the casual chat context of Daily Talk sessions, and vice versa. For example, a Learner practicing workplace English about sprint planning would see those topics injected into their Daily Talk session with Chris, breaking the casual atmosphere.
 
 Learning Profile, on the other hand, represents the Learner's English skill level (grammar weaknesses, strengths, improvement trends) — this should remain cross-mode since the same Learner has the same skill level regardless of mode.
 

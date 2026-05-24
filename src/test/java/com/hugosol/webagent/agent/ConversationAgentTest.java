@@ -82,7 +82,7 @@ class ConversationAgentTest {
 
         String systemContent = getSystemContent();
         assertThat(systemContent).contains("friendly teammate");
-        assertThat(systemContent).contains("standup meeting");
+        assertThat(systemContent).contains("daily standup");
     }
 
     @Test
@@ -93,23 +93,23 @@ class ConversationAgentTest {
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("English conversation partner");
-        assertThat(systemContent).contains("Chinese Java developer");
+        assertThat(systemContent).contains("friendly teammate");
+        assertThat(systemContent).contains("software engineer");
         assertThat(systemContent).contains("practice workplace English");
     }
 
     @Test
-    void dailyTalkSystemContentContainsHikaruPersona() {
+    void dailyTalkSystemContentContainsChrisPersona() {
         agent.generateStream(
                 List.of(),
                 AgentMode.DAILY_TALK,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("Hikaru");
-        assertThat(systemContent).contains("American");
+        assertThat(systemContent).contains("Chris");
+        assertThat(systemContent).contains("English-speaking");
         assertThat(systemContent).contains("cultural");
-        assertThat(systemContent).contains("voice chat");
+        assertThat(systemContent).contains("voice call");
     }
 
     @Test
@@ -120,10 +120,10 @@ class ConversationAgentTest {
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("natural way to say");
-        assertThat(systemContent).contains("cultural background");
+        assertThat(systemContent).contains("unnatural phrase");
+        assertThat(systemContent).contains("culturally specific");
         assertThat(systemContent).contains("open-ended questions");
-        assertThat(systemContent).contains("3-5 sentences");
+        assertThat(systemContent).contains("varying naturally");
     }
 
     @Test
@@ -135,7 +135,7 @@ class ConversationAgentTest {
 
         String systemContent = getSystemContent();
         assertThat(systemContent).contains("encouraging and supportive");
-        assertThat(systemContent).contains("2-4 sentences");
+        assertThat(systemContent).contains("varying naturally");
     }
 
     @Test

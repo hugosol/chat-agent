@@ -194,7 +194,7 @@ web-agent/
 │       ├── workplace_standup/            ← per-AgentMode 子目录
 │       │   ├── description.txt           ← 身份声明 + 场景描述
 │       │   └── rules.txt                 ← 行为规则
-│       ├── daily_talk/                   ← per-AgentMode 子目录 (Hikaru)
+│       ├── daily_talk/                   ← per-AgentMode 子目录 (Chris)
 │       │   ├── description.txt           ← 身份声明 + 场景描述
 │       │   └── rules.txt                 ← 行为规则
 │       ├── correction.txt
@@ -253,7 +253,7 @@ App-level configuration in `application.yml`:
 ## V2 Roadmap
 
 - [ ] OpenAI Whisper for server-side voice input
-- [x] Additional AgentMode values (DAILY_TALK with Hikaru persona — casual friend+tutor chat)
+- [x] Additional AgentMode values (DAILY_TALK with Chris persona — casual friend+tutor chat)
 - [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)
