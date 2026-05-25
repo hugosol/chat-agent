@@ -18,10 +18,10 @@
 | 4 | 交付形态 | Web 应用 (Spring Boot + 浏览器) |
 | 5 | LLM 提供商 | DeepSeek V4 FAST，LangChain4j 抽象层保证可替换 |
 | 6 | 输入方式 | 文本输入框，iOS 用户可借助键盘原生听写。浏览器 SpeechSynthesis 做 TTS 输出（需用户手势触发） |
-| 7 | Agent 核心能力 | 角色扮演 + 自然纠错 + 对话后报告 + 学习进度追踪 |
+| 7 | Agent 核心能力 | 角色扮演 + 自然纠错 + 对话后报告 + 学习进度追踪 + 跨会话记忆（User Memory + MemoryCue 双轨） |
 | 8 | 纠错机制 | Agent 口头自然纠正（融入对话不打断） |
 | 9 | LangGraph 深度 | 深度：HITL + Checkpoint + 持久化 |
-| 10 | Agent 架构 | 三 Agent 协作：Conversation + Correction + Report |
+| 10 | Agent 架构 | 五 Agent 协作：Conversation + Correction + Report + Memory + MemoryCue |
 | 11 | 前端技术 | 原生 HTML + Vanilla JS |
 | 12 | 通信协议 | WebSocket |
 | 13 | 数据库 | H2 文件模式 |
@@ -47,6 +47,8 @@
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
+| 36 | 双轨记忆系统 | User Memory（合并摘要，注入 System Prompt）与 MemoryCue（结构化 topic/summary/tags，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，与 Report 并行。v1 仅写入，v2 启用 JSON_CONTAINS 检索 |
+| 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（prompt/response/tokens/duration）。同步 Agent 通过 `LoggableChatModel` 包装器透明拦截，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
 
 ---
 
@@ -141,7 +143,7 @@ START → correction → END
           (调用 DeepSeek, 分析 5 类错误)
 ```
 
-> **实现版本**: 图只有 1 个节点。`ConversationNode` 和 `MergeResponseNode` 已移除——对话流式生成改为 `TurnProcessor` 直接调用 `ConversationAgent.generateStream()`，token 计数由 `TokenTracker` 管理。
+> **实现版本**: 图只有 1 个节点。`ConversationNode` 和 `MergeResponseNode` 已移除——对话流式生成改为 `TurnProcessor` 直接调用 `ConversationAgent.generateStream()`，token 计数由 `TokenTracker` 管理。记忆注入窗口从首轮扩展到前三轮（messageId ≤ 3），判断逻辑下沉到 `ConversationAgent` 内部。
 
 ### 节点职责（1 个节点）
 
@@ -166,7 +168,9 @@ START → correction → END
 
 [用户 End Session]
   → ReportAgent.generate(messages, corrections) → 生成报告
-  → SessionStore.completeSession(sessionId, messages, corrections, report)
+  → SessionStore.completeSession(sessionId, messages, corrections, report) → H2 持久化
+  → MemoryService.generateMemoryAsync(userId, report, mode, sessionId) → 异步合并 Topic + Profile 记忆
+  → MemoryCueService.generateCuesAsync(sessionId, userId, mode, messages) → 异步生成结构化 MemoryCue（与上并行）
   → SessionService.remove(sessionId, wsId) → 释放 state + TokenTracker + sessionToWs 映射
 
 [会话恢复 RESUME_SESSION]
@@ -277,36 +281,58 @@ Errors: {allCorrections}
 ## 六、数据模型（H2 / JPA）
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│    User     │1───*│   Session   │1───*│   Message    │1───*│ ErrorRecord  │
-│─────────────│     │─────────────│     │──────────────│     │──────────────│
-│ id (PK)     │     │ id (PK)     │     │ id (PK)      │     │ id (PK)      │
-│ username    │     │ userId (FK) │     │ sessionId(FK)│     │ messageId(FK)│
-│ password    │     │ mode        │     │ role (Enum)  │     │ type (Enum)  │
-│ createTime  │     │ startTime   │     │ content      │     │ originalText │
-│ updateTime  │     │ endTime     │     │ tokenCount   │     │ correctedText│
-└─────────────┘     │ status      │     └──────────────┘     │ explanation  │
-                    │ status      │                          └──────────────┘
+┌─────────────┐     ┌──────────────┐     ┌────────────────┐                            
+│    User     │1───*│   Session   │1───*│    Message      │1───*│ ErrorRecord     │
+│─────────────│     │─────────────│     │────────────────│     │─────────────────│
+│ id (PK)     │     │ id (PK)     │     │ id (PK)        │     │ id (PK)         │
+│ username    │     │ userId (FK) │     │ sessionId(FK)  │     │ messageId(FK)   │
+│ password    │     │ mode        │     │ role (Enum)    │     │ type (Enum)     │
+│ createTime  │     │ startTime   │     │ content        │     │ originalText    │
+│ updateTime  │     │ endTime     │     │ tokenCount     │     │ correctedText   │
+└─────────────┘     │ status      │     └────────────────┘     │ explanation     │
+                    │ status      │                            └─────────────────┘
                     └─────────────┘
                           1
                           │
-                          ├──────────────┐
-                          │              │
-                    ┌──────────────┐  ┌──────────────┐
-                    │SessionReport │  │ UserProgress │
-                    │──────────────│  │──────────────│
-                    │ id (PK)      │  │ id (PK)      │
-                    │ sessionId(FK)│  │ userId (UQ)  │
-                    │ summary      │  │ totalSessions│
-                    │ fluencyScore │  │ totalMinutes │
-                    │ vocabulary   │  │ errorStats   │
-                    │ keyTakeaway  │  │ createTime   │
-                    └──────────────┘  └──────────────┘
+              ┌───────────┼───────────┬───────────────┐
+              │           │           │               │
+    ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────────────────┐
+    │SessionReport │ │ UserProgress │ │  UserMemory  │ │       MemoryCue         │
+    │──────────────│ │──────────────│ │──────────────│ │─────────────────────────│
+    │ id (PK)      │ │ id (PK)      │ │ id (PK)      │ │ id (PK)                 │
+    │ sessionId(FK)│ │ userId (UQ)  │ │ userId       │ │ sessionId                │
+    │ summary      │ │ totalSessions│ │ type (Enum)  │ │ userId                   │
+    │ fluencyScore │ │ totalMinutes │ │ content      │ │ mode (AgentMode Enum)    │
+    │ vocabulary   │ │ errorStats   │ │ version      │ │ segmentIndex             │
+    │ keyTakeaway  │ │ createTime   │ │ mode (nullable)│ │ topic                  │
+    └──────────────┘ └──────────────┘ │ sessionId    │ │ summary                 │
+                                     └──────────────┘ │ tags (JSON List<String>) │
+                                                        │ status (MemoryCueStatus) │
+                                                        └─────────────────────────┘
+                                                        ┌─────────────────────────┐
+                                                        │      LlmCallLog         │
+                                                        │─────────────────────────│
+                                                        │ id (PK)                 │
+                                                        │ sessionId (nullable)    │
+                                                        │ userId (nullable)       │
+                                                        │ agentType               │
+                                                        │ mode                    │
+                                                        │ model                   │
+                                                        │ requestPrompt (CLOB)    │
+                                                        │ responseText (CLOB)     │
+                                                        │ inputTokens (nullable)  │
+                                                        │ outputTokens (nullable) │
+                                                        │ durationMs              │
+                                                        │ status                  │
+                                                        │ errorMessage (nullable) │
+                                                        └─────────────────────────┘
 
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
 Enum: SessionStatus { ACTIVE, COMPLETED }
 Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAILY_TALK("Daily Talk", "daily_talk") }
+Enum: MemoryType { TOPIC_SUMMARY, LEARNING_PROFILE }
+Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 ```
 
 > **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。
@@ -357,26 +383,39 @@ Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAI
 | **持久化存储** | H2 逐条存 Message + ErrorRecord | `saveSession` 节点在会话结束时批量写入 JPA。跨会话通过 Session 关联 |
 | **Checkpoint / 恢复** | MemorySaver | `CompileConfig.builder().checkpointSaver(new MemorySaver())`，每个会话 `threadId`，刷新页面恢复 |
 | **前端展示** | 全部消息 + 折叠旧消息 | 可滚动聊天区，顶部 token 进度条，旧消息折叠到 "Show earlier" 后 |
-| **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` 顺序执行，一次事务写入 |
+| **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` + `memoryService` + `memoryCueService` 并行执行 |
+| **日志写入** | LLM 调用时即时异步写入 | `LoggableChatModel`（同步 Agent）在 `chat()` 调用点拦截；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
+| **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
+| **记忆写入** | MemoryService + MemoryCueService 异步触发 | `memoryExecutor` (core=4, max=8) 上同时运行 Topic Merge + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry |
 
 ### 会话生命周期
 
 ```
 [对话中]
   AgentState.messages (MemorySaver checkpoint)  ← 只在内存
+  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 3 时注入记忆)
   UI token bar 实时更新
 
 [用户点击 End Session]
   ↓
-reportAgent → 生成报告
+  ┌─ memoryExecutor (并行):
+  │    reportAgent.generate() → ReportResult
+  │    → SessionStore.completeSession() → H2
+  │    → MemoryService.generateMemoryAsync() → Topic Merge + Profile Merge → H2
+  │
+  └─ memoryExecutor (并行，与上不互斥):
+       MemoryCueService.generateCuesAsync()
+       → detectSwitches (话题切换点)
+       → generateCue per segment (并行)
+       → memory_cues 表写入
   ↓
-saveSession → Session + Messages + ErrorRecords + SessionReport → H2
-  ↓
-AgentState 释放，checkpoint 清除
+  SessionService.remove() → 释放 state
+  SESSION_REPORT → 前端弹窗
 
 [用户重新打开]
   从 H2 加载历史会话列表（只读）
   新建会话 → 新 threadId → 新 MemorySaver checkpoint
+  加载最新 User Memory → 注入前三轮 System Prompt
 ```
 
 ---
@@ -464,7 +503,9 @@ web-agent/
 │   ├── agent/                              // Agent 调用封装
 │   │   ├── ConversationAgent.java          // 角色扮演对话（Prompt 模板替换 + DeepSeek 调用）
 │   │   ├── CorrectionAgent.java            // 5类纠错分析（JSON 解析 LLM 输出）
-│   │   └── ReportAgent.java                // 会话报告生成
+│   │   ├── ReportAgent.java                // 会话报告生成
+│   │   ├── MemoryAgent.java                // Topic + Learning Profile 合并（跨会话记忆）
+│   │   └── MemoryCueAgent.java             // 两步 LLM：话题切换检测 + 分段结构化摘要生成
 │   │
 │   ├── websocket/
 │   │   ├── CoachWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)
@@ -485,31 +526,44 @@ web-agent/
 │   │   ├── ErrorRecord.java
 │   │   ├── SessionReport.java
 │   │   ├── UserProgress.java               // 学习进度（含 userId unique，每用户一行）
+│   │   ├── UserMemory.java                 // 跨会话记忆（Topic Memory + Learning Profile，含 sessionId 追溯）
+│   │   ├── MemoryCue.java                  // 结构化话题记忆（topic/summary/tags，含状态追踪）
+│   │   ├── LlmCallLog.java                 // LLM API 调用日志（prompt/response/tokens/duration/status）
+│   │   ├── MemoryCueStatus.java            // 枚举: COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED
+│   │   ├── StringListConverter.java        // JPA AttributeConverter: List<String> ↔ JSON
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED
 │   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP (含 displayName + templatePath)
 │   │
-│   ├── repository/                         // Spring Data JPA（6 个）
+│   ├── repository/                         // Spring Data JPA（9 个）
 │   │   ├── UserRepository.java             // findByUsername
 │   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
 │   │   ├── ErrorRecordRepository.java
 │   │   ├── SessionReportRepository.java
-│   │   └── UserProgressRepository.java     // findByUserId
+│   │   ├── UserProgressRepository.java     // findByUserId
+│   │   ├── UserMemoryRepository.java       // findByUserIdAndTypeAndModeOrderByVersionDesc
+│   │   ├── MemoryCueRepository.java        // findByUserIdAndMode, findBySessionId
+│   │   └── LlmCallLogRepository.java       // deleteByCreateTimeBefore
 │   │
 │   ├── service/                            // 业务服务
 │   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
-│   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图)
+│   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图，messageId ≤ 3 记忆注入)
 │   │   ├── SessionStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
+│   │   ├── MemoryService.java              // 异步 Topic + Learning Profile 合并（含 sessionId 追溯）
+│   │   ├── MemoryCueService.java           // 异步 MemoryCue 生成（话题分割 + 分段摘要，与 Report/Memory 并行）
+│   │   ├── LlmCallLogService.java          // 异步 LLM 调用日志写入 + 启动时清理 3 天前记录
 │   │   ├── SessionCleanupLogoutHandler.java // 登出时清理 activeStates
 │   │   ├── EntityMapper.java              // 运行时数据 → JPA 实体转换
 │   │   └── TokenTracker.java               // 按 AgentType 分计 token
 │   │
 │   └── config/                             // 配置类
 │       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel + OpenAiStreamingChatModel) Bean 配置
+│       ├── LoggableChatModel.java          // ChatLanguageModel 包装器，拦截 chat(String) 写入日志
 │       ├── SecurityConfig.java             // Spring Security filter chain + 登录事件日志
 │       ├── WebSocketConfig.java            // WebSocket Handler 注册（同源策略）
+│       ├── AsyncConfig.java                // memoryExecutor + llmLogExecutor 线程池配置
 │       ├── AppProperties.java              // @ConfigurationProperties(prefix="app") 包含 security.permit-all-paths
 │       ├── PasswordEncoderConfig.java      // BCryptPasswordEncoder bean（独立配置，非 web 环境可用）
 │       ├── DataInitializer.java            // CommandLineRunner：从 app.initial-users 种子用户
@@ -519,6 +573,7 @@ web-agent/
 ├── src/main/resources/
 │   ├── application.yml                     // 默认配置 + app.security.permit-all-paths: [/login/**]
 │   ├── application-local.yml               // 本地覆盖（H2 console, initial-users, /h2-console/** 放行）
+│   ├── logback-spring.xml                  // 日志配置（local profile 启用文件日志，INFO 控制台）
 │   └── prompts/
 │       ├── conversation-system.txt         // 骨架模板（{Description}, {Rules} 占位符）
 │       ├── workplace_standup/              // per-AgentMode 子目录
@@ -530,7 +585,9 @@ web-agent/
 │       ├── correction.txt
 │       ├── report.txt
 │       ├── memory-topic.txt
-│       └── memory-profile.txt
+│       ├── memory-profile.txt
+│       ├── memory-cue-split.txt
+│       └── memory-cue-entry.txt
 │
 └── src/main/resources/static/
     ├── login/                              // 登录页（公开目录）
@@ -550,8 +607,9 @@ web-agent/
 
 | | V1（已实现） | V2 |
 |---|-------------|----|
-| **场景** | 职场英语 (Standup) | 技术演讲练习 + 更多 AgentMode |
-| **Agent** | 三 Agent 全协作 | 场景自动切换 |
+| **场景** | 职场英语 (Standup) + 日常闲聊 (Daily Talk) | 技术演讲练习 + 更多 AgentMode |
+| **Agent** | 五 Agent 全协作（Conversation + Correction + Report + Memory + MemoryCue） | 场景自动切换 |
+| **记忆** | 双轨：User Memory (摘要注入) + MemoryCue (结构化存储, write-only) | MemoryCue 关键字检索 (JSON_CONTAINS) + 替换 User Memory 注入 |
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
 | **TTS** | 浏览器 SpeechSynthesis（🔊 按钮手动触发） | OpenAI TTS（自然度更高） |

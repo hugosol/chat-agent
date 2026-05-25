@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class ConversationAgent {
@@ -44,19 +45,37 @@ public class ConversationAgent {
     }
 
     public void generateStream(List<MessageData> history, AgentMode mode,
-                                StreamingChatResponseHandler handler) {
-        generate(history, mode, null, null, false, handler);
+                                String topicSummary, String learningProfile,
+                                int messageId, StreamingChatResponseHandler handler) {
+        boolean hasMemory = (topicSummary != null && !topicSummary.isBlank())
+                || (learningProfile != null && !learningProfile.isBlank());
+        boolean injectMemory = messageId <= 3 && hasMemory;
+        generate(history, mode, topicSummary, learningProfile, injectMemory, handler);
     }
 
-    public void generateStreamFirstTurn(List<MessageData> history, AgentMode mode,
-                                         String topicSummary, String learningProfile,
-                                         StreamingChatResponseHandler handler) {
-        generate(history, mode, topicSummary, learningProfile, true, handler);
+    public String buildPromptJson(List<MessageData> history, AgentMode mode,
+                                   String topicSummary, String learningProfile,
+                                   int messageId) {
+        boolean hasMemory = (topicSummary != null && !topicSummary.isBlank())
+                || (learningProfile != null && !learningProfile.isBlank());
+        boolean injectMemory = messageId <= 3 && hasMemory;
+        List<ChatMessage> messages = buildMessages(history, mode, topicSummary, learningProfile, injectMemory);
+        return "[" + messages.stream()
+                .map(m -> "{\"role\":\"" + roleName(m) + "\",\"content\":" + jsonEscape(contentOf(m)) + "}")
+                .collect(Collectors.joining(",")) + "]";
     }
 
     private void generate(List<MessageData> history, AgentMode mode,
                           String topicSummary, String learningProfile, boolean injectMemory,
                           StreamingChatResponseHandler handler) {
+        List<ChatMessage> messages = buildMessages(history, mode, topicSummary, learningProfile, injectMemory);
+
+        log.debug("ConversationAgent sending {} messages", messages.size());
+        chatModel.chat(messages, handler);
+    }
+
+    private List<ChatMessage> buildMessages(List<MessageData> history, AgentMode mode,
+                                            String topicSummary, String learningProfile, boolean injectMemory) {
         String systemContent = buildSystemContent(mode, topicSummary, learningProfile, injectMemory);
 
         List<ChatMessage> messages = new ArrayList<>();
@@ -71,9 +90,39 @@ public class ConversationAgent {
                 messages.add(AiMessage.from(msg.getContent()));
             }
         }
+        return messages;
+    }
 
-        log.debug("ConversationAgent sending {} messages", messages.size());
-        chatModel.chat(messages, handler);
+    private static String roleName(ChatMessage msg) {
+        if (msg instanceof SystemMessage) return "system";
+        if (msg instanceof AiMessage) return "assistant";
+        return "user";
+    }
+
+    private static String contentOf(ChatMessage msg) {
+        String text = msg instanceof SystemMessage sm ? sm.text()
+                : msg instanceof UserMessage um ? um.singleText()
+                : msg instanceof AiMessage am ? am.text()
+                : msg.toString();
+        return text != null ? text : "";
+    }
+
+    private static String jsonEscape(String s) {
+        if (s == null) return "null";
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':  sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:   sb.append(c);
+            }
+        }
+        sb.append("\"");
+        return sb.toString();
     }
 
     private String buildSystemContent(AgentMode mode,

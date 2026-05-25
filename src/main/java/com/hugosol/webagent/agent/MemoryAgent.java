@@ -25,9 +25,9 @@ public class MemoryAgent {
                 .replace("{oldTopicSummary}", oldSummary.isEmpty() ? "(No previous sessions)" : oldSummary)
                 .replace("{newSessionSummary}", newSessionSummary);
 
-        log.info("MemoryAgent mergeTopic INPUT:\n{}", prompt);
+        log.debug("MemoryAgent mergeTopic INPUT:\n{}", prompt);
         String response = chatModel.chat(prompt);
-        log.info("MemoryAgent mergeTopic OUTPUT:\n{}", response);
+        log.debug("MemoryAgent mergeTopic OUTPUT:\n{}", response);
         return response.trim();
     }
 
@@ -37,9 +37,9 @@ public class MemoryAgent {
                 .replace("{errorSummary}", errorSummary)
                 .replace("{vocabularySuggestions}", vocabularySuggestions);
 
-        log.info("MemoryAgent mergeProfile INPUT:\n{}", prompt);
+        log.debug("MemoryAgent mergeProfile INPUT:\n{}", prompt);
         String response = chatModel.chat(prompt);
-        log.info("MemoryAgent mergeProfile OUTPUT:\n{}", response);
+        log.debug("MemoryAgent mergeProfile OUTPUT:\n{}", response);
         return response.trim();
     }
 }

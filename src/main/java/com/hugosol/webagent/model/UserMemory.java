@@ -27,6 +27,9 @@ public class UserMemory extends BaseEntity {
     @Column(length = 50)
     private AgentMode mode;
 
+    @Column(length = 36)
+    private String sessionId;
+
     public UserMemory() {}
 
     public UserMemory(String userId, MemoryType type, String content, Integer version) {
@@ -42,6 +45,15 @@ public class UserMemory extends BaseEntity {
         this.content = content;
         this.version = version;
         this.mode = mode;
+    }
+
+    public UserMemory(String userId, MemoryType type, String content, Integer version, AgentMode mode, String sessionId) {
+        this.userId = userId;
+        this.type = type;
+        this.content = content;
+        this.version = version;
+        this.mode = mode;
+        this.sessionId = sessionId;
     }
 
     public String getId() { return id; }
@@ -61,4 +73,7 @@ public class UserMemory extends BaseEntity {
 
     public AgentMode getMode() { return mode; }
     public void setMode(AgentMode mode) { this.mode = mode; }
+
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 }

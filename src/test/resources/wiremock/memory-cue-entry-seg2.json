@@ -1,0 +1,19 @@
+{
+  "id": "mock-memory-cue-entry-2",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "{\"topic\": \"Travel Plans\", \"summary\": \"The user talked about their upcoming trip to Japan, including itinerary planning and hotel bookings.\", \"tags\": [\"travel\", \"japan\", \"itinerary\", \"hotel\"]}"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 35,
+    "total_tokens": 135
+  }
+}

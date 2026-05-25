@@ -35,9 +35,9 @@ public class ReportAgent {
                 .replace("{fullConversation}", conversationText)
                 .replace("{allCorrections}", errorsText);
 
-        log.info("ReportAgent INPUT:\n{}", prompt);
+        log.debug("ReportAgent INPUT:\n{}", prompt);
         String response = chatModel.chat(prompt);
-        log.info("ReportAgent OUTPUT:\n{}", response);
+        log.debug("ReportAgent OUTPUT:\n{}", response);
 
         return parseReport(response);
     }

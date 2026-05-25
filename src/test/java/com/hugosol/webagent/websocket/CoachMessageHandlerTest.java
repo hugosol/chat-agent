@@ -9,9 +9,10 @@ import com.hugosol.webagent.model.Session;
 import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
+import com.hugosol.webagent.service.MemoryCueService;
+import com.hugosol.webagent.service.MemoryService;
 import com.hugosol.webagent.service.SessionService;
 import com.hugosol.webagent.service.SessionStore;
-import com.hugosol.webagent.service.MemoryService;
 import com.hugosol.webagent.service.TurnProcessor;
 import com.hugosol.webagent.service.TurnProcessor.TurnCallback;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +59,9 @@ class CoachMessageHandlerTest {
     private MemoryService memoryService;
 
     @Mock
+    private MemoryCueService memoryCueService;
+
+    @Mock
     private ProtocolDispatcher protocol;
 
     @Mock
@@ -71,7 +75,7 @@ class CoachMessageHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new CoachMessageHandler(sessionService, turnProcessor,
-                reportAgent, sessionStore, memoryService, protocol);
+                reportAgent, sessionStore, memoryService, memoryCueService, protocol);
         when(ws.getPrincipal()).thenReturn(principal);
         when(principal.getName()).thenReturn("user1");
     }
@@ -233,7 +237,7 @@ class CoachMessageHandlerTest {
         handler.onEndSession(ws);
 
         verify(sessionStore).completeSession(eq("s1"), any(), any(), eq(reportResult));
-        verify(memoryService).generateMemoryAsync("user1", reportResult, AgentMode.WORKPLACE_STANDUP);
+        verify(memoryService).generateMemoryAsync("user1", reportResult, AgentMode.WORKPLACE_STANDUP, "s1");
         verify(sessionService).remove("s1");
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);

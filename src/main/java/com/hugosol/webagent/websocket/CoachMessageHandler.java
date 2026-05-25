@@ -12,6 +12,7 @@ import com.hugosol.webagent.protocol.ServerMessage;
 import com.hugosol.webagent.agent.ReportAgent;
 import com.hugosol.webagent.service.SessionStore;
 import com.hugosol.webagent.service.SessionService;
+import com.hugosol.webagent.service.MemoryCueService;
 import com.hugosol.webagent.service.MemoryService;
 import com.hugosol.webagent.service.TurnProcessor;
 import org.slf4j.Logger;
@@ -36,6 +37,7 @@ public class CoachMessageHandler implements MessageHandler {
     private final ReportAgent reportAgent;
     private final SessionStore sessionStore;
     private final MemoryService memoryService;
+    private final MemoryCueService memoryCueService;
     private final ProtocolDispatcher protocol;
 
     public CoachMessageHandler(SessionService sessionService,
@@ -43,12 +45,14 @@ public class CoachMessageHandler implements MessageHandler {
                                ReportAgent reportAgent,
                                SessionStore sessionStore,
                                MemoryService memoryService,
+                               MemoryCueService memoryCueService,
                                ProtocolDispatcher protocol) {
         this.sessionService = sessionService;
         this.turnProcessor = turnProcessor;
         this.reportAgent = reportAgent;
         this.sessionStore = sessionStore;
         this.memoryService = memoryService;
+        this.memoryCueService = memoryCueService;
         this.protocol = protocol;
     }
 
@@ -156,15 +160,21 @@ public class CoachMessageHandler implements MessageHandler {
             List<CorrectionData> corrections = sessionService.getCorrections(sessionId);
             ReportResult report = reportAgent.generate(messages, corrections);
 
-        sessionStore.completeSession(sessionId, messages, corrections, report);
+            sessionStore.completeSession(sessionId, messages, corrections, report);
 
-        String userId = sessionService.getUserId(sessionId);
-        if (userId != null) {
-            AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
-            memoryService.generateMemoryAsync(userId, report, mode);
-        }
+            String userId = sessionService.getUserId(sessionId);
+            if (userId != null) {
+                AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
+                memoryService.generateMemoryAsync(userId, report, mode, sessionId);
 
-        sessionService.remove(sessionId);
+                try {
+                    memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
+                } catch (Exception e) {
+                    log.warn("Failed to dispatch MemoryCue generation: {}", e.getMessage());
+                }
+            }
+
+            sessionService.remove(sessionId);
 
             var reportData = new ServerMessage.ReportData(
                     report != null ? report.overallAssessment() : "",

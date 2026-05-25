@@ -29,6 +29,7 @@ public class TurnProcessor {
     private final CompiledGraph<CoachState> graph;
     private final ConversationAgent conversationAgent;
     private final SessionService sessionService;
+    private final LlmCallLogService llmCallLogService;
 
     public interface TurnCallback {
         void onConversationToken(String delta, int messageId);
@@ -39,10 +40,12 @@ public class TurnProcessor {
 
     public TurnProcessor(CoachGraphBuilder graphBuilder,
                          ConversationAgent conversationAgent,
-                         SessionService sessionService) {
+                         SessionService sessionService,
+                         LlmCallLogService llmCallLogService) {
         this.graph = graphBuilder.getCompiledGraph();
         this.conversationAgent = conversationAgent;
         this.sessionService = sessionService;
+        this.llmCallLogService = llmCallLogService;
     }
 
     public void processTurn(String sessionId, String userInput, int messageId, TurnCallback callback) {
@@ -59,11 +62,15 @@ public class TurnProcessor {
         final AgentMode finalMode = mode;
         String topicSummary = sessionService.getTopicMemory(sessionId);
         String learningProfile = sessionService.getLearningProfile(sessionId);
-        boolean isFirstTurn = historySnapshot.size() <= 1;
-        boolean hasMemory = !topicSummary.isBlank() || !learningProfile.isBlank();
 
         CompletableFuture.runAsync(() -> {
+            String promptJson = conversationAgent.buildPromptJson(historySnapshot, finalMode,
+                    topicSummary, learningProfile, messageId);
+            long startTime = System.currentTimeMillis();
             StringBuilder fullText = new StringBuilder();
+
+            String userId = sessionService.getUserId(sessionId);
+            String modeName = finalMode.name();
 
             StreamingChatResponseHandler handler = new StreamingChatResponseHandler() {
                         @Override
@@ -78,6 +85,18 @@ public class TurnProcessor {
                             int tokens = (response != null && response.tokenUsage() != null)
                                     ? response.tokenUsage().totalTokenCount() : 0;
 
+                            if (response != null) {
+                                int inputTokens = (response.tokenUsage() != null)
+                                        ? response.tokenUsage().inputTokenCount() : 0;
+                                int outputTokens = (response.tokenUsage() != null)
+                                        ? response.tokenUsage().outputTokenCount() : 0;
+                                long duration = System.currentTimeMillis() - startTime;
+
+                                llmCallLogService.saveAsync(sessionId, userId, "CONVERSATION", modeName,
+                                        promptJson, agentText, inputTokens, outputTokens,
+                                        duration, "SUCCESS", null);
+                            }
+
                             sessionService.addMessage(sessionId, MessageRole.AGENT, agentText, messageId, tokens);
                             sessionService.recordTokens(sessionId, AgentType.CONVERSATION, tokens);
 
@@ -91,12 +110,8 @@ public class TurnProcessor {
                         }
                     };
 
-            if (isFirstTurn && hasMemory) {
-                conversationAgent.generateStreamFirstTurn(historySnapshot, finalMode,
-                        topicSummary, learningProfile, handler);
-            } else {
-                conversationAgent.generateStream(historySnapshot, finalMode, handler);
-            }
+            conversationAgent.generateStream(historySnapshot, finalMode,
+                    topicSummary, learningProfile, messageId, handler);
         });
 
         CompletableFuture.runAsync(() -> {

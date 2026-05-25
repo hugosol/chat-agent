@@ -15,11 +15,14 @@ public class WireMockStubs {
     private static final String SCENARIO_CORR = "correction-rounds";
     private static final String SCENARIO_MEM_TOPIC = "memory-topic-rounds";
     private static final String SCENARIO_MEM_PROFILE = "memory-profile-rounds";
+    private static final String SCENARIO_CUE_ENTRY = "memory-cue-entry-rounds";
 
     private static final String KEYWORD_CORRECTION = "Correction prompt:";
     private static final String KEYWORD_REPORT = "Report prompt.";
     private static final String KEYWORD_MEM_TOPIC = "E2E_MARKER_MEMORY_TOPIC";
     private static final String KEYWORD_MEM_PROFILE = "E2E_MARKER_MEMORY_PROFILE";
+    private static final String KEYWORD_MEM_CUE_SPLIT = "E2E_MARKER_MEMORY_CUE_SPLIT";
+    private static final String KEYWORD_MEM_CUE_ENTRY = "E2E_MARKER_MEMORY_CUE_ENTRY";
 
     public static void registerAllStubs(WireMockServer wireMock) {
         configureFor("localhost", wireMock.port());
@@ -30,6 +33,7 @@ public class WireMockStubs {
         registerReportStub();
         registerMemoryTopicStubs();
         registerMemoryProfileStubs();
+        registerMemoryCueStubs();
     }
 
     public static void registerDailyTalkStubs(WireMockServer wireMock) {
@@ -41,6 +45,7 @@ public class WireMockStubs {
         registerDailyReportStub();
         registerMemoryTopicStubs();
         registerMemoryProfileStubs();
+        registerMemoryCueStubs();
     }
 
     private static void registerConversationStubs() {
@@ -285,6 +290,40 @@ public class WireMockStubs {
                         .withHeader("Content-Type", "application/json")
                         .withBody(loadResource("wiremock/memory-profile-merge.json")))
                 .willSetStateTo("round-3"));
+    }
+
+    private static void registerMemoryCueStubs() {
+        String splitKeyword = KEYWORD_MEM_CUE_SPLIT;
+        String entryKeyword = KEYWORD_MEM_CUE_ENTRY;
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(splitKeyword)))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/memory-cue-split-two-switch.json"))));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(entryKeyword)))
+                .inScenario(SCENARIO_CUE_ENTRY)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/memory-cue-entry-success.json")))
+                .willSetStateTo("segment-1"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(entryKeyword)))
+                .inScenario(SCENARIO_CUE_ENTRY)
+                .whenScenarioStateIs("segment-1")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/memory-cue-entry-seg2.json"))));
     }
 
     private static String loadResource(String path) {

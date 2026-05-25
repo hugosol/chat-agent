@@ -180,4 +180,24 @@ class MemoryServiceTest {
         assertThat(result).isEqualTo("profile data");
         verify(repository).findTopByUserIdAndTypeAndModeOrderByVersionDesc("user-1", MemoryType.LEARNING_PROFILE, null);
     }
+
+    @Test
+    void generateMemoryAsync_passesSessionIdToSavedRecords() throws Exception {
+        ReportResult report = new ReportResult("overall", "topic data", "errors", "vocab", 7, "takeaway");
+        when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic merged");
+        when(memoryAgent.mergeProfile(anyString(), anyString(), anyString())).thenReturn("profile merged");
+        when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.TOPIC_SUMMARY), any()))
+                .thenReturn(Optional.empty());
+        when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.LEARNING_PROFILE), isNull()))
+                .thenReturn(Optional.empty());
+
+        service.generateMemoryAsync("user-1", report, AgentMode.WORKPLACE_STANDUP, "session-abc-123");
+        Thread.sleep(200);
+
+        ArgumentCaptor<UserMemory> captor = ArgumentCaptor.forClass(UserMemory.class);
+        verify(repository, times(2)).save(captor.capture());
+
+        captor.getAllValues().forEach(memory ->
+                assertThat(memory.getSessionId()).isEqualTo("session-abc-123"));
+    }
 }

@@ -61,9 +61,18 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a 500-character summary of conversation topics discussed across past Practice sessions of the same AgentMode (mode-scoped isolation). | Topic summary, conversation memory |
 | **Learning Profile** | A User Memory of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
 | **Memory Merge** | An LLM-driven process that combines an old User Memory (version N) with a newly completed session's Report to produce an updated version (N+1) | Incremental update, memory consolidation |
-| **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first Turn's System Prompt so the Agent recalls past context when greeting the Learner | Context injection, memory recall |
+| **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first three Turns' System Prompt (messageId ≤ 3) so the Agent has multiple chances to naturally bring up past context | Context injection, memory recall |
 | **Active Engagement** | A System Prompt instruction directing the Agent to proactively bring up unfinished topics and ask questions based on the injected memory | Initiative prompt, engagement instruction |
 | **Memory Version** | A sequential integer on each User Memory record, starting at 1 and incremented by each Memory Merge operation | Version number, revision counter |
+| **MemoryCue** | A structured memory record in the `memory_cues` table — one row per conversation topic segment, containing topic, summary, and tags. Generated post-session by MemoryCueAgent via two-step LLM analysis (topic switch detection + per-segment summarization). Coexists alongside legacy User Memory; retrieval is planned for v2. | Structured memory, topic cue, memory tag |
+| **Memory Cue Split** | The first LLM step in MemoryCue generation: analyzes the full conversation transcript and detects topic switch points, returning a list of message index boundaries | Topic switch detection, split detection |
+| **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary, tags)` triple in structured JSON | Segment summarization, cue generation |
+
+## Observability
+
+| Term | Definition | Aliases to avoid |
+|------|------------|----------------|
+| **LLM Call Log** | Every LLM API call is persisted as a row in the `llm_call_logs` table: prompt, response, token usage (input/output), duration (ms), and status (SUCCESS/ERROR). Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via a `LoggableChatModel` wrapper; the ConversationAgent (streaming) is logged manually via `TurnProcessor`. Writes are async (non-blocking) and records older than 3 days are cleaned up on startup. Used for debugging and cost tracking. | LLM log, call log, API log |
 
 ## Data Isolation
 
@@ -87,9 +96,11 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 - A **Tab takeover** occurs when a Learner resumes their own Practice session from a different tab, displacing the previous Active Tab.
 - A **Stale Tab** self-heals via a **Visibility resume** that triggers a **State rebuild**.
 - A **Learner** has zero or more **User Memory** records, each identified by type.
-- A **Practice session** end triggers one **Memory Merge** per **User Memory** type (Topic Memory and Learning Profile), executed asynchronously.
-- The first **Turn** of a new Practice session includes a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt.
+- A **Practice session** end triggers one **Memory Merge** per **User Memory** type (Topic Memory and Learning Profile), executed asynchronously alongside **MemoryCue** generation.
+- The first three **Turns** of a new Practice session include a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt (messageId ≤ 3).
 - A **Memory Merge** reads the previous **Memory Version**, generates a new one, and inserts it — old versions remain as immutable history.
+- Each **User Memory** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
+- A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status.
 
 ## Flagged Ambiguities
 
