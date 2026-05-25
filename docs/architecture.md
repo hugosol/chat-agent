@@ -365,26 +365,37 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 | **持久化存储** | H2 逐条存 Message + ErrorRecord | `saveSession` 节点在会话结束时批量写入 JPA。跨会话通过 Session 关联 |
 | **Checkpoint / 恢复** | MemorySaver | `CompileConfig.builder().checkpointSaver(new MemorySaver())`，每个会话 `threadId`，刷新页面恢复 |
 | **前端展示** | 全部消息 + 折叠旧消息 | 可滚动聊天区，顶部 token 进度条，旧消息折叠到 "Show earlier" 后 |
-| **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` 顺序执行，一次事务写入 |
+| **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` + `memoryService` + `memoryCueService` 并行执行 |
+| **记忆写入** | MemoryService + MemoryCueService 异步触发 | `memoryExecutor` (core=4, max=8) 上同时运行 Topic Merge + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry |
 
 ### 会话生命周期
 
 ```
 [对话中]
   AgentState.messages (MemorySaver checkpoint)  ← 只在内存
+  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 3 时注入记忆)
   UI token bar 实时更新
 
 [用户点击 End Session]
   ↓
-reportAgent → 生成报告
+  ┌─ memoryExecutor (并行):
+  │    reportAgent.generate() → ReportResult
+  │    → SessionStore.completeSession() → H2
+  │    → MemoryService.generateMemoryAsync() → Topic Merge + Profile Merge → H2
+  │
+  └─ memoryExecutor (并行，与上不互斥):
+       MemoryCueService.generateCuesAsync()
+       → detectSwitches (话题切换点)
+       → generateCue per segment (并行)
+       → memory_cues 表写入
   ↓
-saveSession → Session + Messages + ErrorRecords + SessionReport → H2
-  ↓
-AgentState 释放，checkpoint 清除
+  SessionService.remove() → 释放 state
+  SESSION_REPORT → 前端弹窗
 
 [用户重新打开]
   从 H2 加载历史会话列表（只读）
   新建会话 → 新 threadId → 新 MemorySaver checkpoint
+  加载最新 User Memory → 注入前三轮 System Prompt
 ```
 
 ---
@@ -571,8 +582,9 @@ web-agent/
 
 | | V1（已实现） | V2 |
 |---|-------------|----|
-| **场景** | 职场英语 (Standup) | 技术演讲练习 + 更多 AgentMode |
-| **Agent** | 三 Agent 全协作 | 场景自动切换 |
+| **场景** | 职场英语 (Standup) + 日常闲聊 (Daily Talk) | 技术演讲练习 + 更多 AgentMode |
+| **Agent** | 五 Agent 全协作（Conversation + Correction + Report + Memory + MemoryCue） | 场景自动切换 |
+| **记忆** | 双轨：User Memory (摘要注入) + MemoryCue (结构化存储, write-only) | MemoryCue 关键字检索 (JSON_CONTAINS) + 替换 User Memory 注入 |
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
 | **TTS** | 浏览器 SpeechSynthesis（🔊 按钮手动触发） | OpenAI TTS（自然度更高） |
