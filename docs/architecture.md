@@ -45,7 +45,7 @@
 | 31 | 权限控制策略 | `app.security.permit-all-paths` YAML 配置驱动，SecurityConfig 无条件注解 |
 | 32 | E2E 认证绕过 | `application-e2e.yml` 设 `permit-all-paths: [/**]` 全放行；`requireUserId` fallback 返回 `"anonymous"` |
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
-| 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Hikaru（30 多岁美国人在中国）为 persona，朋友 + 外教混搭角色。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
+| 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
 
 ---
@@ -218,7 +218,7 @@ prompts/workplace_standup/
 └── rules.txt          ← 行为约束规则（回复长度、纠错方式、语气等）
 
 prompts/daily_talk/
-├── description.txt    ← Hikaru 人设：30 多岁美国人住在中国，朋友+外教混搭
+├── description.txt    ← Chris 人设：朋友+外教混搭
 └── rules.txt          ← 10 条：轻松闲聊、教地道表达、补充词汇、文化背景解释等
 ```
 
@@ -524,7 +524,7 @@ web-agent/
 │       ├── workplace_standup/              // per-AgentMode 子目录
 │       │   ├── description.txt
 │       │   └── rules.txt
-│       ├── daily_talk/                     // per-AgentMode 子目录 (Hikaru)
+│       ├── daily_talk/                     // per-AgentMode 子目录 (Chris)
 │       │   ├── description.txt
 │       │   └── rules.txt
 │       ├── correction.txt

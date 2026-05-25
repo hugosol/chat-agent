@@ -1,6 +1,7 @@
 package com.hugosol.webagent.e2e;
 
 import com.hugosol.webagent.e2e.helper.E2ETestBase;
+import com.hugosol.webagent.model.AgentMode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -9,7 +10,7 @@ class EnglishCoachResumeIT extends E2ETestBase {
 
     @Test
     void sessionResumesAfterPageReload() {
-        startSession("WORKPLACE_STANDUP");
+        startSession(AgentMode.WORKPLACE_STANDUP.name());
 
         String sid = sessionId();
         assertNotNull(sid, "sessionId should be in localStorage after session start");

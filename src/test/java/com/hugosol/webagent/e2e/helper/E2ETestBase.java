@@ -28,6 +28,8 @@ import java.util.regex.Pattern;
 @ActiveProfiles("e2e")
 public abstract class E2ETestBase {
 
+    protected static final String DEFAULT_USER_ID = "anonymous";
+
     protected static final int WIREMOCK_PORT = 19090;
     protected static WireMockServer wireMockServer;
     protected static Browser browser;
