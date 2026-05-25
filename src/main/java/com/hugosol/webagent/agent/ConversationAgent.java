@@ -44,14 +44,12 @@ public class ConversationAgent {
     }
 
     public void generateStream(List<MessageData> history, AgentMode mode,
-                                StreamingChatResponseHandler handler) {
-        generate(history, mode, null, null, false, handler);
-    }
-
-    public void generateStreamFirstTurn(List<MessageData> history, AgentMode mode,
-                                         String topicSummary, String learningProfile,
-                                         StreamingChatResponseHandler handler) {
-        generate(history, mode, topicSummary, learningProfile, true, handler);
+                                String topicSummary, String learningProfile,
+                                int messageId, StreamingChatResponseHandler handler) {
+        boolean hasMemory = (topicSummary != null && !topicSummary.isBlank())
+                || (learningProfile != null && !learningProfile.isBlank());
+        boolean injectMemory = messageId <= 3 && hasMemory;
+        generate(history, mode, topicSummary, learningProfile, injectMemory, handler);
     }
 
     private void generate(List<MessageData> history, AgentMode mode,

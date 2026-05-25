@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -94,10 +95,10 @@ class TurnProcessorTest {
     @Test
     void conversationErrorFiresCallback() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(2);
+            StreamingChatResponseHandler handler = inv.getArgument(5);
             handler.onError(new RuntimeException("model down"));
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(), any(), anyInt(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -212,11 +213,11 @@ class TurnProcessorTest {
     @Test
     void nullChatResponseGuardDoesNotThrow() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(2);
+            StreamingChatResponseHandler handler = inv.getArgument(5);
             handler.onPartialResponse("x");
             handler.onCompleteResponse(null);
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(), any(), anyInt(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -239,14 +240,14 @@ class TurnProcessorTest {
 
     private void setupConversationAgent(String responseText, int totalTokens) {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(2);
+            StreamingChatResponseHandler handler = inv.getArgument(5);
             handler.onPartialResponse(responseText);
             handler.onCompleteResponse(ChatResponse.builder()
                     .aiMessage(dev.langchain4j.data.message.AiMessage.from(responseText))
                     .tokenUsage(new TokenUsage(totalTokens / 2, totalTokens / 2, totalTokens))
                     .build());
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(), any(), anyInt(), any());
     }
 
     private static class StubCallback implements TurnProcessor.TurnCallback {

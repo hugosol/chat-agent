@@ -35,11 +35,15 @@ public class MemoryService {
     }
 
     public void generateMemoryAsync(String userId, ReportResult report, AgentMode mode) {
-        executor.execute(() -> generateSingle(userId, MemoryType.TOPIC_SUMMARY, mode,
+        generateMemoryAsync(userId, report, mode, null);
+    }
+
+    public void generateMemoryAsync(String userId, ReportResult report, AgentMode mode, String sessionId) {
+        executor.execute(() -> generateSingle(userId, MemoryType.TOPIC_SUMMARY, mode, sessionId,
                 () -> memoryAgent.mergeTopic(
                         loadLatestContent(userId, MemoryType.TOPIC_SUMMARY, mode),
                         report.topicSummary())));
-        executor.execute(() -> generateSingle(userId, MemoryType.LEARNING_PROFILE, null,
+        executor.execute(() -> generateSingle(userId, MemoryType.LEARNING_PROFILE, null, sessionId,
                 () -> memoryAgent.mergeProfile(
                         loadLatestContent(userId, MemoryType.LEARNING_PROFILE, null),
                         report.errorSummary(),
@@ -56,7 +60,7 @@ public class MemoryService {
         return loadLatestContent(userId, MemoryType.valueOf(type), mode);
     }
 
-    private void generateSingle(String userId, MemoryType type, AgentMode mode, MemoryGenerateTask task) {
+    private void generateSingle(String userId, MemoryType type, AgentMode mode, String sessionId, MemoryGenerateTask task) {
         try {
             UserMemory latest = repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(userId, type, mode).orElse(null);
             log.info("MemoryService generating {} for user {}, mode={}, oldVersion={}, oldContent={}",
@@ -66,7 +70,7 @@ public class MemoryService {
             int newVersion = (latest != null) ? latest.getVersion() + 1 : 1;
 
             transactionTemplate.executeWithoutResult(status -> {
-                UserMemory memory = new UserMemory(userId, type, merged, newVersion, mode);
+                UserMemory memory = new UserMemory(userId, type, merged, newVersion, mode, sessionId);
                 repository.save(memory);
                 log.info("Saved {} v{} for user {}, mode={}", type, newVersion, userId, mode);
             });

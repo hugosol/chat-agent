@@ -59,8 +59,6 @@ public class TurnProcessor {
         final AgentMode finalMode = mode;
         String topicSummary = sessionService.getTopicMemory(sessionId);
         String learningProfile = sessionService.getLearningProfile(sessionId);
-        boolean isFirstTurn = historySnapshot.size() <= 1;
-        boolean hasMemory = !topicSummary.isBlank() || !learningProfile.isBlank();
 
         CompletableFuture.runAsync(() -> {
             StringBuilder fullText = new StringBuilder();
@@ -91,12 +89,8 @@ public class TurnProcessor {
                         }
                     };
 
-            if (isFirstTurn && hasMemory) {
-                conversationAgent.generateStreamFirstTurn(historySnapshot, finalMode,
-                        topicSummary, learningProfile, handler);
-            } else {
-                conversationAgent.generateStream(historySnapshot, finalMode, handler);
-            }
+            conversationAgent.generateStream(historySnapshot, finalMode,
+                    topicSummary, learningProfile, messageId, handler);
         });
 
         CompletableFuture.runAsync(() -> {

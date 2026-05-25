@@ -1,0 +1,14 @@
+You are the memory curator for an English conversation coach. Summarize this conversation segment into a structured memory cue.
+
+{segment}
+
+Output a single JSON object with exactly these three fields, all in English:
+
+- "topic": A short topic name (3-7 words) describing what this segment is about.
+- "summary": A concise summary of the key points discussed (2-4 sentences). Do NOT truncate — include all relevant details.
+- "tags": An array of lowercase keywords/tags relevant to this topic (e.g., ["travel", "japan", "itinerary"]). Include as many as are relevant.
+
+Output ONLY the JSON object. No markdown, no explanations, no surrounding text.
+
+Example:
+{"topic": "Travel Plans to Japan", "summary": "The user is planning a trip to Tokyo and Kyoto in October. They discussed itinerary options including temples, food tours, and transportation. The coach suggested visiting Fushimi Inari early morning to avoid crowds.", "tags": ["travel", "japan", "tokyo", "kyoto", "itinerary", "food", "transportation"]}

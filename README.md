@@ -1,7 +1,7 @@
 # Web Agent
 
 AI-powered English speaking practice tool for Chinese Java developers.  
-Uses **LangChain4j** + **langgraph4j** + **DeepSeek** to run 3 AI agents that role-play conversations, correct English errors in real-time, and generate session reports.
+Uses **LangChain4j** + **langgraph4j** + **DeepSeek** to run 5 AI agents that role-play conversations, correct English errors in real-time, generate session reports, and maintain cross-session memory with structured topic cues.
 
 ## Quick Start
 
@@ -76,8 +76,11 @@ E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari view
 |-----------|-----------------|
 | `EnglishCoachSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
 | `EnglishCoachResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
+| `EnglishCoachMemoryIT` | Two sessions back-to-back → User Memory v1→v2 merge → topic memory mode-scoped isolation → learning profile cross-mode sharing |
+| `DailyTalkIT` | DAILY_TALK mode → 3-turn casual conversation → teaching-style corrections → mode-scoped memory |
+| `EnglishCoachMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
 
-Test resources: `src/test/resources/wiremock/` (7 mock response files), `src/test/resources/application-e2e.yml` (in-memory H2, permit all paths).
+Test resources: `src/test/resources/wiremock/` (mock response files for conversation, correction, report, memory merge, and memory cue), `src/test/resources/application-e2e.yml` (in-memory H2, permit all paths).
 
 ## H2 Database Console
 
@@ -92,7 +95,7 @@ Password: (leave empty)
 
 > H2 console is open by default with the `local` profile. With the `default` profile, you must log in first.
 
-Tables: `users`, `sessions`, `messages`, `error_records`, `session_reports`, `user_progress`
+Tables: `users`, `sessions`, `messages`, `error_records`, `session_reports`, `user_progress`, `user_memory`, `memory_cues`
 
 ## Tech Stack
 
@@ -124,6 +127,8 @@ CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor 
     │                              │
     │                              ├── SessionService (runtime state + token tracking)
     │                              ├── ReportAgent → DeepSeek (session-end)
+    │                              ├── MemoryService (async Topic + Profile merge) ──► MemoryAgent → DeepSeek
+    │                              ├── MemoryCueService (async topic split + segment cues) ──► MemoryCueAgent → DeepSeek
     │                              └── SessionStore → H2 (JPA)
     │
     ▼
@@ -139,13 +144,15 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 - **Multi-tab**: `sessionToWs` map is one-to-one (sessionId → wsId). Page Visibility API triggers auto-resume on tab activation, keeping UI fresh across tabs.
 - **Config-driven auth**: `app.security.permit-all-paths` controls which URL patterns skip authentication. No conditional annotations on SecurityConfig.
 
-### 3 AI Agents
+### 5 AI Agents
 
 | Agent | Responsibility |
 |-------|---------------|
 | **ConversationAgent** | Role-plays according to the selected AgentMode (scenario + persona combined), generates natural English dialogue |
 | **CorrectionAgent** | Analyzes user input for 5 error types: grammar, word choice, Chinglish, pronunciation hints, fluency |
 | **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, vocabulary suggestions, key takeaway |
+| **MemoryAgent** | Merges new session reports with existing Topic Memory and Learning Profile into updated summaries |
+| **MemoryCueAgent** | Two-step post-session LLM: detects topic switch points in conversation, then generates structured `(topic, summary, tags)` triples per segment |
 
 ### LangGraph State Machine (Per-Turn)
 
@@ -154,6 +161,8 @@ START → CorrectionNode → END
 ```
 
 The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
+
+Topic Memory and Learning Profile are injected into the System Prompt for the first **three turns** (messageId ≤ 3). At session end, `MemoryService` fires async LLM merges of Topic + Profile memory, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation — all on the `memoryExecutor` thread pool (core=4, max=8).
 
 ## Project Structure
 
@@ -172,7 +181,9 @@ web-agent/
 │   ├── agent/
 │   │   ├── ConversationAgent.java
 │   │   ├── CorrectionAgent.java
-│   │   └── ReportAgent.java
+│   │   ├── ReportAgent.java
+│   │   ├── MemoryAgent.java
+│   │   └── MemoryCueAgent.java
 │   ├── websocket/
 │   │   ├── CoachWebSocketHandler.java
 │   │   └── CoachMessageHandler.java
@@ -182,9 +193,9 @@ web-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, AgentMode, ...)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, MemoryCueStatus, AgentMode, StringListConverter, ...)
 │   ├── repository/     (Spring Data JPA)
-│   ├── service/        (SessionService, TurnProcessor, SessionStore, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
+│   ├── service/        (SessionService, TurnProcessor, SessionStore, MemoryService, MemoryCueService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
 │   └── config/         (LangChain4jConfig, SecurityConfig, WebSocketConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml
@@ -200,7 +211,9 @@ web-agent/
 │       ├── correction.txt
 │       ├── report.txt
 │       ├── memory-topic.txt
-│       └── memory-profile.txt
+│       ├── memory-profile.txt
+│       ├── memory-cue-split.txt
+│       └── memory-cue-entry.txt
 ├── src/main/resources/static/
 │   ├── login/
 │   │   ├── main.html
@@ -213,13 +226,16 @@ web-agent/
     ├── java/com/hugosol/webagent/e2e/    # E2E regression tests (Playwright + WireMock)
     │   ├── EnglishCoachSessionIT.java
     │   ├── EnglishCoachResumeIT.java
+    │   ├── EnglishCoachMemoryIT.java
+    │   ├── DailyTalkIT.java
+    │   ├── EnglishCoachMemoryCueIT.java
     │   └── helper/
     │       ├── E2ETestBase.java
     │       └── WireMockStubs.java
     └── resources/
         ├── application-e2e.yml           # E2E profile (memory H2, WireMock base-url, permit-all-paths: [/**])
-        ├── prompts/                       # Test prompt overrides
-        └── wiremock/                      # 7 mock response files (SSE streams + JSON)
+        ├── prompts/                       # Test prompt overrides (correction, report, memory-cue-split, memory-cue-entry)
+        └── wiremock/                      # Mock response files (SSE streams + JSON for all agents)
 ```
 
 ## Configuration
@@ -254,6 +270,9 @@ App-level configuration in `application.yml`:
 
 - [ ] OpenAI Whisper for server-side voice input
 - [x] Additional AgentMode values (DAILY_TALK with Chris persona — casual friend+tutor chat)
+- [x] Cross-session memory (Topic Memory + Learning Profile dual memory system)
+- [x] Structured MemoryCue (topic segmentation + tagged memory entries, write-only in v1)
+- [ ] MemoryCue keyword retrieval (JSON_CONTAINS queries on tags column)
 - [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)

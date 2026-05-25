@@ -35,15 +35,15 @@ public class AsyncConfig {
         };
 
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                2,
                 4,
+                8,
                 60L, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(),
                 threadFactory,
                 new ThreadPoolExecutor.CallerRunsPolicy()
         );
         executor.allowCoreThreadTimeOut(true);
-        log.info("Memory executor configured: core=2, max=4, async mode");
+        log.info("Memory executor configured: core=4, max=8, async mode");
         return executor;
     }
 

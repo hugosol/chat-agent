@@ -27,7 +27,7 @@ mvn spring-boot:run
 
 - **Java 17** / **Spring Boot 3.4.7** / **Maven** — `mvn compile` for build verification, `mvn test` for unit tests, `mvn verify` for E2E tests.
 - **Spring Security**: form login + remember-me + BCrypt. SecurityConfig is always loaded — no conditional annotations. Auth behavior is driven entirely by `app.security.permit-all-paths` in YAML config. Default user: `admin/admin123` (from `application.yml` → `DataInitializer`).
-- **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/webagent/e2e/`. Two IT test classes: `EnglishCoachSessionIT` (full session + sidebar + H2 assertions), `EnglishCoachResumeIT` (page reload → session resume). WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`. Uses `@ActiveProfiles("e2e")` + `application-e2e.yml` with `permit-all-paths: [/**]` to bypass authentication.
+- **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/webagent/e2e/`. Five IT test classes: `EnglishCoachSessionIT`, `EnglishCoachResumeIT`, `EnglishCoachMemoryIT`, `DailyTalkIT`, `EnglishCoachMemoryCueIT`. WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`. Uses `@ActiveProfiles("e2e")` + `application-e2e.yml` with `permit-all-paths: [/**]` to bypass authentication.
 - **Package**: `com.hugosol.webagent` (note: Maven `groupId` is `com.example` — ignore that, it's vestigial).
 - **DeepSeek via LangChain4j**: uses OpenAI-compatible adapter (`dev.langchain4j:langchain4j-open-ai`). Default model is `deepseek-v4-flash` (see `application.yml`, not README which says `deepseek-chat`).
 - **Two LLM beans**: `ChatLanguageModel` (sync, for CorrectionAgent/ReportAgent) + `StreamingChatLanguageModel` (`OpenAiStreamingChatModel`, for ConversationAgent). Both in `LangChain4jConfig`.
@@ -75,27 +75,34 @@ No `.env` file support — use `local` profile (`application-local.yml`, gitigno
 com.hugosol.webagent/
 ├── graph/           # LangGraph: CoachState (7 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
-├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent
+├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, MemoryAgent, MemoryCueAgent
 ├── websocket/       # CoachWebSocketHandler (WS entry), CoachMessageHandler (protocol logic)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
-│                    # SessionStore (entity persistence), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
-├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, AgentMode, ...
-├── repository/      # Spring Data JPA repos (6: User, Session, Message, ErrorRecord, SessionReport, UserProgress)
-├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
+│                    # SessionStore (entity persistence), MemoryService, MemoryCueService,
+│                    # SessionCleanupLogoutHandler, TokenTracker, EntityMapper
+├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport,
+│                    # UserProgress, UserMemory, MemoryCue, AgentMode, MemoryCueStatus, StringListConverter, ...
+├── repository/      # Spring Data JPA repos (7: User, Session, Message, ErrorRecord, SessionReport,
+│                    # UserProgress, UserMemory, MemoryCue)
+├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AsyncConfig,
+│                    # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
 └── speech/          # (vacant — V2 will add STT/TTS adapters when needed)
 
 src/test/java/com/hugosol/webagent/e2e/
-├── EnglishCoachSessionIT.java   # Full session: 3 turns + sidebar + H2 assertions
-├── EnglishCoachResumeIT.java    # Page reload → session resume verification
+├── EnglishCoachSessionIT.java    # Full session: 3 turns + sidebar + H2 assertions
+├── EnglishCoachResumeIT.java     # Page reload → session resume verification
+├── EnglishCoachMemoryIT.java     # Two sessions back-to-back → memory merge verification
+├── DailyTalkIT.java              # DAILY_TALK mode → teaching-style corrections
+├── EnglishCoachMemoryCueIT.java  # Session end → MemoryCue structured generation verification
 └── helper/
-    ├── E2ETestBase.java         # @SpringBootTest base: WireMock (19090), Playwright, DOM waits, @ActiveProfiles("e2e")
-    └── WireMockStubs.java       # Scenario state machine stubs (7 stubs, JSON Path body matching)
+    ├── E2ETestBase.java          # @SpringBootTest base: WireMock (19090), Playwright, DOM waits, @ActiveProfiles("e2e")
+    └── WireMockStubs.java        # Scenario state machine stubs (memory cue stubs included, JSON Path body matching)
 
 src/test/resources/
-├── application-e2e.yml          # E2E profile: mem H2, base-url → localhost:19090, permit-all-paths: [/**]
-├── prompts/                     # Test prompt overrides (correction.txt, report.txt)
-└── wiremock/                    # 7 mock response files (3 conv SSE + 3 corr JSON + 1 report JSON)
+├── application-e2e.yml           # E2E profile: mem H2, base-url → localhost:19090, permit-all-paths: [/**]
+├── prompts/                      # Test prompt overrides (correction, report, memory-cue-split, memory-cue-entry)
+└── wiremock/                     # Mock response files (conv SSE + corr JSON + report + memory + memory-cue JSON)
 ```
 
 ## WebSocket Protocol
@@ -139,6 +146,10 @@ Server → Client:
 - **Session resume**: disconnect only removes `sessionToWs` mapping, never calls `removeSession()`. State stays in `activeStates` until explicit `END_SESSION`. On reconnect, `RESUME_SESSION` validates `userId` ownership.
 - **UserId fallback**: `requireUserId()` returns `"anonymous"` if `ws.getPrincipal()` is null. Production always has a Principal (Spring Security interceptor); E2E profile has no auth so this gracefully bypasses.
 - **Config-driven security**: No `@ConditionalOnProperty` or `@Profile` on `SecurityConfig`. All path-level auth control is via `app.security.permit-all-paths` in YAML.
+- **Memory injection**: Now spans the first three turns (messageId ≤ 3) instead of only the first turn. `ConversationAgent` merged `generateStream` + `generateStreamFirstTurn` into a single method with `int messageId` parameter. `TurnProcessor` no longer checks `isFirstTurn` — just passes `messageId` through.
+- **MemoryCue module**: New `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary, tags}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `memoryExecutor`, parallel with Report and Memory Merge. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
+- **Dual memory system**: User Memory (merged summaries) and MemoryCue (structured topic entries) coexist. User Memory feeds System Prompt injection; MemoryCue stores tagged, searchable topic segments for future retrieval (v2).
+- **Thread pool**: `memoryExecutor` expanded to core=4, max=8 to handle MemoryCue split + parallel segment generation + Report + Topic/Profile Merge concurrently.
 
 ## Agent skills
 
