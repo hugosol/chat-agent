@@ -31,7 +31,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | **Correction type** | One of five categories: GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY | Error category, error kind |
 | **Correction sidebar** | The slide-out panel displaying detailed Correction items with type, original->corrected, and explanation | Sidebar, correction panel |
 | **Correction bubble** | A numbered summary inserted after the Learner message in the chat flow | Correction summary, inline correction |
-| **Report** | Post-session analysis: summary, fluency score, error summary, vocabulary suggestions, key takeaway | Session report, assessment, feedback |
+| **Report** | Post-session analysis: summary, fluency score, error summary, key takeaway | Session report, assessment, feedback |
 | **Progress** | Per-Learner aggregated statistics: total sessions completed and total minutes practiced | Statistics, learning progress, track record |
 
 ## Multi-Tab Coordination

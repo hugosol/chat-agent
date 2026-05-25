@@ -58,7 +58,6 @@ class ReportAgentTest {
                   "overallAssessment": "Good progress",
                   "topicSummary": "Talked about work and travel",
                   "errorSummary": "Grammar: 2, Chinglish: 1",
-                  "vocabularySuggestions": "try however instead of but",
                   "fluencyScore": 7,
                   "keyTakeaway": "Practice past tense"
                 }""");
@@ -71,7 +70,6 @@ class ReportAgentTest {
         assertThat(result.overallAssessment()).isEqualTo("Good progress");
         assertThat(result.topicSummary()).isEqualTo("Talked about work and travel");
         assertThat(result.errorSummary()).isEqualTo("Grammar: 2, Chinglish: 1");
-        assertThat(result.vocabularySuggestions()).isEqualTo("try however instead of but");
         assertThat(result.fluencyScore()).isEqualTo(7);
         assertThat(result.keyTakeaway()).isEqualTo("Practice past tense");
     }
@@ -84,7 +82,6 @@ class ReportAgentTest {
         assertThat(result.overallAssessment()).isEmpty();
         assertThat(result.topicSummary()).isEmpty();
         assertThat(result.errorSummary()).isEmpty();
-        assertThat(result.vocabularySuggestions()).isEmpty();
         assertThat(result.fluencyScore()).isZero();
         assertThat(result.keyTakeaway()).isEmpty();
     }

@@ -84,7 +84,7 @@ class SessionStoreTest {
         SessionReport result = store.completeSession("s1",
                 List.of(new MessageData(MessageRole.USER, "Hi", 1)),
                 List.of(),
-                new ReportResult("ok", "topics", "", "", 5, ""));
+                new ReportResult("ok", "topics", "", 5, ""));
 
         assertThat(result).isSameAs(report);
         verify(sessionRepository).save(session);
@@ -99,7 +99,7 @@ class SessionStoreTest {
 
         assertThatThrownBy(() -> store.completeSession("unknown",
                 List.of(), List.of(),
-                new ReportResult("", "", "", "", 0, "")))
+                new ReportResult("", "", "", 0, "")))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("unknown");
     }
@@ -122,7 +122,7 @@ class SessionStoreTest {
         when(userProgressRepository.save(any(UserProgress.class))).thenReturn(existing);
 
         store.completeSession("s1", List.of(), List.of(),
-                new ReportResult("", "", "", "", 0, ""));
+                new ReportResult("", "", "", 0, ""));
 
         verify(userProgressRepository).save(any(UserProgress.class));
     }

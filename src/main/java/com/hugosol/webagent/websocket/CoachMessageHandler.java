@@ -178,13 +178,12 @@ public class CoachMessageHandler implements MessageHandler {
                     report != null ? report.topicSummary() : "",
                     report != null ? report.fluencyScore() : 0,
                     report != null ? report.errorSummary() : "",
-                    report != null ? report.vocabularySuggestions() : "",
                     report != null ? report.keyTakeaway() : ""
             );
             protocol.send(ws, new ServerMessage.SessionReportMessage(reportData));
 
             long elapsed = System.currentTimeMillis() - startTime;
-            log.info("Conversation close latency: {}ms", elapsed);
+            log.info("Conversation close latency: {}s", String.format("%.1f", elapsed / 1000.0));
         } catch (Exception e) {
             log.error("Error ending session", e);
             protocol.send(ws, new ServerMessage.ErrorMessage("Failed to end session: " + e.getMessage()));

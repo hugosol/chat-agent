@@ -18,9 +18,6 @@ public class SessionReport extends BaseEntity {
 
     private Integer fluencyScore;
 
-    @Column(length = 2000)
-    private String vocabularySuggestions;
-
     @Column(length = 1000)
     private String keyTakeaway;
 
@@ -44,9 +41,6 @@ public class SessionReport extends BaseEntity {
 
     public Integer getFluencyScore() { return fluencyScore; }
     public void setFluencyScore(Integer fluencyScore) { this.fluencyScore = fluencyScore; }
-
-    public String getVocabularySuggestions() { return vocabularySuggestions; }
-    public void setVocabularySuggestions(String vocabularySuggestions) { this.vocabularySuggestions = vocabularySuggestions; }
 
     public String getKeyTakeaway() { return keyTakeaway; }
     public void setKeyTakeaway(String keyTakeaway) { this.keyTakeaway = keyTakeaway; }

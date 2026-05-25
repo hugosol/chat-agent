@@ -46,9 +46,9 @@ class MemoryServiceTest {
 
     @Test
     void generateMemoryAsync_submitsBothTasks() throws Exception {
-        ReportResult report = new ReportResult("overall", "topic data", "error summary", "vocab", 7, "takeaway");
+        ReportResult report = new ReportResult("overall", "topic data", "error summary", 7, "takeaway");
         when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic merged");
-        when(memoryAgent.mergeProfile(anyString(), anyString(), anyString())).thenReturn("profile merged");
+        when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile merged");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.TOPIC_SUMMARY), any()))
                 .thenReturn(Optional.of(new UserMemory("u1", MemoryType.TOPIC_SUMMARY, "old-topic", 1)));
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.LEARNING_PROFILE), isNull()))
@@ -59,17 +59,17 @@ class MemoryServiceTest {
         Thread.sleep(200);
 
         verify(memoryAgent, times(1)).mergeTopic(eq("old-topic"), eq("topic data"));
-        verify(memoryAgent, times(1)).mergeProfile(eq("old-profile"), eq("error summary"), eq("vocab"));
+        verify(memoryAgent, times(1)).mergeProfile(eq("old-profile"), eq("error summary"));
         verify(repository, times(2)).save(any(UserMemory.class));
     }
 
     @Test
     void generateMemoryAsync_createsFirstVersionWhenNoPreviousMemory() throws Exception {
-        ReportResult report = new ReportResult("new summary", "new topics", "new errors", "new vocab", 7, "takeaway");
+        ReportResult report = new ReportResult("new summary", "new topics", "new errors", 7, "takeaway");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(anyString(), any(MemoryType.class), any()))
                 .thenReturn(Optional.empty());
         when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic v1");
-        when(memoryAgent.mergeProfile(anyString(), anyString(), anyString())).thenReturn("profile v1");
+        when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile v1");
 
         service.generateMemoryAsync("user-1", report, AgentMode.WORKPLACE_STANDUP);
         Thread.sleep(200);
@@ -89,17 +89,17 @@ class MemoryServiceTest {
 
     @Test
     void generateMemoryAsync_handlesMergeFailureGracefully() throws Exception {
-        ReportResult report = new ReportResult("overall", "topics", "errors", "vocab", 7, "takeaway");
+        ReportResult report = new ReportResult("overall", "topics", "errors", 7, "takeaway");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(anyString(), any(MemoryType.class), any()))
                 .thenReturn(Optional.empty());
         when(memoryAgent.mergeTopic(anyString(), anyString())).thenThrow(new RuntimeException("LLM error"));
-        when(memoryAgent.mergeProfile(anyString(), anyString(), anyString())).thenReturn("profile ok");
+        when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile ok");
 
         service.generateMemoryAsync("user-1", report, AgentMode.WORKPLACE_STANDUP);
         Thread.sleep(200);
 
         verify(memoryAgent, times(1)).mergeTopic(anyString(), anyString());
-        verify(memoryAgent, times(1)).mergeProfile(anyString(), anyString(), anyString());
+        verify(memoryAgent, times(1)).mergeProfile(anyString(), anyString());
         verify(repository, times(1)).save(any(UserMemory.class));
     }
 
@@ -135,9 +135,9 @@ class MemoryServiceTest {
 
     @Test
     void generateMemoryAsync_savesTopicMemoryWithMode() throws Exception {
-        ReportResult report = new ReportResult("overall", "topic data", "errors", "vocab", 7, "takeaway");
+        ReportResult report = new ReportResult("overall", "topic data", "errors", 7, "takeaway");
         when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic merged");
-        when(memoryAgent.mergeProfile(anyString(), anyString(), anyString())).thenReturn("profile merged");
+        when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile merged");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.TOPIC_SUMMARY), eq(AgentMode.DAILY_TALK)))
                 .thenReturn(Optional.empty());
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.LEARNING_PROFILE), isNull()))
@@ -183,9 +183,9 @@ class MemoryServiceTest {
 
     @Test
     void generateMemoryAsync_passesSessionIdToSavedRecords() throws Exception {
-        ReportResult report = new ReportResult("overall", "topic data", "errors", "vocab", 7, "takeaway");
+        ReportResult report = new ReportResult("overall", "topic data", "errors", 7, "takeaway");
         when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic merged");
-        when(memoryAgent.mergeProfile(anyString(), anyString(), anyString())).thenReturn("profile merged");
+        when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile merged");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.TOPIC_SUMMARY), any()))
                 .thenReturn(Optional.empty());
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.LEARNING_PROFILE), isNull()))

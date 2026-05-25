@@ -48,7 +48,6 @@ class EntityMapper {
         SessionReport sr = new SessionReport(sessionId);
         sr.setSummary(report.overallAssessment());
         sr.setErrorSummary(report.errorSummary());
-        sr.setVocabularySuggestions(report.vocabularySuggestions());
         sr.setFluencyScore(report.fluencyScore());
         sr.setKeyTakeaway(report.keyTakeaway());
         return sr;

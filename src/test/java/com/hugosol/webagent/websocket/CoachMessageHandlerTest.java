@@ -231,7 +231,7 @@ class CoachMessageHandlerTest {
         when(sessionService.getUserId("s1")).thenReturn("user1");
         when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
 
-        ReportResult reportResult = new ReportResult("Great", "topics discussed", "none", "try however", 8, "practice");
+        ReportResult reportResult = new ReportResult("Great", "topics discussed", "none", 8, "practice");
         when(reportAgent.generate(any(), any())).thenReturn(reportResult);
 
         handler.onEndSession(ws);

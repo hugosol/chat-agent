@@ -31,11 +31,10 @@ public class MemoryAgent {
         return response.trim();
     }
 
-    public String mergeProfile(String oldProfile, String errorSummary, String vocabularySuggestions) {
+    public String mergeProfile(String oldProfile, String errorSummary) {
         String prompt = profileTemplate
                 .replace("{oldLearningProfile}", oldProfile.isEmpty() ? "(No previous sessions)" : oldProfile)
-                .replace("{errorSummary}", errorSummary)
-                .replace("{vocabularySuggestions}", vocabularySuggestions);
+                .replace("{errorSummary}", errorSummary);
 
         log.debug("MemoryAgent mergeProfile INPUT:\n{}", prompt);
         String response = chatModel.chat(prompt);

@@ -81,8 +81,7 @@ public class ConversationAgent {
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(systemContent));
 
-        int start = Math.max(0, history.size() - 20);
-        for (int i = start; i < history.size(); i++) {
+        for (int i = 0; i < history.size(); i++) {
             MessageData msg = history.get(i);
             if (msg.getRole() == MessageRole.USER) {
                 messages.add(UserMessage.from(msg.getContent()));

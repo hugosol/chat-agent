@@ -85,7 +85,7 @@ public class MemoryCueService {
                             consolidateTags(sessionId, userId, mode);
                         } finally {
                             long elapsed = System.currentTimeMillis() - triggerTime;
-                            log.info("Background task duration (MemoryCue + consolidation): {}ms", elapsed);
+                            log.info("Background task duration (MemoryCue + consolidation): {}s", String.format("%.1f", elapsed / 1000.0));
                         }
                     }, executor);
         });

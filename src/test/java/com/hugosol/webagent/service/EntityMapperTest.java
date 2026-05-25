@@ -194,7 +194,6 @@ class EntityMapperTest {
                 "Overall assessment text",
                 "Discussed standup topics and travel plans",
                 "Grammar: 3, Word Choice: 2",
-                "vocab1\nvocab2",
                 7,
                 "Practice articles"
         );
@@ -204,7 +203,6 @@ class EntityMapperTest {
         assertThat(sr.getSessionId()).isEqualTo("s1");
         assertThat(sr.getSummary()).isEqualTo("Overall assessment text");
         assertThat(sr.getErrorSummary()).isEqualTo("Grammar: 3, Word Choice: 2");
-        assertThat(sr.getVocabularySuggestions()).isEqualTo("vocab1\nvocab2");
         assertThat(sr.getFluencyScore()).isEqualTo(7);
         assertThat(sr.getKeyTakeaway()).isEqualTo("Practice articles");
     }
@@ -239,7 +237,7 @@ class EntityMapperTest {
 
     @Test
     void buildReportHandlesEmptyValues() {
-        ReportResult report = new ReportResult("", "", "", "", 0, "");
+        ReportResult report = new ReportResult("", "", "", 0, "");
 
         SessionReport sr = mapper.buildReport("s1", report);
 

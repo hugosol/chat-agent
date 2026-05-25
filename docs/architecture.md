@@ -269,9 +269,8 @@ Given the full conversation history and all error corrections from this session,
 
 1. **Overall Assessment** (3-4 sentences in English + Chinese translation)
 2. **Error Summary**: Group by error type, count each, list top 3 most frequent errors
-3. **Vocabulary Suggestions**: 3-5 better words/phrases the user could have used
-4. **Fluency Score**: 1-10 rating with 1-sentence justification
-5. **Key Takeaway**: One actionable improvement focus for next session
+3. **Fluency Score**: 1-10 rating with 1-sentence justification
+4. **Key Takeaway**: One actionable improvement focus for next session
 
 Conversation: {fullConversation}
 Errors: {allCorrections}
@@ -303,9 +302,8 @@ Errors: {allCorrections}
     │ id (PK)      │ │ id (PK)      │ │ id (PK)      │ │ id (PK)                 │
     │ sessionId(FK)│ │ userId (UQ)  │ │ userId       │ │ sessionId                │
     │ summary      │ │ totalSessions│ │ type (Enum)  │ │ userId                   │
-    │ fluencyScore │ │ totalMinutes │ │ content      │ │ mode (AgentMode Enum)    │
-    │ vocabulary   │ │ errorStats   │ │ version      │ │ segmentIndex             │
-    │ keyTakeaway  │ │ createTime   │ │ mode (nullable)│ │ topic                  │
+│ fluencyScore │ │ totalMinutes │ │ content      │ │ mode (AgentMode Enum)    │
+│ keyTakeaway  │ │ errorStats   │ │ version      │ │ segmentIndex             │
     └──────────────┘ └──────────────┘ │ sessionId    │ │ summary                 │
                                      └──────────────┘ │ tags (JSON List<String>) │
                                                         │ status (MemoryCueStatus) │
@@ -472,10 +470,6 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 │  Grammar Errors: 3                     │
 │  Word Choice: 2                        │
 │  Chinglish: 4                          │
-│  ────────────────────────────────────  │
-│  Vocabulary Suggestions:               │
-│  • "went to park" → "went to the park" │
-│  • ...                                 │
 │  ────────────────────────────────────  │
 │  Key Takeaway: ...                     │
 │  ────────────────────────────────────  │

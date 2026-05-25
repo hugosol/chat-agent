@@ -168,7 +168,7 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 |-------|---------------|
 | **ConversationAgent** | Role-plays according to the selected AgentMode (scenario + persona combined), generates natural English dialogue |
 | **CorrectionAgent** | Analyzes user input for 5 error types: grammar, word choice, Chinglish, pronunciation hints, fluency |
-| **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, vocabulary suggestions, key takeaway |
+| **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, key takeaway |
 | **MemoryAgent** | Merges new session reports with existing Topic Memory and Learning Profile into updated summaries |
 | **MemoryCueAgent** | Two-step post-session LLM: detects topic switch points in conversation, then generates structured `(topic, summary, tags)` triples per segment (≤5 tags). Runs a tag consolidation pass to merge semantically equivalent tags across sessions into canonical forms. |
 

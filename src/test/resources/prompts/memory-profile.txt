@@ -1,1 +1,1 @@
-E2E_MARKER_MEMORY_PROFILE {oldLearningProfile} {errorSummary} {vocabularySuggestions}
+E2E_MARKER_MEMORY_PROFILE {oldLearningProfile} {errorSummary}

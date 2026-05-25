@@ -49,13 +49,12 @@ public class ReportAgent {
                     getString(sections, "overallAssessment"),
                     getString(sections, "topicSummary"),
                     getString(sections, "errorSummary"),
-                    getString(sections, "vocabularySuggestions"),
                     getInt(sections, "fluencyScore"),
                     getString(sections, "keyTakeaway")
             );
         } catch (Exception e) {
             log.warn("ReportAgent: failed to parse JSON, raw response:\n{}", response, e);
-            return new ReportResult(response, "", "", "", 0, "");
+            return new ReportResult(response, "", "", 0, "");
         }
     }
 
@@ -100,7 +99,6 @@ public class ReportAgent {
             String overallAssessment,
             String topicSummary,
             String errorSummary,
-            String vocabularySuggestions,
             int fluencyScore,
             String keyTakeaway
     ) {}
