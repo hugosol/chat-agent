@@ -46,8 +46,7 @@ public class MemoryService {
         executor.execute(() -> generateSingle(userId, MemoryType.LEARNING_PROFILE, null, sessionId,
                 () -> memoryAgent.mergeProfile(
                         loadLatestContent(userId, MemoryType.LEARNING_PROFILE, null),
-                        report.errorSummary(),
-                        report.vocabularySuggestions())));
+                        report.errorSummary())));
     }
 
     public String loadLatestContent(String userId, MemoryType type, AgentMode mode) {

@@ -105,7 +105,7 @@ The executor bean is qualified as `@Qualifier("memoryExecutor")`.
 | Memory Type | Input Fields |
 |-------------|-------------|
 | Topic Memory | `SessionReport.summary` (overallAssessment) |
-| Learning Profile | `SessionReport.errorSummary` + `SessionReport.vocabularySuggestions` |
+| Learning Profile | `SessionReport.errorSummary` |
 
 The old memory content (previous version) is read from H2 and passed alongside the new data into the LLM prompt.
 
@@ -113,7 +113,7 @@ The old memory content (previous version) is read from H2 and passed alongside t
 
 ### 8. MemoryAgent — LLM Interface
 
-**Decision**: New `MemoryAgent` component analogous to `CorrectionAgent` and `ReportAgent`. Uses the synchronous `ChatLanguageModel.chat(String prompt)` API — no streaming needed. Returns plain text, not JSON. Two methods: `mergeTopic(oldSummary, newSessionSummary)` and `mergeProfile(oldProfile, errorSummary, vocabularySuggestions)`. Each loads its own prompt template via `PromptLoader`.
+**Decision**: New `MemoryAgent` component analogous to `CorrectionAgent` and `ReportAgent`. Uses the synchronous `ChatLanguageModel.chat(String prompt)` API — no streaming needed. Returns plain text, not JSON. Two methods: `mergeTopic(oldSummary, newSessionSummary)` and `mergeProfile(oldProfile, errorSummary)`. Each loads its own prompt template via `PromptLoader`.
 
 **Rationale**: Memory generation runs in background threads — there is no frontend to stream to. The output is pure natural language (no JSON structure to parse). Using the synchronous API simplifies error handling and eliminates `CompletableFuture` nesting (the outer executor handles parallelism).
 
@@ -122,7 +122,7 @@ The old memory content (previous version) is read from H2 and passed alongside t
 **Decision**: Two new prompt files under `src/main/resources/prompts/`:
 
 - `memory-topic.txt`: Instructs the LLM to merge old topic memory with new session overview. Output constrained to under 500 characters, English only, plain text.
-- `memory-profile.txt`: Instructs the LLM to merge old learning profile with new error summary and vocabulary suggestions. Output constrained to under 400 characters, English only, plain text.
+- `memory-profile.txt`: Instructs the LLM to merge old learning profile with new error summary. Output constrained to under 400 characters, English only, plain text.
 
 Both templates handle the case where old memory is empty (first session) by instructing the LLM to create a fresh summary from new data alone. The template uses natural language labels ("Previous topic memory:", "Latest session overview:") to distinguish old from new for the LLM — no structured metadata needed.
 

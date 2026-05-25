@@ -7,7 +7,6 @@ Previous learning profile (may be empty if this is the first session):
 
 Latest session data:
 - Error Summary: {errorSummary}
-- Vocabulary Suggestions: {vocabularySuggestions}
 
 Rules:
 - Update the profile by incorporating new observations from this session.

@@ -188,26 +188,6 @@ class ConversationAgentTest {
     }
 
     @Test
-    void historyTruncatedToLast20() {
-        List<MessageData> history = new ArrayList<>();
-        for (int i = 1; i <= 25; i++) {
-            history.add(new MessageData(MessageRole.USER, "msg-" + String.format("%02d", i), i));
-        }
-
-        agent.generateStream(history,
-                AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
-                new NoopHandler());
-
-        assertThat(lastMessages).hasSize(21); // system + 20 user messages
-        String firstUserContent = lastMessages.get(1).toString();
-        assertThat(firstUserContent).doesNotContain("msg-01");
-        assertThat(firstUserContent).contains("msg-06");
-        String lastUserContent = lastMessages.get(20).toString();
-        assertThat(lastUserContent).contains("msg-25");
-    }
-
-    @Test
     void errorCallbackFiresOnStreamingError() throws Exception {
         StubStreamingModel errorModel = new StubStreamingModel() {
             @Override

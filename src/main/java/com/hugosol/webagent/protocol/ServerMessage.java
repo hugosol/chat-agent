@@ -45,7 +45,7 @@ public sealed interface ServerMessage
     }
 
     record ReportData(String summary, String topicSummary, int fluencyScore, String errorSummary,
-                      String vocabularySuggestions, String keyTakeaway) {
+                      String keyTakeaway) {
     }
 
     record SessionReportMessage(ReportData report) implements ServerMessage {

@@ -405,7 +405,6 @@
             '<div class="report-section"><strong>Topic Summary:</strong><p>' + escapeHtml(report.topicSummary || '') + '</p></div>' +
             '<div class="report-section"><strong>Fluency Score:</strong> ' + report.fluencyScore + '/10</div>' +
             '<div class="report-section"><strong>Error Summary:</strong><p>' + escapeHtml(report.errorSummary || '') + '</p></div>' +
-            '<div class="report-section"><strong>Vocabulary Suggestions:</strong><p>' + escapeHtml(report.vocabularySuggestions || '') + '</p></div>' +
             '<div class="report-section"><strong>Key Takeaway:</strong><p>' + escapeHtml(report.keyTakeaway || '') + '</p></div>';
         els.reportModal.classList.remove('hidden');
     }

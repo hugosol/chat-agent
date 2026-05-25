@@ -7,7 +7,7 @@
     "index": 0,
     "message": {
       "role": "assistant",
-      "content": "{\"topic\": \"Travel Plans\", \"summary\": \"The user talked about their upcoming trip to Japan, including itinerary planning and hotel bookings.\", \"tags\": [\"travel\", \"japan\", \"itinerary\", \"hotel\"]}"
+      "content": "{\"topic\": \"Travel Plans\", \"summary\": \"The user talked about their upcoming trip to Japan, including itinerary planning and hotel bookings.\", \"tags\": [\"travel\", \"japan\", \"spaniel\", \"poodle\", \"dog\"]}"
     },
     "finish_reason": "stop"
   }],

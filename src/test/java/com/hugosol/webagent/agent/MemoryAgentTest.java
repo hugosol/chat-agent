@@ -78,7 +78,7 @@ class MemoryAgentTest {
     void mergeProfile_returnsTrimmedResponse() {
         chatModel.setResponse("  Past tense errors (40%), article usage improving.  ");
 
-        String result = agent.mergeProfile("old profile", "error data", "vocab suggestions");
+        String result = agent.mergeProfile("old profile", "error data");
 
         assertThat(result).isEqualTo("Past tense errors (40%), article usage improving.");
     }
@@ -87,18 +87,17 @@ class MemoryAgentTest {
     void mergeProfile_includesAllInputsInPrompt() {
         chatModel.setResponse("merged profile");
 
-        agent.mergeProfile("Old: past tense weak", "New: 3 grammar errors", "Try: 'staff' instead of 'people'");
+        agent.mergeProfile("Old: past tense weak", "New: 3 grammar errors");
 
         assertThat(chatModel.lastPrompt).contains("Old: past tense weak");
         assertThat(chatModel.lastPrompt).contains("New: 3 grammar errors");
-        assertThat(chatModel.lastPrompt).contains("Try: 'staff' instead of 'people'");
     }
 
     @Test
     void mergeProfile_handlesEmptyOldProfile() {
         chatModel.setResponse("fresh profile");
 
-        agent.mergeProfile("", "error data", "vocab suggestions");
+        agent.mergeProfile("", "error data");
 
         assertThat(chatModel.lastPrompt).doesNotContain("null");
         assertThat(chatModel.lastPrompt).contains("error data");

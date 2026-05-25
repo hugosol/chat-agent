@@ -152,7 +152,7 @@ Server → Client:
 - **Config-driven security**: No `@ConditionalOnProperty` or `@Profile` on `SecurityConfig`. All path-level auth control is via `app.security.permit-all-paths` in YAML.
 - **Memory injection**: Now spans the first three turns (messageId ≤ 3) instead of only the first turn. `ConversationAgent` merged `generateStream` + `generateStreamFirstTurn` into a single method with `int messageId` parameter. `TurnProcessor` no longer checks `isFirstTurn` — just passes `messageId` through.
 - **MemoryCue module**: New `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary, tags}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `memoryExecutor`, parallel with Report and Memory Merge. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
-- **Dual memory system**: User Memory (merged summaries) and MemoryCue (structured topic entries) coexist. User Memory feeds System Prompt injection; MemoryCue stores tagged, searchable topic segments for future retrieval (v2).
+- **Dual memory system**: User Memory (merged summaries) and MemoryCue (structured topic entries) coexist. User Memory feeds System Prompt injection; MemoryCue stores tagged, searchable topic segments for future retrieval (v2). Tag consolidation runs post-segment with a static lock and a 5-tag limit enforced in the entry prompt. In-place UPDATE, no versioning.
 - **Thread pool**: `memoryExecutor` expanded to core=4, max=8 to handle MemoryCue split + parallel segment generation + Report + Topic/Profile Merge concurrently.
 
 ## Logging

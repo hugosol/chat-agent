@@ -12,7 +12,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,11 +28,13 @@ public class MemoryCueAgent {
     private final ChatLanguageModel chatModel;
     private final String splitTemplate;
     private final String entryTemplate;
+    private final String consolidationTemplate;
 
     public MemoryCueAgent(ChatLanguageModel chatModel, PromptLoader promptLoader) {
         this.chatModel = chatModel;
         this.splitTemplate = promptLoader.load("memory-cue-split.txt");
         this.entryTemplate = promptLoader.load("memory-cue-entry.txt");
+        this.consolidationTemplate = promptLoader.load("tag-consolidation.txt");
     }
 
     public record CueResult(String topic, String summary, List<String> tags) {}
@@ -63,6 +67,32 @@ public class MemoryCueAgent {
             }
         }
         return Collections.emptyList();
+    }
+
+    public Map<String, String> consolidateTags(Map<String, Integer> frequencyMap) {
+        StringBuilder tagList = new StringBuilder();
+        for (var entry : frequencyMap.entrySet()) {
+            tagList.append(entry.getKey()).append("(").append(entry.getValue()).append(")\n");
+        }
+
+        String prompt = consolidationTemplate.replace("{tagList}", tagList.toString());
+        log.debug("MemoryCueAgent consolidateTags prompt length: {}", prompt.length());
+        String response = chatModel.chat(prompt);
+        log.debug("MemoryCueAgent consolidateTags response: {}", response);
+
+        try {
+            JsonNode root = mapper.readTree(response);
+            Map<String, String> result = new HashMap<>();
+            var fields = root.fields();
+            while (fields.hasNext()) {
+                var field = fields.next();
+                result.put(field.getKey(), field.getValue().asText());
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("MemoryCueAgent: failed to parse consolidation response: {}", e.getMessage());
+            return Collections.emptyMap();
+        }
     }
 
     public CueResult generateCue(List<MessageData> messages, AgentMode mode, int segmentIndex) {

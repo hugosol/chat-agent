@@ -23,6 +23,7 @@ public class WireMockStubs {
     private static final String KEYWORD_MEM_PROFILE = "E2E_MARKER_MEMORY_PROFILE";
     private static final String KEYWORD_MEM_CUE_SPLIT = "E2E_MARKER_MEMORY_CUE_SPLIT";
     private static final String KEYWORD_MEM_CUE_ENTRY = "E2E_MARKER_MEMORY_CUE_ENTRY";
+    private static final String KEYWORD_TAG_CONSOLIDATION = "E2E_MARKER_TAG_CONSOLIDATION";
 
     public static void registerAllStubs(WireMockServer wireMock) {
         configureFor("localhost", wireMock.port());
@@ -324,6 +325,14 @@ public class WireMockStubs {
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(loadResource("wiremock/memory-cue-entry-seg2.json"))));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(KEYWORD_TAG_CONSOLIDATION)))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/tag-consolidation-response.json"))));
     }
 
     private static String loadResource(String path) {
