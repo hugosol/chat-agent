@@ -146,6 +146,8 @@ public class CoachMessageHandler implements MessageHandler {
 
     @Override
     public void onEndSession(WebSocketSession ws) throws IOException {
+        long startTime = System.currentTimeMillis();
+
         String sessionId = sessionService.getSessionId(ws.getId());
         if (sessionId == null) {
             protocol.send(ws, new ServerMessage.ErrorMessage("No active session to end."));
@@ -166,12 +168,7 @@ public class CoachMessageHandler implements MessageHandler {
             if (userId != null) {
                 AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
                 memoryService.generateMemoryAsync(userId, report, mode, sessionId);
-
-                try {
-                    memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
-                } catch (Exception e) {
-                    log.warn("Failed to dispatch MemoryCue generation: {}", e.getMessage());
-                }
+                memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
             }
 
             sessionService.remove(sessionId);
@@ -185,6 +182,9 @@ public class CoachMessageHandler implements MessageHandler {
                     report != null ? report.keyTakeaway() : ""
             );
             protocol.send(ws, new ServerMessage.SessionReportMessage(reportData));
+
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("Conversation close latency: {}ms", elapsed);
         } catch (Exception e) {
             log.error("Error ending session", e);
             protocol.send(ws, new ServerMessage.ErrorMessage("Failed to end session: " + e.getMessage()));

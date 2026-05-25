@@ -6,7 +6,7 @@ Output a single JSON object with exactly these three fields, all in English:
 
 - "topic": A short topic name (3-7 words) describing what this segment is about.
 - "summary": A concise summary of the key points discussed (2-4 sentences). Do NOT truncate — include all relevant details.
-- "tags": An array of lowercase keywords/tags relevant to this topic (e.g., ["travel", "japan", "itinerary"]). Include as many as are relevant.
+- "tags": An array of lowercase keywords/tags relevant to this topic (e.g., ["travel", "japan", "itinerary"]). Include at most 5 tags — choose the ones most relevant to the text.
 
 Output ONLY the JSON object. No markdown, no explanations, no surrounding text.
 

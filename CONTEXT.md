@@ -67,6 +67,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | **MemoryCue** | A structured memory record in the `memory_cues` table — one row per conversation topic segment, containing topic, summary, and tags. Generated post-session by MemoryCueAgent via two-step LLM analysis (topic switch detection + per-segment summarization). Coexists alongside legacy User Memory; retrieval is planned for v2. | Structured memory, topic cue, memory tag |
 | **Memory Cue Split** | The first LLM step in MemoryCue generation: analyzes the full conversation transcript and detects topic switch points, returning a list of message index boundaries | Topic switch detection, split detection |
 | **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary, tags)` triple in structured JSON | Segment summarization, cue generation |
+| **Tag Consolidation** | The post-session LLM-driven process that merges semantically equivalent tags across all MemoryCue records for a given Learner+AgentMode into canonical forms, updating rows in-place. Runs after all segments complete, protected by a static lock, idempotent. Entry prompt enforces ≤5 tags. | Canonicalization, tag merge |
 
 ## Observability
 
@@ -100,7 +101,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 - The first three **Turns** of a new Practice session include a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt (messageId ≤ 3).
 - A **Memory Merge** reads the previous **Memory Version**, generates a new one, and inserts it — old versions remain as immutable history.
 - Each **User Memory** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
-- A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status.
+- A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status. After all segments complete, **Tag Consolidation** merges equivalent tags across all historical MemoryCue rows for the same Learner+Mode into canonical forms in-place.
 
 ## Flagged Ambiguities
 

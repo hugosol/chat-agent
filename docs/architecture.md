@@ -49,6 +49,7 @@
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
 | 36 | 双轨记忆系统 | User Memory（合并摘要，注入 System Prompt）与 MemoryCue（结构化 topic/summary/tags，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，与 Report 并行。v1 仅写入，v2 启用 JSON_CONTAINS 检索 |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（prompt/response/tokens/duration）。同步 Agent 通过 `LoggableChatModel` 包装器透明拦截，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
+| 38 | Tag Consolidation | MemoryCue tags 通过 LLM 合并语义等效标签为规范形式。in-place UPDATE `memory_cues.tags` 列，无 `original_tags` 列或版本控制。static lock 序列化合并（每进程一次）。部分失败跳过：SEGMENT_FAILED 或 FIRST_CALL_FAILED 时跳过。等幂：重新运行不产生新保存。Entry prompt 限制 ≤5 tags。性能工具：会话结束延迟 + 后台任务持续时间日志。 |
 
 ---
 
@@ -170,7 +171,7 @@ START → correction → END
   → ReportAgent.generate(messages, corrections) → 生成报告
   → SessionStore.completeSession(sessionId, messages, corrections, report) → H2 持久化
   → MemoryService.generateMemoryAsync(userId, report, mode, sessionId) → 异步合并 Topic + Profile 记忆
-  → MemoryCueService.generateCuesAsync(sessionId, userId, mode, messages) → 异步生成结构化 MemoryCue（与上并行）
+  → MemoryCueService.generateCuesAsync(sessionId, userId, mode, messages) → 异步生成结构化 MemoryCue（与上并行，步骤：话题切换检测 → 分段摘要生成 → Tag Consolidation）
   → SessionService.remove(sessionId, wsId) → 释放 state + TokenTracker + sessionToWs 映射
 
 [会话恢复 RESUME_SESSION]

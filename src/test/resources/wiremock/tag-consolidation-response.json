@@ -1,0 +1,19 @@
+{
+  "id": "mock-tag-consolidation",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "{\"job\": \"work\", \"spaniel\": \"dog\", \"poodle\": \"dog\"}"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 30,
+    "completion_tokens": 15,
+    "total_tokens": 45
+  }
+}
