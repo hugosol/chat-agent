@@ -21,6 +21,9 @@ mvn spring-boot:run
 
 # H2 console (for debugging data, local profile opens without auth)
 # http://localhost:8080/h2-console → jdbc:h2:file:./data/englishcoach → sa / (empty)
+
+# File logs (only with local profile, written to ./logs/)
+mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 ## Key Facts
@@ -59,6 +62,7 @@ mvn spring-boot:run
 | `DEEPSEEK_API_KEY` | *(required by default)* | Bypass with `local` profile: place key in `application-local.yml` |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | |
 | `DEEPSEEK_MODEL` | `deepseek-v4-flash` | Config in `application.yml` |
+| `LOG_DIR` | `./logs/` | File log output directory (local profile only) |
 
 No `.env` file support — use `local` profile (`application-local.yml`, gitignored) or set vars directly in shell.
 
@@ -83,10 +87,10 @@ com.hugosol.webagent/
 │                    # SessionCleanupLogoutHandler, TokenTracker, EntityMapper
 ├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport,
 │                    # UserProgress, UserMemory, MemoryCue, AgentMode, MemoryCueStatus, StringListConverter, ...
-├── repository/      # Spring Data JPA repos (7: User, Session, Message, ErrorRecord, SessionReport,
-│                    # UserProgress, UserMemory, MemoryCue)
+├── repository/      # Spring Data JPA repos (8: User, Session, Message, ErrorRecord, SessionReport,
+│                    # UserProgress, UserMemory, MemoryCue, LlmCallLog)
 ├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AsyncConfig,
-│                    # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
+│                    # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader, LoggableChatModel
 └── speech/          # (vacant — V2 will add STT/TTS adapters when needed)
 
 src/test/java/com/hugosol/webagent/e2e/
@@ -150,6 +154,12 @@ Server → Client:
 - **MemoryCue module**: New `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary, tags}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `memoryExecutor`, parallel with Report and Memory Merge. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
 - **Dual memory system**: User Memory (merged summaries) and MemoryCue (structured topic entries) coexist. User Memory feeds System Prompt injection; MemoryCue stores tagged, searchable topic segments for future retrieval (v2).
 - **Thread pool**: `memoryExecutor` expanded to core=4, max=8 to handle MemoryCue split + parallel segment generation + Report + Topic/Profile Merge concurrently.
+
+## Logging
+
+- **File logs** (`logback-spring.xml`): Only active with `local` profile. Console keeps INFO level; file writes DEBUG level to `./logs/english-coach.YYYY-MM-DD.log` with daily rolling and 3-day retention. `ReportAgent` and `MemoryAgent` prompt/response printing has been downgraded from `log.info` to `log.debug` to keep the console clean.
+- **LLM Call Log** (`llm_call_logs` table): Every LLM API call is persisted asynchronously — prompt, response, token usage, duration, status. Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via `LoggableChatModel` wrapper on `ChatLanguageModel` bean. Streaming agent (ConversationAgent) is logged manually in `TurnProcessor.onCompleteResponse()` with full metadata (sessionId, userId, agentType, mode, input/output tokens). Records older than 3 days are cleaned up on startup via `LlmCallLogService.cleanupOnStartup()`. Query via H2 console: `SELECT * FROM llm_call_logs ORDER BY create_time DESC`.
+- **`llmLogExecutor` thread pool**: core=2, max=4, dedicated to async LLM call log writes (defined in `AsyncConfig`).
 
 ## Agent skills
 

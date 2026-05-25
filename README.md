@@ -95,7 +95,25 @@ Password: (leave empty)
 
 > H2 console is open by default with the `local` profile. With the `default` profile, you must log in first.
 
-Tables: `users`, `sessions`, `messages`, `error_records`, `session_reports`, `user_progress`, `user_memory`, `memory_cues`
+## Logging
+
+**File logs** (`logback-spring.xml`, local profile only):
+
+```bash
+# Activate local profile to enable file logging
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+
+# Logs written to: ./logs/english-coach.YYYY-MM-DD.log
+# Console: INFO level — File: DEBUG level, 3-day rolling retention
+```
+
+**LLM Call Log** (`llm_call_logs` table): Every LLM API call (prompt, response, token usage, duration, status) is persisted asynchronously in H2. Query via H2 console:
+
+```sql
+SELECT * FROM llm_call_logs ORDER BY create_time DESC;
+```
+
+Records older than 3 days are automatically cleaned up on startup.
 
 ## Tech Stack
 
@@ -193,13 +211,14 @@ web-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, MemoryCueStatus, AgentMode, StringListConverter, ...)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, StringListConverter, ...)
 │   ├── repository/     (Spring Data JPA)
-│   ├── service/        (SessionService, TurnProcessor, SessionStore, MemoryService, MemoryCueService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
-│   └── config/         (LangChain4jConfig, SecurityConfig, WebSocketConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
+│   ├── service/        (SessionService, TurnProcessor, SessionStore, MemoryService, MemoryCueService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
+│   └── config/         (LangChain4jConfig, LoggableChatModel, SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml
 │   ├── application-local.yml
+│   ├── logback-spring.xml
 │   └── prompts/
 │       ├── conversation-system.txt       ← 骨架模板（{Description} / {Rules} 占位符）
 │       ├── workplace_standup/            ← per-AgentMode 子目录

@@ -19,6 +19,35 @@ public class AsyncConfig {
     private boolean asyncEnabled;
 
     @Bean
+    @Qualifier("llmLogExecutor")
+    public ExecutorService llmLogExecutor() {
+        if (!asyncEnabled) {
+            log.info("LLM log executor configured as synchronous (e2e/test mode)");
+            return new DirectExecutorService();
+        }
+
+        ThreadFactory threadFactory = r -> {
+            ThreadFactory defaultFactory = Executors.defaultThreadFactory();
+            Thread t = defaultFactory.newThread(r);
+            t.setName("llm-log-" + t.getName());
+            t.setDaemon(true);
+            return t;
+        };
+
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2,
+                4,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(),
+                threadFactory,
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+        executor.allowCoreThreadTimeOut(true);
+        log.info("LLM log executor configured: core=2, max=4");
+        return executor;
+    }
+
+    @Bean
     @Qualifier("memoryExecutor")
     public ExecutorService memoryExecutor() {
         if (!asyncEnabled) {

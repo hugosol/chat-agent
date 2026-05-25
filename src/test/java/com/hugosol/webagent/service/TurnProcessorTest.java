@@ -45,13 +45,19 @@ class TurnProcessorTest {
     @Mock
     private CorrectionNode correctionNode;
 
+    @Mock
+    private LlmCallLogService llmCallLogService;
+
     @BeforeEach
     void setUp() {
         when(sessionService.getMessages(anyString())).thenReturn(List.of());
         when(sessionService.getMode(anyString())).thenReturn("WORKPLACE_STANDUP");
+        when(sessionService.getUserId(anyString())).thenReturn("user-1");
         when(sessionService.getCorrectionCount(anyString())).thenReturn(0);
         when(sessionService.getTopicMemory(anyString())).thenReturn("");
         when(sessionService.getLearningProfile(anyString())).thenReturn("");
+        when(conversationAgent.buildPromptJson(any(), any(AgentMode.class), any(), any(), anyInt()))
+                .thenReturn("{\"prompt\":\"test\"}");
     }
 
     @Test
@@ -235,7 +241,7 @@ class TurnProcessorTest {
 
     private TurnProcessor newProcessor() {
         CoachGraphBuilder builder = new CoachGraphBuilder(correctionNode);
-        return new TurnProcessor(builder, conversationAgent, sessionService);
+        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService);
     }
 
     private void setupConversationAgent(String responseText, int totalTokens) {

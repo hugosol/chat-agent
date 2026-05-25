@@ -68,6 +68,12 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | **Memory Cue Split** | The first LLM step in MemoryCue generation: analyzes the full conversation transcript and detects topic switch points, returning a list of message index boundaries | Topic switch detection, split detection |
 | **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary, tags)` triple in structured JSON | Segment summarization, cue generation |
 
+## Observability
+
+| Term | Definition | Aliases to avoid |
+|------|------------|----------------|
+| **LLM Call Log** | Every LLM API call is persisted as a row in the `llm_call_logs` table: prompt, response, token usage (input/output), duration (ms), and status (SUCCESS/ERROR). Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via a `LoggableChatModel` wrapper; the ConversationAgent (streaming) is logged manually via `TurnProcessor`. Writes are async (non-blocking) and records older than 3 days are cleaned up on startup. Used for debugging and cost tracking. | LLM log, call log, API log |
+
 ## Data Isolation
 
 | Term | Definition | Aliases to avoid |

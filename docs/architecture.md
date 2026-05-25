@@ -48,6 +48,7 @@
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
 | 36 | 双轨记忆系统 | User Memory（合并摘要，注入 System Prompt）与 MemoryCue（结构化 topic/summary/tags，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，与 Report 并行。v1 仅写入，v2 启用 JSON_CONTAINS 检索 |
+| 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（prompt/response/tokens/duration）。同步 Agent 通过 `LoggableChatModel` 包装器透明拦截，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
 
 ---
 
@@ -306,8 +307,25 @@ Errors: {allCorrections}
     │ keyTakeaway  │ │ createTime   │ │ mode (nullable)│ │ topic                  │
     └──────────────┘ └──────────────┘ │ sessionId    │ │ summary                 │
                                      └──────────────┘ │ tags (JSON List<String>) │
-                                                       │ status (MemoryCueStatus) │
-                                                       └─────────────────────────┘
+                                                        │ status (MemoryCueStatus) │
+                                                        └─────────────────────────┘
+                                                        ┌─────────────────────────┐
+                                                        │      LlmCallLog         │
+                                                        │─────────────────────────│
+                                                        │ id (PK)                 │
+                                                        │ sessionId (nullable)    │
+                                                        │ userId (nullable)       │
+                                                        │ agentType               │
+                                                        │ mode                    │
+                                                        │ model                   │
+                                                        │ requestPrompt (CLOB)    │
+                                                        │ responseText (CLOB)     │
+                                                        │ inputTokens (nullable)  │
+                                                        │ outputTokens (nullable) │
+                                                        │ durationMs              │
+                                                        │ status                  │
+                                                        │ errorMessage (nullable) │
+                                                        └─────────────────────────┘
 
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
@@ -366,6 +384,8 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 | **Checkpoint / 恢复** | MemorySaver | `CompileConfig.builder().checkpointSaver(new MemorySaver())`，每个会话 `threadId`，刷新页面恢复 |
 | **前端展示** | 全部消息 + 折叠旧消息 | 可滚动聊天区，顶部 token 进度条，旧消息折叠到 "Show earlier" 后 |
 | **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` + `memoryService` + `memoryCueService` 并行执行 |
+| **日志写入** | LLM 调用时即时异步写入 | `LoggableChatModel`（同步 Agent）在 `chat()` 调用点拦截；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
+| **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
 | **记忆写入** | MemoryService + MemoryCueService 异步触发 | `memoryExecutor` (core=4, max=8) 上同时运行 Topic Merge + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry |
 
 ### 会话生命周期
@@ -508,6 +528,7 @@ web-agent/
 │   │   ├── UserProgress.java               // 学习进度（含 userId unique，每用户一行）
 │   │   ├── UserMemory.java                 // 跨会话记忆（Topic Memory + Learning Profile，含 sessionId 追溯）
 │   │   ├── MemoryCue.java                  // 结构化话题记忆（topic/summary/tags，含状态追踪）
+│   │   ├── LlmCallLog.java                 // LLM API 调用日志（prompt/response/tokens/duration/status）
 │   │   ├── MemoryCueStatus.java            // 枚举: COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED
 │   │   ├── StringListConverter.java        // JPA AttributeConverter: List<String> ↔ JSON
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
@@ -515,7 +536,7 @@ web-agent/
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED
 │   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP (含 displayName + templatePath)
 │   │
-│   ├── repository/                         // Spring Data JPA（8 个）
+│   ├── repository/                         // Spring Data JPA（9 个）
 │   │   ├── UserRepository.java             // findByUsername
 │   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
@@ -523,7 +544,8 @@ web-agent/
 │   │   ├── SessionReportRepository.java
 │   │   ├── UserProgressRepository.java     // findByUserId
 │   │   ├── UserMemoryRepository.java       // findByUserIdAndTypeAndModeOrderByVersionDesc
-│   │   └── MemoryCueRepository.java        // findByUserIdAndMode, findBySessionId
+│   │   ├── MemoryCueRepository.java        // findByUserIdAndMode, findBySessionId
+│   │   └── LlmCallLogRepository.java       // deleteByCreateTimeBefore
 │   │
 │   ├── service/                            // 业务服务
 │   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
@@ -531,15 +553,17 @@ web-agent/
 │   │   ├── SessionStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
 │   │   ├── MemoryService.java              // 异步 Topic + Learning Profile 合并（含 sessionId 追溯）
 │   │   ├── MemoryCueService.java           // 异步 MemoryCue 生成（话题分割 + 分段摘要，与 Report/Memory 并行）
+│   │   ├── LlmCallLogService.java          // 异步 LLM 调用日志写入 + 启动时清理 3 天前记录
 │   │   ├── SessionCleanupLogoutHandler.java // 登出时清理 activeStates
 │   │   ├── EntityMapper.java              // 运行时数据 → JPA 实体转换
 │   │   └── TokenTracker.java               // 按 AgentType 分计 token
 │   │
 │   └── config/                             // 配置类
 │       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel + OpenAiStreamingChatModel) Bean 配置
+│       ├── LoggableChatModel.java          // ChatLanguageModel 包装器，拦截 chat(String) 写入日志
 │       ├── SecurityConfig.java             // Spring Security filter chain + 登录事件日志
 │       ├── WebSocketConfig.java            // WebSocket Handler 注册（同源策略）
-│       ├── AsyncConfig.java                // memoryExecutor 线程池配置（core=4, max=8, CallerRunsPolicy）
+│       ├── AsyncConfig.java                // memoryExecutor + llmLogExecutor 线程池配置
 │       ├── AppProperties.java              // @ConfigurationProperties(prefix="app") 包含 security.permit-all-paths
 │       ├── PasswordEncoderConfig.java      // BCryptPasswordEncoder bean（独立配置，非 web 环境可用）
 │       ├── DataInitializer.java            // CommandLineRunner：从 app.initial-users 种子用户
@@ -549,6 +573,7 @@ web-agent/
 ├── src/main/resources/
 │   ├── application.yml                     // 默认配置 + app.security.permit-all-paths: [/login/**]
 │   ├── application-local.yml               // 本地覆盖（H2 console, initial-users, /h2-console/** 放行）
+│   ├── logback-spring.xml                  // 日志配置（local profile 启用文件日志，INFO 控制台）
 │   └── prompts/
 │       ├── conversation-system.txt         // 骨架模板（{Description}, {Rules} 占位符）
 │       ├── workplace_standup/              // per-AgentMode 子目录
