@@ -5,6 +5,7 @@ import com.hugosol.webagent.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -16,13 +17,16 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final AppProperties appProperties;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     public DataInitializer(UserRepository userRepository,
-                           AppProperties appProperties,
-                           PasswordEncoder passwordEncoder) {
+                            AppProperties appProperties,
+                            PasswordEncoder passwordEncoder,
+                            JdbcTemplate jdbcTemplate) {
         this.userRepository = userRepository;
         this.appProperties = appProperties;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -35,6 +39,13 @@ public class DataInitializer implements CommandLineRunner {
             } else {
                 log.info("Initial user already exists: {}", user.username());
             }
+        }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE memory_cues DROP COLUMN IF EXISTS tags");
+            log.info("Migrated: dropped tags column from memory_cues");
+        } catch (Exception e) {
+            log.debug("Tags column migration skipped or already applied: {}", e.getMessage());
         }
     }
 }

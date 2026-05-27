@@ -2,8 +2,6 @@ package com.hugosol.webagent.model;
 
 import jakarta.persistence.*;
 
-import java.util.List;
-
 @Entity
 @Table(name = "memory_cues")
 public class MemoryCue extends BaseEntity {
@@ -31,10 +29,6 @@ public class MemoryCue extends BaseEntity {
     @Column(columnDefinition = "CLOB")
     private String summary;
 
-    @Column
-    @Convert(converter = StringListConverter.class)
-    private List<String> tags;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MemoryCueStatus status;
@@ -42,14 +36,13 @@ public class MemoryCue extends BaseEntity {
     public MemoryCue() {}
 
     public MemoryCue(String sessionId, String userId, AgentMode mode, int segmentIndex,
-                     String topic, String summary, List<String> tags, MemoryCueStatus status) {
+                     String topic, String summary, MemoryCueStatus status) {
         this.sessionId = sessionId;
         this.userId = userId;
         this.mode = mode;
         this.segmentIndex = segmentIndex;
         this.topic = topic;
         this.summary = summary;
-        this.tags = tags;
         this.status = status;
     }
 
@@ -73,9 +66,6 @@ public class MemoryCue extends BaseEntity {
 
     public String getSummary() { return summary; }
     public void setSummary(String summary) { this.summary = summary; }
-
-    public List<String> getTags() { return tags; }
-    public void setTags(List<String> tags) { this.tags = tags; }
 
     public MemoryCueStatus getStatus() { return status; }
     public void setStatus(MemoryCueStatus status) { this.status = status; }

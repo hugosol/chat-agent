@@ -1,6 +1,7 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
+import com.hugosol.webagent.dto.MemoryContent;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MessageRole;
@@ -68,7 +69,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new RecordingHandler());
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
@@ -80,7 +81,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("workplace_standup/description.txt");
@@ -93,7 +94,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
         String description = promptLoader.load("workplace_standup/description.txt");
@@ -106,7 +107,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.DAILY_TALK,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("daily_talk/description.txt");
@@ -119,7 +120,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.DAILY_TALK,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("daily_talk/rules.txt");
@@ -132,7 +133,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("workplace_standup/rules.txt");
@@ -142,13 +143,10 @@ class ConversationAgentTest {
 
     @Test
     void userMessagesIncludedInMessageList() {
-        List<MessageData> history = List.of(
-                new MessageData(MessageRole.USER, "I finished the login module", 1)
-        );
-
-        agent.generateStream(history,
+        agent.generateStream(
+                List.of(new MessageData(MessageRole.USER, "I finished the login module", 1)),
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
         assertThat(lastMessages).isNotNull();
@@ -164,7 +162,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
         assertThat(lastMessages).isNotNull();
@@ -180,10 +178,10 @@ class ConversationAgentTest {
 
         agent.generateStream(history,
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
-        assertThat(lastMessages).hasSize(3); // system + user + assistant
+        assertThat(lastMessages).hasSize(3);
         assertThat(lastMessages.get(0)).isInstanceOf(SystemMessage.class);
     }
 
@@ -202,7 +200,7 @@ class ConversationAgentTest {
         latch = new CountDownLatch(1);
         errorAgent.generateStream(List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new StreamingChatResponseHandler() {
                     @Override
                     public void onPartialResponse(String token) {}
@@ -220,13 +218,12 @@ class ConversationAgentTest {
     }
 
     @Test
-    void messageIdOneInjectsMemoryContent() {
+    void userMemoryInjection_containsTopicAndProfile() {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                "Talked about travel plans",
-                "Past tense needs work",
-                1,
+                new MemoryContent("Talked about travel plans", "Past tense needs work", null),
+                0,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
@@ -235,51 +232,38 @@ class ConversationAgentTest {
         assertThat(systemContent).contains("Your Learning Profile");
         assertThat(systemContent).contains("Past tense needs work");
         assertThat(systemContent).contains("Active Engagement");
-        assertThat(systemContent).contains("unfinished topic");
     }
 
     @Test
-    void messageIdThreeInjectsMemoryContent() {
+    void ragMemoryInjection_containsMemoryCues() {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                "Talked about travel plans",
-                "Past tense needs work",
-                3,
+                new MemoryContent(null, null, "Work Standup: discussed login module, as well as, Sprint Planning: sprint review notes"),
+                0,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("Conversation Memory");
+        assertThat(systemContent).doesNotContain("Conversation Memory");
+        assertThat(systemContent).doesNotContain("Your Learning Profile");
+        assertThat(systemContent).contains("Memory Cues");
+        assertThat(systemContent).contains("login module");
+        assertThat(systemContent).contains("sprint review");
         assertThat(systemContent).contains("Active Engagement");
     }
 
     @Test
-    void messageIdFourDoesNotInjectMemory() {
+    void emptyMemoryContent_noInjection() {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                "Talked about travel plans",
-                "Past tense needs work",
-                4,
+                new MemoryContent(null, null, null),
+                0,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
         assertThat(systemContent).doesNotContain("Conversation Memory");
-        assertThat(systemContent).doesNotContain("Active Engagement");
-        assertThat(systemContent).doesNotContain("Your Learning Profile");
-    }
-
-    @Test
-    void noMemoryData_doesNotInjectEvenOnFirstTurn() {
-        agent.generateStream(
-                List.of(new MessageData(MessageRole.USER, "Hi", 0)),
-                AgentMode.WORKPLACE_STANDUP,
-                "", "",
-                1,
-                new NoopHandler());
-
-        String systemContent = getSystemContent();
-        assertThat(systemContent).doesNotContain("Conversation Memory");
+        assertThat(systemContent).doesNotContain("Memory Cues");
         assertThat(systemContent).doesNotContain("Active Engagement");
     }
 
@@ -292,10 +276,10 @@ class ConversationAgentTest {
 
         agent.generateStream(history,
                 AgentMode.WORKPLACE_STANDUP,
-                "", "", 4,
+                new MemoryContent(null, null, null), 0,
                 new NoopHandler());
 
-        assertThat(lastMessages).hasSize(2); // system + user only, correction skipped
+        assertThat(lastMessages).hasSize(2);
     }
 
     private String getSystemContent() {

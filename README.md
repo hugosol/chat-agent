@@ -180,7 +180,7 @@ START → CorrectionNode → END
 
 The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
 
-Topic Memory and Learning Profile are injected into the System Prompt for the first **three turns** (messageId ≤ 3). At session end, `MemoryService` fires async LLM merges of Topic + Profile memory, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation — all on the `memoryExecutor` thread pool (core=4, max=8).
+Topic Memory and Learning Profile are injected into the System Prompt for the first **turn** (messageId ≤ 1). At session end, `MemoryService` fires async LLM merges of Topic + Profile memory, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation — all on the `memoryExecutor` thread pool (core=4, max=8).
 
 ## Project Structure
 

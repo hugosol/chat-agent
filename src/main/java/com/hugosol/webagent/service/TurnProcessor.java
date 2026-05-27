@@ -1,6 +1,9 @@
 package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.agent.ConversationAgent;
+import com.hugosol.webagent.config.AppProperties;
+import com.hugosol.webagent.dto.CueMatch;
+import com.hugosol.webagent.dto.MemoryContent;
 import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
@@ -20,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Component
 public class TurnProcessor {
@@ -30,6 +34,8 @@ public class TurnProcessor {
     private final ConversationAgent conversationAgent;
     private final SessionService sessionService;
     private final LlmCallLogService llmCallLogService;
+    private final EmbeddingService embeddingService;
+    private final AppProperties appProperties;
 
     public interface TurnCallback {
         void onConversationToken(String delta, int messageId);
@@ -39,13 +45,17 @@ public class TurnProcessor {
     }
 
     public TurnProcessor(CoachGraphBuilder graphBuilder,
-                         ConversationAgent conversationAgent,
-                         SessionService sessionService,
-                         LlmCallLogService llmCallLogService) {
+                          ConversationAgent conversationAgent,
+                          SessionService sessionService,
+                          LlmCallLogService llmCallLogService,
+                          EmbeddingService embeddingService,
+                          AppProperties appProperties) {
         this.graph = graphBuilder.getCompiledGraph();
         this.conversationAgent = conversationAgent;
         this.sessionService = sessionService;
         this.llmCallLogService = llmCallLogService;
+        this.embeddingService = embeddingService;
+        this.appProperties = appProperties;
     }
 
     public void processTurn(String sessionId, String userInput, int messageId, TurnCallback callback) {
@@ -62,14 +72,37 @@ public class TurnProcessor {
         final AgentMode finalMode = mode;
         String topicSummary = sessionService.getTopicMemory(sessionId);
         String learningProfile = sessionService.getLearningProfile(sessionId);
+        String userId = sessionService.getUserId(sessionId);
+
+        int userMemoryRounds = appProperties.getMemory().getUserMemoryRounds();
+
+        final MemoryContent memoryContent;
+        if (messageId <= userMemoryRounds) {
+            memoryContent = new MemoryContent(topicSummary, learningProfile, null);
+        } else {
+            int topK = appProperties.getMemory().getRetrieval().getTopK();
+            double threshold = appProperties.getMemory().getRetrieval().getSimilarityThreshold();
+            List<CueMatch> ragResults = embeddingService.search(userInput, finalMode, userId, topK, threshold);
+            if (!ragResults.isEmpty()) {
+                String memoryCuesText = ragResults.stream()
+                        .map(m -> m.topic() + ": " + m.summary())
+                        .collect(Collectors.joining(", as well as, "));
+                log.info("TurnProcessor: RAG retrieved {} cues for session {} messageId {}",
+                        ragResults.size(), sessionId, messageId);
+                memoryContent = new MemoryContent(null, null, memoryCuesText);
+            } else {
+                memoryContent = new MemoryContent(null, null, null);
+            }
+        }
+
+        final MemoryContent finalMemoryContent = memoryContent;
 
         CompletableFuture.runAsync(() -> {
             String promptJson = conversationAgent.buildPromptJson(historySnapshot, finalMode,
-                    topicSummary, learningProfile, messageId);
+                    finalMemoryContent, messageId);
             long startTime = System.currentTimeMillis();
             StringBuilder fullText = new StringBuilder();
 
-            String userId = sessionService.getUserId(sessionId);
             String modeName = finalMode.name();
 
             StreamingChatResponseHandler handler = new StreamingChatResponseHandler() {
@@ -111,7 +144,7 @@ public class TurnProcessor {
                     };
 
             conversationAgent.generateStream(historySnapshot, finalMode,
-                    topicSummary, learningProfile, messageId, handler);
+                    finalMemoryContent, messageId, handler);
         });
 
         CompletableFuture.runAsync(() -> {

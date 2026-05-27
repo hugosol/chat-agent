@@ -61,13 +61,16 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a 500-character summary of conversation topics discussed across past Practice sessions of the same AgentMode (mode-scoped isolation). | Topic summary, conversation memory |
 | **Learning Profile** | A User Memory of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
 | **Memory Merge** | An LLM-driven process that combines an old User Memory (version N) with a newly completed session's Report to produce an updated version (N+1) | Incremental update, memory consolidation |
-| **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first three Turns' System Prompt (messageId ≤ 3) so the Agent has multiple chances to naturally bring up past context | Context injection, memory recall |
+| **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first Turn's System Prompt (messageId ≤ 1) so the Agent can naturally bring up past context | Context injection, memory recall |
 | **Active Engagement** | A System Prompt instruction directing the Agent to proactively bring up unfinished topics and ask questions based on the injected memory | Initiative prompt, engagement instruction |
 | **Memory Version** | A sequential integer on each User Memory record, starting at 1 and incremented by each Memory Merge operation | Version number, revision counter |
-| **MemoryCue** | A structured memory record in the `memory_cues` table — one row per conversation topic segment, containing topic, summary, and tags. Generated post-session by MemoryCueAgent via two-step LLM analysis (topic switch detection + per-segment summarization). Coexists alongside legacy User Memory; retrieval is planned for v2. | Structured memory, topic cue, memory tag |
+| **MemoryCue** | A structured memory record in the `memory_cues` table — one row per conversation topic segment, containing topic and summary. Generated post-session by MemoryCueAgent via two-step LLM analysis (topic switch detection + per-segment summarization). Vectorized by EmbeddingService into an InMemoryEmbeddingStore for semantic RAG retrieval starting from Round 4. | Structured memory, topic cue |
 | **Memory Cue Split** | The first LLM step in MemoryCue generation: analyzes the full conversation transcript and detects topic switch points, returning a list of message index boundaries | Topic switch detection, split detection |
-| **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary, tags)` triple in structured JSON | Segment summarization, cue generation |
-| **Tag Consolidation** | The post-session LLM-driven process that merges semantically equivalent tags across all MemoryCue records for a given Learner+AgentMode into canonical forms, updating rows in-place. Runs after all segments complete, protected by a static lock, idempotent. Entry prompt enforces ≤5 tags. | Canonicalization, tag merge |
+| **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary)` pair in structured JSON | Segment summarization, cue generation |
+| **MemoryCue Retrieval** | Vector semantic retrieval of historical MemoryCue records using ONNX embeddings (all-MiniLM-L6-v2, 384 dimensions). Starting from Round 2 (after User Memory's 1-turn window), each user message triggers a cosine-similarity search against past cues filtered by userId × AgentMode, injecting top-2 matches into the System Prompt. | RAG retrieval, semantic search, vector recall |
+| **EmbeddingService** | The RAG vectorization module: manages InMemoryEmbeddingStore lifecycle (init from disk or H2, async indexing, search with metadata filtering, JSON disk serialization). Uses a dedicated `embeddingExecutor` thread pool for ONNX CPU-bound operations. | Vector service, embedding module |
+| **CueMatch** | A DTO record returned by `EmbeddingService.search()` containing `(cueId, topic, summary, score)`, decoupled from JPA entities. | Search result, match record |
+| **MemoryContent** | A DTO record encapsulating all memory data injected into the System Prompt: `(topicSummary, learningProfile, memoryCuesText)`. Replaces three separate parameters in ConversationAgent and TurnProcessor. | Prompt payload, memory injection package |
 
 ## Observability
 
@@ -98,7 +101,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 - A **Stale Tab** self-heals via a **Visibility resume** that triggers a **State rebuild**.
 - A **Learner** has zero or more **User Memory** records, each identified by type.
 - A **Practice session** end triggers one **Memory Merge** per **User Memory** type (Topic Memory and Learning Profile), executed asynchronously alongside **MemoryCue** generation.
-- The first three **Turns** of a new Practice session include a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt (messageId ≤ 3).
+- The first **Turn** of a new Practice session includes a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt (messageId ≤ 1).
 - A **Memory Merge** reads the previous **Memory Version**, generates a new one, and inserts it — old versions remain as immutable history.
 - Each **User Memory** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
 - A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status. After all segments complete, **Tag Consolidation** merges equivalent tags across all historical MemoryCue rows for the same Learner+Mode into canonical forms in-place.
