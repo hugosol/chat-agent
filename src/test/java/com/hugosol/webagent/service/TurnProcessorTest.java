@@ -49,6 +49,9 @@ class TurnProcessorTest {
     @Mock
     private EmbeddingService embeddingService;
 
+    @Mock
+    private MemoryService memoryService;
+
     private AppProperties appProperties;
 
     @BeforeEach
@@ -61,7 +64,7 @@ class TurnProcessorTest {
         when(sessionService.getTopicMemory(anyString())).thenReturn("");
         when(sessionService.getLearningProfile(anyString())).thenReturn("");
         when(conversationAgent.buildPromptJson(any(), any(AgentMode.class), any(MemoryContent.class), anyInt()))
-                .thenReturn("{\"prompt\":\"test\"}");
+                .thenReturn("[{\"role\":\"system\",\"content\":\"You are a coach\"},{\"role\":\"user\",\"content\":\"hi\"},{\"role\":\"assistant\",\"content\":\"Hello\"}]");
     }
 
     @Test
@@ -100,6 +103,10 @@ class TurnProcessorTest {
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
         verify(sessionService).addMessage("s1", MessageRole.AGENT, "Hi", 1, 6);
         verify(sessionService).recordTokens("s1", AgentType.CONVERSATION, 6);
+        verify(llmCallLogService).saveAsync(
+                eq("s1"), eq("user-1"), eq("CONVERSATION"), eq("WORKPLACE_STANDUP"),
+                contains("system"), contains("You are a coach"), contains("user"),
+                contains("Hi"), anyInt(), anyInt(), anyLong(), eq("SUCCESS"), isNull());
     }
 
     @Test
@@ -170,7 +177,7 @@ class TurnProcessorTest {
     void messageIdFive_callsRagSearch() throws Exception {
         setupConversationAgent("ok", 0);
         when(embeddingService.search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), anyInt(), anyDouble()))
-                .thenReturn(List.of(new CueMatch("cue-1", "Work Standup", "Discussed login", 0.85)));
+                .thenReturn(List.of(new CueMatch("cue-1", "Work Standup", "Discussed login", 0.85, null)));
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -261,7 +268,7 @@ class TurnProcessorTest {
 
     private TurnProcessor newProcessor() {
         CoachGraphBuilder builder = new CoachGraphBuilder(correctionNode);
-        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, appProperties);
+        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, memoryService, appProperties);
     }
 
     private void setupConversationAgent(String responseText, int totalTokens) {

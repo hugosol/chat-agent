@@ -1,5 +1,6 @@
 package com.hugosol.webagent.agent;
 
+import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
@@ -46,7 +47,7 @@ class MemoryCueAgentTest {
     void setUp() {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
-        agent = new MemoryCueAgent(chatModel, promptLoader);
+        agent = new MemoryCueAgent(chatModel, promptLoader, new AppProperties());
     }
 
     @Test

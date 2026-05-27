@@ -35,7 +35,7 @@ class MemoryCueServiceTest {
         agent = mock(MemoryCueAgent.class);
         repository = mock(MemoryCueRepository.class);
         embeddingService = mock(EmbeddingService.class);
-        when(embeddingService.indexAsync(any(), anyString(), anyString(), any(), anyString()))
+        when(embeddingService.indexAsync(any(), anyString(), anyString(), any(), anyString(), isNull()))
                 .thenReturn(CompletableFuture.completedFuture(null));
         executor = Executors.newSingleThreadExecutor();
         service = new MemoryCueService(agent, repository, embeddingService, executor);
@@ -65,7 +65,7 @@ class MemoryCueServiceTest {
         assertThat(savedCues.get(0).getTopic()).isEqualTo("Travel");
 
         verify(embeddingService).indexAsync(any(), eq("Travel"), eq("summary"),
-                eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"));
+                eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), isNull());
     }
 
     @Test
@@ -84,7 +84,7 @@ class MemoryCueServiceTest {
         assertThat(savedCues).hasSize(2);
 
         verify(embeddingService, times(2)).indexAsync(any(), anyString(), anyString(),
-                any(), anyString());
+                any(), anyString(), isNull());
     }
 
     @Test
@@ -97,7 +97,7 @@ class MemoryCueServiceTest {
         assertThat(savedCues.get(0).getStatus()).isEqualTo(MemoryCueStatus.FIRST_CALL_FAILED);
         assertThat(savedCues.get(0).getSegmentIndex()).isEqualTo(-1);
         verify(agent, never()).generateCue(any(), any(), anyInt());
-        verify(embeddingService, never()).indexAsync(any(), anyString(), anyString(), any(), anyString());
+        verify(embeddingService, never()).indexAsync(any(), anyString(), anyString(), any(), anyString(), isNull());
     }
 
     @Test
@@ -114,7 +114,7 @@ class MemoryCueServiceTest {
         assertThat(savedCues).extracting(MemoryCue::getStatus)
                 .containsExactlyInAnyOrder(MemoryCueStatus.COMPLETED, MemoryCueStatus.SEGMENT_FAILED);
 
-        verify(embeddingService, times(1)).indexAsync(any(), anyString(), anyString(), any(), anyString());
+        verify(embeddingService, times(1)).indexAsync(any(), anyString(), anyString(), any(), anyString(), isNull());
     }
 
     private static MessageData msg(String text) {

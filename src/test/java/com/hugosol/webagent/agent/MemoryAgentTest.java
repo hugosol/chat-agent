@@ -1,5 +1,6 @@
 package com.hugosol.webagent.agent;
 
+import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.config.PromptLoader;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -42,36 +43,7 @@ class MemoryAgentTest {
     void setUp() {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
-        agent = new MemoryAgent(chatModel, promptLoader);
-    }
-
-    @Test
-    void mergeTopic_returnsTrimmedResponse() {
-        chatModel.setResponse("  Discussed login module and session management.  ");
-
-        String result = agent.mergeTopic("old topic", "new summary");
-
-        assertThat(result).isEqualTo("Discussed login module and session management.");
-    }
-
-    @Test
-    void mergeTopic_includesOldAndNewDataInPrompt() {
-        chatModel.setResponse("merged");
-
-        agent.mergeTopic("Talked about travel plans", "Today discussed presentation prep");
-
-        assertThat(chatModel.lastPrompt).contains("Talked about travel plans");
-        assertThat(chatModel.lastPrompt).contains("Today discussed presentation prep");
-    }
-
-    @Test
-    void mergeTopic_handlesEmptyOldSummary() {
-        chatModel.setResponse("fresh summary");
-
-        agent.mergeTopic("", "new session data");
-
-        assertThat(chatModel.lastPrompt).doesNotContain("null");
-        assertThat(chatModel.lastPrompt).contains("new session data");
+        agent = new MemoryAgent(chatModel, promptLoader, new AppProperties());
     }
 
     @Test

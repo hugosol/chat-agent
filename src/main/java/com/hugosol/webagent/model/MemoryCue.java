@@ -69,4 +69,9 @@ public class MemoryCue extends BaseEntity {
 
     public MemoryCueStatus getStatus() { return status; }
     public void setStatus(MemoryCueStatus status) { this.status = status; }
+
+    @Transient
+    public String getTimeLabel(java.time.LocalDateTime referenceTime) {
+        return TimeLabel.computeLabel(getCreateTime(), referenceTime);
+    }
 }

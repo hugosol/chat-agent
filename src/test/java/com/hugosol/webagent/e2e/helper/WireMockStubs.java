@@ -13,13 +13,11 @@ public class WireMockStubs {
 
     private static final String SCENARIO_CONV = "conversation-rounds";
     private static final String SCENARIO_CORR = "correction-rounds";
-    private static final String SCENARIO_MEM_TOPIC = "memory-topic-rounds";
     private static final String SCENARIO_MEM_PROFILE = "memory-profile-rounds";
     private static final String SCENARIO_CUE_ENTRY = "memory-cue-entry-rounds";
 
     private static final String KEYWORD_CORRECTION = "Correction prompt:";
     private static final String KEYWORD_REPORT = "Report prompt.";
-    private static final String KEYWORD_MEM_TOPIC = "E2E_MARKER_MEMORY_TOPIC";
     private static final String KEYWORD_MEM_PROFILE = "E2E_MARKER_MEMORY_PROFILE";
     private static final String KEYWORD_MEM_CUE_SPLIT = "E2E_MARKER_MEMORY_CUE_SPLIT";
     private static final String KEYWORD_MEM_CUE_ENTRY = "E2E_MARKER_MEMORY_CUE_ENTRY";
@@ -32,7 +30,6 @@ public class WireMockStubs {
         registerConversationStubs();
         registerCorrectionStubs();
         registerReportStub();
-        registerMemoryTopicStubs();
         registerMemoryProfileStubs();
         registerMemoryCueStubs();
     }
@@ -44,7 +41,6 @@ public class WireMockStubs {
         registerDailyConversationStubs();
         registerDailyCorrectionStubs();
         registerDailyReportStub();
-        registerMemoryTopicStubs();
         registerMemoryProfileStubs();
         registerMemoryCueStubs();
     }
@@ -184,8 +180,8 @@ public class WireMockStubs {
         String reportKeyword = KEYWORD_REPORT;
 
         stubFor(post(urlEqualTo("/chat/completions"))
-                .withRequestBody(matchingJsonPath("$.messages[0].content",
-                        containing(reportKeyword)))
+                .atPriority(1)
+                .withRequestBody(containing(reportKeyword))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
@@ -239,32 +235,6 @@ public class WireMockStubs {
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(loadResource("wiremock/report.json"))));
-    }
-
-    private static void registerMemoryTopicStubs() {
-        String keyword = KEYWORD_MEM_TOPIC;
-
-        stubFor(post(urlEqualTo("/chat/completions"))
-                .withRequestBody(matchingJsonPath("$.messages[0].content",
-                        containing(keyword)))
-                .inScenario(SCENARIO_MEM_TOPIC)
-                .whenScenarioStateIs(Scenario.STARTED)
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(loadResource("wiremock/memory-topic-init.json")))
-                .willSetStateTo("round-2"));
-
-        stubFor(post(urlEqualTo("/chat/completions"))
-                .withRequestBody(matchingJsonPath("$.messages[0].content",
-                        containing(keyword)))
-                .inScenario(SCENARIO_MEM_TOPIC)
-                .whenScenarioStateIs("round-2")
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(loadResource("wiremock/memory-topic-merge.json")))
-                .willSetStateTo("round-3"));
     }
 
     private static void registerMemoryProfileStubs() {

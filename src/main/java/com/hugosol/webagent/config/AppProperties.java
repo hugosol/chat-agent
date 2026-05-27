@@ -57,6 +57,9 @@ public class AppProperties {
     public static class Memory {
         private int userMemoryRounds = 3;
         private String storePath = "data/embedding-store.json";
+        private int profileMaxLength = 400;
+        private int cueTopicMaxWords = 7;
+        private int cueSummaryMaxSentences = 4;
         private Retrieval retrieval = new Retrieval();
 
         public int getUserMemoryRounds() { return userMemoryRounds; }
@@ -64,6 +67,15 @@ public class AppProperties {
 
         public String getStorePath() { return storePath; }
         public void setStorePath(String storePath) { this.storePath = storePath; }
+
+        public int getProfileMaxLength() { return profileMaxLength; }
+        public void setProfileMaxLength(int profileMaxLength) { this.profileMaxLength = profileMaxLength; }
+
+        public int getCueTopicMaxWords() { return cueTopicMaxWords; }
+        public void setCueTopicMaxWords(int cueTopicMaxWords) { this.cueTopicMaxWords = cueTopicMaxWords; }
+
+        public int getCueSummaryMaxSentences() { return cueSummaryMaxSentences; }
+        public void setCueSummaryMaxSentences(int cueSummaryMaxSentences) { this.cueSummaryMaxSentences = cueSummaryMaxSentences; }
 
         public Retrieval getRetrieval() {
             if (retrieval == null) {

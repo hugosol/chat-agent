@@ -5,6 +5,7 @@ import com.hugosol.webagent.dto.MemoryContent;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MessageRole;
+import com.hugosol.webagent.model.TimeLabel;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -134,17 +136,25 @@ public class ConversationAgent {
         if (hasUserMemory) {
             String ts = memoryContent.topicSummary();
             String lp = memoryContent.learningProfile();
+            String tsFormatted = "";
+            if (ts != null && !ts.isBlank()) {
+                String timePrefix = buildTimePrefix(memoryContent.topicCreatedAt());
+                tsFormatted = "[Conversation Memory]\n" + timePrefix + ts;
+            }
             content = content
-                    .replace("{topicSummary}", ts != null && !ts.isBlank()
-                            ? "[Conversation Memory]\n" + ts : "")
+                    .replace("{topicSummary}", tsFormatted)
                     .replace("{memoryCues}", "")
                     .replace("{learningProfile}", lp != null && !lp.isBlank()
                             ? "[Your Learning Profile]\n" + lp : "")
                     .replace("{activeEngagement}", ACTIVE_ENGAGEMENT_TEXT);
         } else if (hasRagMemory) {
+            String cuesText = memoryContent.memoryCuesText();
+            if (memoryContent.cueCreatedAts() != null && !memoryContent.cueCreatedAts().isEmpty()) {
+                cuesText = applyTimeLabelsToCues(cuesText, memoryContent.cueCreatedAts());
+            }
             content = content
                     .replace("{topicSummary}", "")
-                    .replace("{memoryCues}", "[Memory Cues]\n" + memoryContent.memoryCuesText())
+                    .replace("{memoryCues}", "[Memory Cues]\n" + cuesText)
                     .replace("{learningProfile}", "")
                     .replace("{activeEngagement}", ACTIVE_ENGAGEMENT_TEXT);
         } else {
@@ -155,5 +165,27 @@ public class ConversationAgent {
                     .replace("{activeEngagement}", "");
         }
         return content;
+    }
+
+    private static String buildTimePrefix(LocalDateTime eventTime) {
+        if (eventTime == null) return "";
+        String label = TimeLabel.computeLabel(eventTime, LocalDateTime.now());
+        return "[from " + label + "] ";
+    }
+
+    static String applyTimeLabelsToCues(String cuesText, List<LocalDateTime> cueCreatedAts) {
+        if (cueCreatedAts == null || cueCreatedAts.isEmpty()) return cuesText;
+        String[] parts = cuesText.split(", as well as, ");
+        StringBuilder sb = new StringBuilder();
+        LocalDateTime now = LocalDateTime.now();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) sb.append(", as well as, ");
+            if (i < cueCreatedAts.size() && cueCreatedAts.get(i) != null) {
+                String label = TimeLabel.computeLabel(cueCreatedAts.get(i), now);
+                sb.append("[from ").append(label).append("] ");
+            }
+            sb.append(parts[i]);
+        }
+        return sb.toString();
     }
 }

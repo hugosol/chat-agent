@@ -51,7 +51,6 @@ class EnglishCoachMemoryIT extends E2ETestBase {
                 DEFAULT_USER_ID, MemoryType.TOPIC_SUMMARY, AgentMode.WORKPLACE_STANDUP);
         assertTrue(topicV1.isPresent(), "topic memory should be generated");
         assertEquals(1, topicV1.get().getVersion());
-        assertTrue(topicV1.get().getContent().contains("login module"));
 
         var profileV1 = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
                 DEFAULT_USER_ID, MemoryType.LEARNING_PROFILE, null);
@@ -81,15 +80,15 @@ class EnglishCoachMemoryIT extends E2ETestBase {
         Session session2 = sessionRepository.findById(sid2).orElseThrow();
         assertEquals(SessionStatus.COMPLETED, session2.getStatus());
 
-        // Verify UserMemory merged: both types now have v2
+        // Verify UserMemory v2 was written as new version (direct write, no merge)
         List<UserMemory> allTopic = userMemoryRepository.findByUserIdAndTypeAndModeOrderByVersionDesc(
                 DEFAULT_USER_ID, MemoryType.TOPIC_SUMMARY, AgentMode.WORKPLACE_STANDUP);
         assertEquals(2, allTopic.size(), "should have 2 topic memory rows (v1 + v2)");
 
-        UserMemory topicV1row = allTopic.stream().filter(m -> m.getVersion() == 1).findFirst().orElseThrow();
         UserMemory topicV2row = allTopic.stream().filter(m -> m.getVersion() == 2).findFirst().orElseThrow();
-        assertNotEquals(topicV1row.getContent(), topicV2row.getContent(),
-                "merged topic memory should differ from v1");
+        assertTrue(topicV2row.getContent().contains("Java developer"),
+                "topic v2 should contain topic summary content");
+        assertEquals("anonymous", topicV2row.getUserId());
 
         List<UserMemory> allProfile = userMemoryRepository.findByUserIdAndTypeAndModeOrderByVersionDesc(
                 DEFAULT_USER_ID, MemoryType.LEARNING_PROFILE, null);

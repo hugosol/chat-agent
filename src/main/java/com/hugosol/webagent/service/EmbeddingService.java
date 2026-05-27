@@ -29,6 +29,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -90,7 +93,7 @@ public class EmbeddingService {
         log.info("EmbeddingService: building store from {} H2 records", completedCues.size());
         for (MemoryCue cue : completedCues) {
             try {
-                indexSync(cue.getId(), cue.getTopic(), cue.getSummary(), cue.getMode(), cue.getUserId());
+                indexSync(cue.getId(), cue.getTopic(), cue.getSummary(), cue.getMode(), cue.getUserId(), cue.getCreateTime());
             } catch (Exception e) {
                 log.warn("EmbeddingService: failed to embed cue {} during rebuild: {}", cue.getId(), e.getMessage());
             }
@@ -99,10 +102,15 @@ public class EmbeddingService {
     }
 
     public CompletableFuture<Void> indexAsync(String cueId, String topic, String summary,
-                                               AgentMode mode, String userId) {
+                                                AgentMode mode, String userId) {
+        return indexAsync(cueId, topic, summary, mode, userId, null);
+    }
+
+    public CompletableFuture<Void> indexAsync(String cueId, String topic, String summary,
+                                                AgentMode mode, String userId, LocalDateTime createdAt) {
         return CompletableFuture.runAsync(() -> {
             try {
-                indexSync(cueId, topic, summary, mode, userId);
+                indexSync(cueId, topic, summary, mode, userId, createdAt);
                 saveToDiskAsync();
                 log.info("EmbeddingService: indexAsync completed for cue {}", cueId);
             } catch (Exception e) {
@@ -112,6 +120,11 @@ public class EmbeddingService {
     }
 
     private void indexSync(String cueId, String topic, String summary, AgentMode mode, String userId) {
+        indexSync(cueId, topic, summary, mode, userId, null);
+    }
+
+    private void indexSync(String cueId, String topic, String summary, AgentMode mode, String userId,
+                            LocalDateTime createdAt) {
         String text = (topic != null ? topic : "") + " " + (summary != null ? summary : "");
         Embedding embedding = embeddingModel.embed(text).content();
         TextSegment segment = TextSegment.from(text);
@@ -119,6 +132,9 @@ public class EmbeddingService {
         segment.metadata().add("topic", topic != null ? topic : "");
         segment.metadata().add("mode", mode.name());
         segment.metadata().add("userId", userId);
+        if (createdAt != null) {
+            segment.metadata().add("createdAt", String.valueOf(createdAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+        }
         store.add(embedding, segment);
         log.info("EmbeddingService: indexed cue {} topic={} mode={} userId={}", cueId, topic, mode, userId);
     }
@@ -145,12 +161,23 @@ public class EmbeddingService {
             List<CueMatch> matches = new ArrayList<>();
             for (var match : result.matches()) {
                 if (match.score() >= threshold) {
+                    LocalDateTime createdAt = null;
+                    String createdAtStr = match.embedded().metadata().getString("createdAt");
+                    if (createdAtStr != null) {
+                        try {
+                            createdAt = LocalDateTime.ofInstant(
+                                    Instant.ofEpochMilli(Long.parseLong(createdAtStr)),
+                                    ZoneId.systemDefault());
+                        } catch (Exception ignored) {
+                        }
+                    }
                     matches.add(new CueMatch(
                             match.embedded().metadata().getString("cueId"),
                             match.embedded().metadata().getString("topic"),
                             match.embedded().metadata().getString("cueId") != null
                                     ? match.embedded().text() : match.embedded().metadata().getString("topic"),
-                            match.score()
+                            match.score(),
+                            createdAt
                     ));
                 }
             }

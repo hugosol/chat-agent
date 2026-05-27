@@ -62,7 +62,7 @@ public class MemoryCueService {
                         MemoryCue cue = repository.save(new MemoryCue(sessionId, userId, mode, segmentIndex,
                                 result.topic(), result.summary(),
                                 MemoryCueStatus.COMPLETED));
-                        embeddingService.indexAsync(cue.getId(), result.topic(), result.summary(), mode, userId);
+                        embeddingService.indexAsync(cue.getId(), result.topic(), result.summary(), mode, userId, cue.getCreateTime());
                         log.debug("MemoryCueService: dispatched indexAsync for cue {}", cue.getId());
                     } catch (Exception e) {
                         log.warn("MemoryCueService: generateCue failed for session {} segment {}: {}",

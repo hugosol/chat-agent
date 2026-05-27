@@ -76,7 +76,7 @@ E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari view
 |-----------|-----------------|
 | `EnglishCoachSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
 | `EnglishCoachResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
-| `EnglishCoachMemoryIT` | Two sessions back-to-back → User Memory v1→v2 merge → topic memory mode-scoped isolation → learning profile cross-mode sharing |
+| `EnglishCoachMemoryIT` | Two sessions back-to-back → Topic Memory v1→v2 direct write → Learning Profile v1→v2 merge → topic memory mode-scoped isolation → learning profile cross-mode sharing |
 | `DailyTalkIT` | DAILY_TALK mode → 3-turn casual conversation → teaching-style corrections → mode-scoped memory |
 | `EnglishCoachMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
 
@@ -148,7 +148,7 @@ CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor 
     │                              │
     │                              ├── SessionService (runtime state + token tracking)
     │                              ├── ReportAgent → DeepSeek (session-end)
-    │                              ├── MemoryService (async Topic + Profile merge) ──► MemoryAgent → DeepSeek
+    │                              ├── MemoryService (Topic direct write + Profile merge) ──► MemoryAgent → DeepSeek
     │                              ├── MemoryCueService (async topic split + segment cues) ──► MemoryCueAgent → DeepSeek
     │                              │       └── EmbeddingService.indexAsync() → ONNX vectorization → embedding-store.json
     │                              ├── EmbeddingService (RAG search + index + disk persistence)
@@ -174,7 +174,7 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 | **ConversationAgent** | Role-plays according to the selected AgentMode (scenario + persona combined), generates natural English dialogue |
 | **CorrectionAgent** | Analyzes user input for 5 error types: grammar, word choice, Chinglish, pronunciation hints, fluency |
 | **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, key takeaway |
-| **MemoryAgent** | Merges new session reports with existing Topic Memory and Learning Profile into updated summaries |
+| **MemoryAgent** | Saves session topic summary directly as a new User Memory version. Merges new session error data with existing Learning Profile via LLM into an updated summary. |
 | **MemoryCueAgent** | Two-step post-session LLM: detects topic switch points in conversation, then generates structured `(topic, summary)` pairs per segment. Each completed entry is asynchronously vectorized by `EmbeddingService` for RAG semantic retrieval. |
 
 ### LangGraph State Machine (Per-Turn)
@@ -185,7 +185,7 @@ START → CorrectionNode → END
 
 The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
 
-Topic Memory and Learning Profile are injected into the System Prompt for the first **turn** (messageId ≤ 1). From messageId ≥ 2, `EmbeddingService.search()` retrieves semantically relevant historical MemoryCue entries (top-2, cosine ≥ 0.6) and injects them via the `{memoryCues}` System Prompt placeholder. At session end, `MemoryService` fires async LLM merges of Topic + Profile memory, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `memoryExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
+Topic Memory and Learning Profile are injected into the System Prompt for the first **turn** (messageId ≤ 1). From messageId ≥ 2, `EmbeddingService.search()` retrieves semantically relevant historical MemoryCue entries (top-2, cosine ≥ 0.6) and injects them via the `{memoryCues}` System Prompt placeholder. At session end, `MemoryService` directly saves the new Topic Memory as a new version and fires an async LLM merge for Learning Profile, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `memoryExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
 
 ## Project Structure
 
@@ -219,7 +219,7 @@ web-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, ...)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, TimeLabel, ...)
 │   ├── repository/     (Spring Data JPA)
 │   ├── service/        (SessionService, TurnProcessor, SessionStore, MemoryService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
 │   └── config/         (LangChain4jConfig, LoggableChatModel, SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
@@ -284,6 +284,9 @@ App-level configuration in `application.yml`:
 | `app.token-limit` | `128000` | Max LLM tokens per session |
 | `app.token-limit-ratio` | `0.8` | Warning threshold ratio |
 | `app.memory.user-memory-rounds` | `1` | Number of turns User Memory persists (messageId ≤ N) |
+| `app.memory.profile-max-length` | `400` | Learning Profile merged text max characters |
+| `app.memory.cue-topic-max-words` | `7` | MemoryCue topic name max word count |
+| `app.memory.cue-summary-max-sentences` | `4` | MemoryCue summary max sentence count |
 | `app.memory.retrieval.top-k` | `2` | Max RAG search results per turn |
 | `app.memory.retrieval.similarity-threshold` | `0.6` | Minimum cosine similarity for RAG match |
 
