@@ -177,7 +177,8 @@ class TurnProcessorTest {
     void messageIdFive_callsRagSearch() throws Exception {
         setupConversationAgent("ok", 0);
         when(embeddingService.search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), anyInt(), anyDouble()))
-                .thenReturn(List.of(new CueMatch("cue-1", "Work Standup", "Discussed login", 0.85, null)));
+                .thenReturn(List.of(new CueMatch("cue-1", "Work Standup", "Discussed login", 0.85,
+                        java.time.LocalDateTime.of(2026, 5, 27, 10, 0))));
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);

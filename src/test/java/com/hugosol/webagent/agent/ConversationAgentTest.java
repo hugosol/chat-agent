@@ -282,6 +282,48 @@ class ConversationAgentTest {
         assertThat(lastMessages).hasSize(2);
     }
 
+    @Test
+    void applyTimeLabelsToCues_addsTimePrefixToEachCue() {
+        var now = java.time.LocalDateTime.of(2026, 5, 28, 12, 0);
+        var yesterday = now.minusDays(1);
+        var lastWeek = now.minusDays(5);
+
+        String result = ConversationAgent.applyTimeLabelsToCues(
+                "Work Standup: discussed login, as well as, Travel: Japan trip",
+                List.of(yesterday, lastWeek));
+
+        assertThat(result).isEqualTo(
+                "[from yesterday] Work Standup: discussed login, as well as, [from a few days ago] Travel: Japan trip");
+    }
+
+    @Test
+    void applyTimeLabelsToCues_skipsNullCreatedAt() {
+        var yesterday = java.time.LocalDateTime.of(2026, 5, 27, 12, 0);
+
+        String result = ConversationAgent.applyTimeLabelsToCues(
+                "Topic A: details, as well as, Topic B: details",
+                java.util.Arrays.asList(yesterday, null));
+
+        assertThat(result).isEqualTo(
+                "[from yesterday] Topic A: details, as well as, Topic B: details");
+    }
+
+    @Test
+    void applyTimeLabelsToCues_emptyCueListReturnsOriginal() {
+        String result = ConversationAgent.applyTimeLabelsToCues(
+                "Topic: details", List.of());
+
+        assertThat(result).isEqualTo("Topic: details");
+    }
+
+    @Test
+    void applyTimeLabelsToCues_nullCueListReturnsOriginal() {
+        String result = ConversationAgent.applyTimeLabelsToCues(
+                "Topic: details", null);
+
+        assertThat(result).isEqualTo("Topic: details");
+    }
+
     private String getSystemContent() {
         if (lastMessages != null && !lastMessages.isEmpty()) {
             ChatMessage first = lastMessages.get(0);

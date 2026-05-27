@@ -183,6 +183,8 @@ public class ConversationAgent {
             if (i < cueCreatedAts.size() && cueCreatedAts.get(i) != null) {
                 String label = TimeLabel.computeLabel(cueCreatedAts.get(i), now);
                 sb.append("[from ").append(label).append("] ");
+            } else if (i < cueCreatedAts.size()) {
+                log.debug("ConversationAgent: cue {} has null createdAt, time label omitted", i);
             }
             sb.append(parts[i]);
         }

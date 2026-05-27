@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 public class EmbeddingService {
 
     private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
+    private static final int CURRENT_STORE_VERSION = 1;
 
     private final EmbeddingModel embeddingModel;
     private InMemoryEmbeddingStore<TextSegment> store;
@@ -74,18 +75,27 @@ public class EmbeddingService {
     public void init() {
         Path filePath = getStorePath();
         if (Files.exists(filePath)) {
-            try {
-                store = InMemoryEmbeddingStore.fromFile(filePath);
-                log.info("EmbeddingService: loaded store from disk");
-                return;
-            } catch (Exception e) {
-                log.warn("EmbeddingService: failed to load store from disk, rebuilding from H2: {}", e.getMessage());
+            String storedVersion = readVersionFile();
+            if (storedVersion != null && storedVersion.equals(String.valueOf(CURRENT_STORE_VERSION))) {
+                try {
+                    store = InMemoryEmbeddingStore.fromFile(filePath);
+                    log.info("EmbeddingService: loaded store from disk (version {})", storedVersion);
+                    return;
+                } catch (Exception e) {
+                    log.warn("EmbeddingService: failed to load store from disk, rebuilding from H2: {}", e.getMessage());
+                }
+            } else if (storedVersion != null) {
+                log.info("EmbeddingService: store version mismatch ({} != {}), rebuilding from H2",
+                        storedVersion, CURRENT_STORE_VERSION);
+            } else {
+                log.info("EmbeddingService: no version file, rebuilding from H2 to ensure createdAt metadata");
             }
         } else {
             log.info("EmbeddingService: no disk store at {}, building from H2", filePath);
         }
 
         rebuildFromH2();
+        saveToDiskAndVersion();
     }
 
     private void rebuildFromH2() {
@@ -130,6 +140,7 @@ public class EmbeddingService {
         TextSegment segment = TextSegment.from(text);
         segment.metadata().add("cueId", cueId);
         segment.metadata().add("topic", topic != null ? topic : "");
+        segment.metadata().add("summary", summary != null ? summary : "");
         segment.metadata().add("mode", mode.name());
         segment.metadata().add("userId", userId);
         if (createdAt != null) {
@@ -174,8 +185,7 @@ public class EmbeddingService {
                     matches.add(new CueMatch(
                             match.embedded().metadata().getString("cueId"),
                             match.embedded().metadata().getString("topic"),
-                            match.embedded().metadata().getString("cueId") != null
-                                    ? match.embedded().text() : match.embedded().metadata().getString("topic"),
+                            resolveSummary(match.embedded()),
                             match.score(),
                             createdAt
                     ));
@@ -195,6 +205,18 @@ public class EmbeddingService {
         }
     }
 
+    private static String resolveSummary(TextSegment segment) {
+        String summary = segment.metadata().getString("summary");
+        if (summary != null && !summary.isEmpty()) {
+            return summary;
+        }
+        String cueId = segment.metadata().getString("cueId");
+        if (cueId != null) {
+            return segment.text();
+        }
+        return segment.metadata().getString("topic");
+    }
+
     private void saveToDiskAsync() {
         CompletableFuture.runAsync(() -> {
             try {
@@ -206,21 +228,41 @@ public class EmbeddingService {
         }, executor);
     }
 
-    @PreDestroy
-    public void saveToDisk() {
+    private void saveToDiskAndVersion() {
         Path filePath = getStorePath();
         try {
             Files.createDirectories(filePath.getParent());
             store.serializeToFile(filePath);
-            log.info("EmbeddingService: store saved to disk");
+            Files.writeString(getVersionPath(), String.valueOf(CURRENT_STORE_VERSION));
+            log.info("EmbeddingService: store saved to disk (version {})", CURRENT_STORE_VERSION);
         } catch (IOException e) {
             log.error("EmbeddingService: failed to save store to disk", e);
             throw new RuntimeException("Failed to save embedding store to disk", e);
         }
     }
 
+    @PreDestroy
+    public void saveToDisk() {
+        saveToDiskAndVersion();
+    }
+
     protected Path getStorePath() {
         return Paths.get(appProperties.getMemory().getStorePath());
+    }
+
+    private Path getVersionPath() {
+        return getStorePath().resolveSibling(getStorePath().getFileName() + ".version");
+    }
+
+    private String readVersionFile() {
+        Path versionPath = getVersionPath();
+        try {
+            if (Files.exists(versionPath)) {
+                return Files.readString(versionPath).trim();
+            }
+        } catch (IOException ignored) {
+        }
+        return null;
     }
 
     InMemoryEmbeddingStore<TextSegment> getStore() {
