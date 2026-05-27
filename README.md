@@ -128,6 +128,7 @@ Records older than 3 days are automatically cleaned up on startup.
 | Communication | WebSocket (JSON protocol) |
 | Frontend | Native HTML + Vanilla JS (no build tools) |
 | TTS | Browser SpeechSynthesis (user-gesture triggered for iOS support) |
+| Embedding & RAG | ONNX all-MiniLM-L6-v2 (384-dim, ~200MB heap) + InMemoryEmbeddingStore (JSON disk persistence) |
 
 ## Architecture
 
@@ -140,6 +141,8 @@ Spring Security  ──►  /login  ──►  /index.html  ──►  /ws/coach
     ▼
 CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor  ──►  LangGraph (1 node: correction)
     │                              │                        │
+    │                              │                        ├── messageId ≤ 1: User Memory (topicSummary + learningProfile)
+    │                              │                        ├── messageId ≥ 2: EmbeddingService.search() → RAG MemoryCue
     │                              │                        ├── Future A: ConversationAgent → DeepSeek (streaming)
     │                              │                        └── Future B: CorrectionNode → CorrectionAgent → DeepSeek
     │                              │
@@ -147,6 +150,8 @@ CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor 
     │                              ├── ReportAgent → DeepSeek (session-end)
     │                              ├── MemoryService (async Topic + Profile merge) ──► MemoryAgent → DeepSeek
     │                              ├── MemoryCueService (async topic split + segment cues) ──► MemoryCueAgent → DeepSeek
+    │                              │       └── EmbeddingService.indexAsync() → ONNX vectorization → embedding-store.json
+    │                              ├── EmbeddingService (RAG search + index + disk persistence)
     │                              └── SessionStore → H2 (JPA)
     │
     ▼
@@ -170,7 +175,7 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 | **CorrectionAgent** | Analyzes user input for 5 error types: grammar, word choice, Chinglish, pronunciation hints, fluency |
 | **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, key takeaway |
 | **MemoryAgent** | Merges new session reports with existing Topic Memory and Learning Profile into updated summaries |
-| **MemoryCueAgent** | Two-step post-session LLM: detects topic switch points in conversation, then generates structured `(topic, summary, tags)` triples per segment (≤5 tags). Runs a tag consolidation pass to merge semantically equivalent tags across sessions into canonical forms. |
+| **MemoryCueAgent** | Two-step post-session LLM: detects topic switch points in conversation, then generates structured `(topic, summary)` pairs per segment. Each completed entry is asynchronously vectorized by `EmbeddingService` for RAG semantic retrieval. |
 
 ### LangGraph State Machine (Per-Turn)
 
@@ -180,7 +185,7 @@ START → CorrectionNode → END
 
 The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
 
-Topic Memory and Learning Profile are injected into the System Prompt for the first **turn** (messageId ≤ 1). At session end, `MemoryService` fires async LLM merges of Topic + Profile memory, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation — all on the `memoryExecutor` thread pool (core=4, max=8).
+Topic Memory and Learning Profile are injected into the System Prompt for the first **turn** (messageId ≤ 1). From messageId ≥ 2, `EmbeddingService.search()` retrieves semantically relevant historical MemoryCue entries (top-2, cosine ≥ 0.6) and injects them via the `{memoryCues}` System Prompt placeholder. At session end, `MemoryService` fires async LLM merges of Topic + Profile memory, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `memoryExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
 
 ## Project Structure
 
@@ -192,10 +197,13 @@ web-agent/
 │   ├── graph/
 │   │   ├── CoachState.java
 │   │   ├── CoachGraphBuilder.java
-│   │   ├── MessageData.java
-│   │   ├── CorrectionData.java
 │   │   └── nodes/
 │   │       └── CorrectionNode.java
+│   ├── dto/
+│   │   ├── MessageData.java
+│   │   ├── CorrectionData.java
+│   │   ├── MemoryContent.java
+│   │   └── CueMatch.java
 │   ├── agent/
 │   │   ├── ConversationAgent.java
 │   │   ├── CorrectionAgent.java
@@ -211,9 +219,9 @@ web-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, StringListConverter, ...)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, ...)
 │   ├── repository/     (Spring Data JPA)
-│   ├── service/        (SessionService, TurnProcessor, SessionStore, MemoryService, MemoryCueService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
+│   ├── service/        (SessionService, TurnProcessor, SessionStore, MemoryService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
 │   └── config/         (LangChain4jConfig, LoggableChatModel, SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml
@@ -232,8 +240,7 @@ web-agent/
 │       ├── memory-topic.txt
 │       ├── memory-profile.txt
 │       ├── memory-cue-split.txt
-│       ├── memory-cue-entry.txt
-│       └── tag-consolidation.txt
+│       └── memory-cue-entry.txt
 ├── src/main/resources/static/
 │   ├── login/
 │   │   ├── main.html
@@ -276,6 +283,9 @@ App-level configuration in `application.yml`:
 | `app.security.permit-all-paths` | `[/login/**]` | URL patterns that skip authentication |
 | `app.token-limit` | `128000` | Max LLM tokens per session |
 | `app.token-limit-ratio` | `0.8` | Warning threshold ratio |
+| `app.memory.user-memory-rounds` | `1` | Number of turns User Memory persists (messageId ≤ N) |
+| `app.memory.retrieval.top-k` | `2` | Max RAG search results per turn |
+| `app.memory.retrieval.similarity-threshold` | `0.6` | Minimum cosine similarity for RAG match |
 
 ## Known Limitations
 
@@ -285,6 +295,7 @@ App-level configuration in `application.yml`:
 | **Mobile input** | Text-only (SpeechRecognition API not supported by iOS Safari/Chrome). iOS keyboard mic provides system dictation. |
 | **Correction sidebar** | Overlay panel (doesn't squeeze chat). Starts collapsed, tap "Corrections N" in header to toggle. |
 | **Token window** | UI shows warning at 80% usage. User must manually end session before overflow. |
+| **ONNX memory** | The all-MiniLM-L6-v2 embedding model consumes ~200MB heap at runtime. |
 
 ## V2 Roadmap
 
@@ -292,7 +303,7 @@ App-level configuration in `application.yml`:
 - [x] Additional AgentMode values (DAILY_TALK with Chris persona — casual friend+tutor chat)
 - [x] Cross-session memory (Topic Memory + Learning Profile dual memory system)
 - [x] Structured MemoryCue (topic segmentation + tagged memory entries, write-only in v1)
-- [ ] MemoryCue keyword retrieval (JSON_CONTAINS queries on tags column)
+- [x] RAG-based MemoryCue retrieval (ONNX vector embeddings, semantic similarity search)
 - [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)
