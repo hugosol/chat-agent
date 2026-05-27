@@ -47,9 +47,10 @@
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
-| 36 | 双轨记忆系统 | User Memory（合并摘要，注入 System Prompt）与 MemoryCue（结构化 topic/summary/tags，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，与 Report 并行。v1 仅写入，v2 启用 JSON_CONTAINS 检索 |
+| 36 | 双轨记忆系统 | User Memory（合并摘要，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 RAG 语义检索注入 MemoryCue |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（prompt/response/tokens/duration）。同步 Agent 通过 `LoggableChatModel` 包装器透明拦截，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
-| 38 | Tag Consolidation | MemoryCue tags 通过 LLM 合并语义等效标签为规范形式。in-place UPDATE `memory_cues.tags` 列，无 `original_tags` 列或版本控制。static lock 序列化合并（每进程一次）。部分失败跳过：SEGMENT_FAILED 或 FIRST_CALL_FAILED 时跳过。等幂：重新运行不产生新保存。Entry prompt 限制 ≤5 tags。性能工具：会话结束延迟 + 后台任务持续时间日志。 |
+| 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
+| 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，top-2 结果 (cosine ≥ 0.6) 注入 System Prompt `{memoryCues}` 占位符。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
 
 ---
 
@@ -162,8 +163,8 @@ START → correction → END
 [每轮对话]
   → WebSocket 收到 USER_INPUT
   → TurnProcessor.processTurn(sessionId, userInput, messageId, callback)
-    → Round ≤ 3: 注入 User Memory (topicSummary + learningProfile)
-    → Round ≥ 4: EmbeddingService.search(userInput, mode, userId, topK, threshold) → MemoryContent(memoryCues)
+    → messageId ≤ 1: 注入 User Memory (topicSummary + learningProfile)
+    → messageId ≥ 2: EmbeddingService.search(userInput, mode, userId, topK, threshold) → MemoryContent(memoryCues)
     → 两路 CompletableFuture 并行:
       A) ConversationAgent.generateStream(history, mode, MemoryContent, messageId, handler) → 流式推送到前端
       B) graph.stream(input, config) → CorrectionNode → 纠错结果异步推送
@@ -213,6 +214,9 @@ compiled.stream(input, RunnableConfig.builder()
 {Rules}
 
 {topicSummary}
+
+{memoryCues}
+
 {learningProfile}
 {activeEngagement}
 ```
@@ -304,10 +308,11 @@ Errors: {allCorrections}
     │ id (PK)      │ │ id (PK)      │ │ id (PK)      │ │ id (PK)                 │
     │ sessionId(FK)│ │ userId (UQ)  │ │ userId       │ │ sessionId                │
     │ summary      │ │ totalSessions│ │ type (Enum)  │ │ userId                   │
-│ fluencyScore │ │ totalMinutes │ │ content      │ │ mode (AgentMode Enum)    │
-│ keyTakeaway  │ │ errorStats   │ │ version      │ │ segmentIndex             │
+    │ fluencyScore │ │ totalMinutes │ │ content      │ │ mode (AgentMode Enum)    │
+    │ keyTakeaway  │ │ errorStats   │ │ version      │ │ segmentIndex             │
+    │              │ │              │ │              │ │ topic                    │
     └──────────────┘ └──────────────┘ │ sessionId    │ │ summary                 │
-                                     └──────────────┘                                                         │ status (MemoryCueStatus) │
+                                      └──────────────┘  │ status (MemoryCueStatus) │
                                                         └─────────────────────────┘
                                                         ┌─────────────────────────┐
                                                         │      LlmCallLog         │
@@ -394,7 +399,7 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 ```
 [对话中]
   AgentState.messages (MemorySaver checkpoint)  ← 只在内存
-  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 1 时注入记忆)
+  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 1 注入 User Memory, messageId ≥ 2 触发 RAG MemoryCue 检索)
   UI token bar 实时更新
 
 [用户点击 End Session]
@@ -492,8 +497,6 @@ web-agent/
 │   ├── graph/                              // LangGraph 核心
 │   │   ├── CoachState.java                 // AgentState 定义 + Schema (7 channels, 含 USER_ID + MODE)
 │   │   ├── CoachGraphBuilder.java          // StateGraph 构建 + compile (1节点线性图)
-│   │   ├── CorrectionData.java             // 纠错数据结构 (type 为 ErrorType 枚举, Serializable)
-│   │   ├── MessageData.java                // 消息数据结构 (role + content + messageId，Serializable)
 │   │   └── nodes/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
