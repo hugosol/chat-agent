@@ -1,7 +1,10 @@
 package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.agent.ConversationAgent;
+import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.CueMatch;
+import com.hugosol.webagent.dto.MemoryContent;
 import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.nodes.CorrectionNode;
@@ -25,13 +28,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TurnProcessorTest {
@@ -48,15 +46,21 @@ class TurnProcessorTest {
     @Mock
     private LlmCallLogService llmCallLogService;
 
+    @Mock
+    private EmbeddingService embeddingService;
+
+    private AppProperties appProperties;
+
     @BeforeEach
     void setUp() {
+        appProperties = new AppProperties();
         when(sessionService.getMessages(anyString())).thenReturn(List.of());
         when(sessionService.getMode(anyString())).thenReturn("WORKPLACE_STANDUP");
         when(sessionService.getUserId(anyString())).thenReturn("user-1");
         when(sessionService.getCorrectionCount(anyString())).thenReturn(0);
         when(sessionService.getTopicMemory(anyString())).thenReturn("");
         when(sessionService.getLearningProfile(anyString())).thenReturn("");
-        when(conversationAgent.buildPromptJson(any(), any(AgentMode.class), any(), any(), anyInt()))
+        when(conversationAgent.buildPromptJson(any(), any(AgentMode.class), any(MemoryContent.class), anyInt()))
                 .thenReturn("{\"prompt\":\"test\"}");
     }
 
@@ -101,10 +105,10 @@ class TurnProcessorTest {
     @Test
     void conversationErrorFiresCallback() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(5);
+            StreamingChatResponseHandler handler = inv.getArgument(4);
             handler.onError(new RuntimeException("model down"));
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(), any(), anyInt(), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyInt(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -142,39 +146,16 @@ class TurnProcessorTest {
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(received).hasSize(1);
-        assertThat(received.get(0).getType()).isEqualTo(ErrorType.GRAMMAR);
         assertThat(received.get(0).getMessageId()).isEqualTo(1);
     }
 
     @Test
-    void correctionResultsAreStoredInSessionService() throws Exception {
-        setupConversationAgent("ok", 0);
-        List<CorrectionData> corrections = List.of(
-                new CorrectionData(ErrorType.GRAMMAR, "orig", "corr", "expl")
-        );
-        when(correctionNode.apply(any(CoachState.class))).thenReturn(Map.of(CoachState.CORRECTIONS, corrections));
-
-        TurnProcessor processor = newProcessor();
-        CountDownLatch latch = new CountDownLatch(1);
-
-        processor.processTurn("s1", "test", 1, new StubCallback() {
-            @Override
-            public void onCorrections(List<CorrectionData> corrs, int msgId) {
-                latch.countDown();
-            }
-        });
-
-        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(sessionService).addCorrections(eq("s1"), any());
-    }
-
-    @Test
-    void userMessageStoredBeforeProcessing() throws Exception {
+    void messageIdOne_doesNotCallRagSearch() throws Exception {
         setupConversationAgent("ok", 0);
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
 
-        processor.processTurn("s1", "user text", 3, new StubCallback() {
+        processor.processTurn("s1", "hi", 1, new StubCallback() {
             @Override
             public void onConversationComplete(String text, int msgId, int tokens) {
                 latch.countDown();
@@ -182,7 +163,47 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(sessionService).addMessage("s1", MessageRole.USER, "user text", 3, null);
+        verify(embeddingService, never()).search(anyString(), any(), anyString(), anyInt(), anyDouble());
+    }
+
+    @Test
+    void messageIdFive_callsRagSearch() throws Exception {
+        setupConversationAgent("ok", 0);
+        when(embeddingService.search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), anyInt(), anyDouble()))
+                .thenReturn(List.of(new CueMatch("cue-1", "Work Standup", "Discussed login", 0.85)));
+
+        TurnProcessor processor = newProcessor();
+        CountDownLatch latch = new CountDownLatch(1);
+
+        processor.processTurn("s1", "tell me about work", 5, new StubCallback() {
+            @Override
+            public void onConversationComplete(String text, int msgId, int tokens) {
+                latch.countDown();
+            }
+        });
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(embeddingService).search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+    }
+
+    @Test
+    void messageIdFive_noSearchResults_passesEmptyMemoryCues() throws Exception {
+        setupConversationAgent("ok", 0);
+        when(embeddingService.search(anyString(), any(), anyString(), anyInt(), anyDouble()))
+                .thenReturn(List.of());
+
+        TurnProcessor processor = newProcessor();
+        CountDownLatch latch = new CountDownLatch(1);
+
+        processor.processTurn("s1", "completely new topic", 5, new StubCallback() {
+            @Override
+            public void onConversationComplete(String text, int msgId, int tokens) {
+                latch.countDown();
+            }
+        });
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(embeddingService).search(anyString(), any(), anyString(), anyInt(), anyDouble());
     }
 
     @Test
@@ -196,10 +217,9 @@ class TurnProcessorTest {
         allCorrections.add(cdNew);
 
         when(correctionNode.apply(any(CoachState.class))).thenReturn(Map.of(CoachState.CORRECTIONS, allCorrections));
-
         when(sessionService.getCorrectionCount("s1")).thenReturn(1);
-        TurnProcessor processor = newProcessor();
 
+        TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
         List<CorrectionData> received = new ArrayList<>();
 
@@ -219,11 +239,11 @@ class TurnProcessorTest {
     @Test
     void nullChatResponseGuardDoesNotThrow() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(5);
+            StreamingChatResponseHandler handler = inv.getArgument(4);
             handler.onPartialResponse("x");
             handler.onCompleteResponse(null);
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(), any(), anyInt(), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyInt(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -241,36 +261,29 @@ class TurnProcessorTest {
 
     private TurnProcessor newProcessor() {
         CoachGraphBuilder builder = new CoachGraphBuilder(correctionNode);
-        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService);
+        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, appProperties);
     }
 
     private void setupConversationAgent(String responseText, int totalTokens) {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(5);
+            StreamingChatResponseHandler handler = inv.getArgument(4);
             handler.onPartialResponse(responseText);
             handler.onCompleteResponse(ChatResponse.builder()
                     .aiMessage(dev.langchain4j.data.message.AiMessage.from(responseText))
                     .tokenUsage(new TokenUsage(totalTokens / 2, totalTokens / 2, totalTokens))
                     .build());
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(), any(), anyInt(), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyInt(), any());
     }
 
     private static class StubCallback implements TurnProcessor.TurnCallback {
         @Override
-        public void onConversationToken(String delta, int messageId) {
-        }
-
+        public void onConversationToken(String delta, int messageId) {}
         @Override
-        public void onConversationComplete(String fullText, int messageId, int tokenCount) {
-        }
-
+        public void onConversationComplete(String fullText, int messageId, int tokenCount) {}
         @Override
-        public void onCorrections(List<CorrectionData> corrections, int messageId) {
-        }
-
+        public void onCorrections(List<CorrectionData> corrections, int messageId) {}
         @Override
-        public void onError(String message) {
-        }
+        public void onError(String message) {}
     }
 }

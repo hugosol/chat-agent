@@ -5,6 +5,8 @@ Rules:
 
 {topicSummary}
 
+{memoryCues}
+
 {learningProfile}
 
 {activeEngagement}

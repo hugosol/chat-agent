@@ -7,7 +7,7 @@
     "index": 0,
     "message": {
       "role": "assistant",
-      "content": "{\"topic\": \"Work Standup\", \"summary\": \"Discussed login module progress, team meeting about sprint planning, and upcoming deadlines.\", \"tags\": [\"work\", \"standup\", \"job\", \"login\", \"sprint\"]}"
+      "content": "{\"topic\": \"Work Standup\", \"summary\": \"Discussed login module progress, team meeting about sprint planning, and upcoming deadlines.\"}"
     },
     "finish_reason": "stop"
   }],

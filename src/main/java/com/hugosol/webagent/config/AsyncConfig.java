@@ -76,6 +76,35 @@ public class AsyncConfig {
         return executor;
     }
 
+    @Bean
+    @Qualifier("embeddingExecutor")
+    public ExecutorService embeddingExecutor() {
+        if (!asyncEnabled) {
+            log.info("Embedding executor configured as synchronous (e2e/test mode)");
+            return new DirectExecutorService();
+        }
+
+        ThreadFactory threadFactory = r -> {
+            ThreadFactory defaultFactory = Executors.defaultThreadFactory();
+            Thread t = defaultFactory.newThread(r);
+            t.setName("embedding-" + t.getName());
+            t.setDaemon(true);
+            return t;
+        };
+
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2,
+                2,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(),
+                threadFactory,
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+        executor.allowCoreThreadTimeOut(true);
+        log.info("Embedding executor configured: core=2, max=2");
+        return executor;
+    }
+
     private static class DirectExecutorService extends AbstractExecutorService {
 
         private volatile boolean shutdown;

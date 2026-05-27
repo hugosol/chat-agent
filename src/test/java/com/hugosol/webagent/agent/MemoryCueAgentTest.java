@@ -88,8 +88,8 @@ class MemoryCueAgentTest {
     }
 
     @Test
-    void generateCue_returnsTopicSummaryTags() {
-        chatModel.setResponse("{\"topic\": \"Travel\", \"summary\": \"Talked about Japan trip\", \"tags\": [\"travel\", \"japan\"]}");
+    void generateCue_returnsTopicSummary() {
+        chatModel.setResponse("{\"topic\": \"Travel\", \"summary\": \"Talked about Japan trip\"}");
 
         var result = agent.generateCue(
                 List.of(msg(0, "I went to Japan"), msg(1, "That sounds fun")),
@@ -97,7 +97,6 @@ class MemoryCueAgentTest {
 
         assertThat(result.topic()).isEqualTo("Travel");
         assertThat(result.summary()).isEqualTo("Talked about Japan trip");
-        assertThat(result.tags()).containsExactly("travel", "japan");
     }
 
     @Test
@@ -120,56 +119,6 @@ class MemoryCueAgentTest {
         assertThat(chatModel.lastPrompt).contains("[MSG#1]");
         assertThat(chatModel.lastPrompt).contains("[MSG#2]");
         assertThat(chatModel.lastPrompt).contains("[MSG#3]");
-    }
-
-    @Test
-    void consolidateTags_normalMapping() {
-        chatModel.setResponse("{\"spaniel\": \"dog\", \"poodle\": \"dog\"}");
-
-        var result = agent.consolidateTags(java.util.Map.of("dog", 5, "spaniel", 2, "poodle", 1));
-
-        assertThat(result).containsEntry("spaniel", "dog");
-        assertThat(result).containsEntry("poodle", "dog");
-        assertThat(result).doesNotContainKey("dog"); // unchanged, not in output
-    }
-
-    @Test
-    void consolidateTags_noChanges() {
-        chatModel.setResponse("{}");
-
-        var result = agent.consolidateTags(java.util.Map.of("work", 3, "travel", 2));
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    void consolidateTags_onlyChangedTagsReturned() {
-        chatModel.setResponse("{\"job\": \"work\"}");
-
-        var result = agent.consolidateTags(java.util.Map.of("work", 4, "job", 2, "travel", 3));
-
-        assertThat(result).containsEntry("job", "work");
-        assertThat(result).doesNotContainKey("travel");
-        assertThat(result).doesNotContainKey("work");
-    }
-
-    @Test
-    void consolidateTags_invalidJson_returnsEmptyMap() {
-        chatModel.setResponse("not a json response");
-
-        var result = agent.consolidateTags(java.util.Map.of("dog", 1));
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    void consolidateTags_formatsFrequencyInPrompt() {
-        chatModel.setResponse("{}");
-
-        agent.consolidateTags(java.util.Map.of("dog", 5, "cat", 3));
-
-        assertThat(chatModel.lastPrompt).contains("dog(5)");
-        assertThat(chatModel.lastPrompt).contains("cat(3)");
     }
 
     private static MessageData msg(int id, String text) {

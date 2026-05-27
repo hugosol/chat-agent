@@ -13,9 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
@@ -23,17 +21,19 @@ import java.util.concurrent.ExecutorService;
 public class MemoryCueService {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryCueService.class);
-    private static final Object consolidationLock = new Object();
 
     private final MemoryCueAgent agent;
     private final MemoryCueRepository repository;
+    private final EmbeddingService embeddingService;
     private final ExecutorService executor;
 
     public MemoryCueService(MemoryCueAgent agent,
                             MemoryCueRepository repository,
+                            EmbeddingService embeddingService,
                             @Qualifier("memoryExecutor") ExecutorService executor) {
         this.agent = agent;
         this.repository = repository;
+        this.embeddingService = embeddingService;
         this.executor = executor;
     }
 
@@ -47,7 +47,7 @@ public class MemoryCueService {
             } catch (Exception e) {
                 log.warn("MemoryCueService: detectSwitches failed for session {}: {}", sessionId, e.getMessage());
                 repository.save(new MemoryCue(sessionId, userId, mode, -1,
-                        null, null, Collections.emptyList(), MemoryCueStatus.FIRST_CALL_FAILED));
+                        null, null, MemoryCueStatus.FIRST_CALL_FAILED));
                 return Collections.<CompletableFuture<Void>>emptyList();
             }
 
@@ -59,14 +59,16 @@ public class MemoryCueService {
                 futures.add(CompletableFuture.runAsync(() -> {
                     try {
                         MemoryCueAgent.CueResult result = agent.generateCue(segments.get(segmentIndex), mode, segmentIndex);
-                        repository.save(new MemoryCue(sessionId, userId, mode, segmentIndex,
-                                result.topic(), result.summary(), result.tags(),
+                        MemoryCue cue = repository.save(new MemoryCue(sessionId, userId, mode, segmentIndex,
+                                result.topic(), result.summary(),
                                 MemoryCueStatus.COMPLETED));
+                        embeddingService.indexAsync(cue.getId(), result.topic(), result.summary(), mode, userId);
+                        log.debug("MemoryCueService: dispatched indexAsync for cue {}", cue.getId());
                     } catch (Exception e) {
                         log.warn("MemoryCueService: generateCue failed for session {} segment {}: {}",
                                 sessionId, segmentIndex, e.getMessage());
                         repository.save(new MemoryCue(sessionId, userId, mode, segmentIndex,
-                                null, null, Collections.emptyList(),
+                                null, null,
                                 MemoryCueStatus.SEGMENT_FAILED));
                     }
                 }, executor));
@@ -81,70 +83,10 @@ public class MemoryCueService {
             long triggerTime = startTime;
             return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                     .thenRunAsync(() -> {
-                        try {
-                            consolidateTags(sessionId, userId, mode);
-                        } finally {
-                            long elapsed = System.currentTimeMillis() - triggerTime;
-                            log.info("Background task duration (MemoryCue + consolidation): {}s", String.format("%.1f", elapsed / 1000.0));
-                        }
+                        long elapsed = System.currentTimeMillis() - triggerTime;
+                        log.info("Background task duration (MemoryCue): {}s", String.format("%.1f", elapsed / 1000.0));
                     }, executor);
         });
-    }
-
-    private void consolidateTags(String sessionId, String userId, AgentMode mode) {
-        synchronized (consolidationLock) {
-            List<MemoryCue> sessionCues = repository.findBySessionId(sessionId);
-
-            boolean hasSegmentFailed = sessionCues.stream()
-                    .anyMatch(c -> c.getStatus() == MemoryCueStatus.SEGMENT_FAILED);
-            if (hasSegmentFailed) {
-                log.warn("MemoryCueService: skipping tag consolidation for session {} due to SEGMENT_FAILED", sessionId);
-                return;
-            }
-
-            boolean hasFirstCallFailed = sessionCues.stream()
-                    .anyMatch(c -> c.getStatus() == MemoryCueStatus.FIRST_CALL_FAILED);
-            if (hasFirstCallFailed) {
-                log.warn("MemoryCueService: skipping tag consolidation for session {} due to FIRST_CALL_FAILED", sessionId);
-                return;
-            }
-
-            List<MemoryCue> allCues = repository.findByUserIdAndMode(userId, mode);
-            Map<String, Integer> frequencyMap = new HashMap<>();
-            for (MemoryCue cue : allCues) {
-                if (cue.getStatus() != MemoryCueStatus.COMPLETED) continue;
-                for (String tag : cue.getTags()) {
-                    frequencyMap.merge(tag, 1, Integer::sum);
-                }
-            }
-
-            try {
-                Map<String, String> mapping = agent.consolidateTags(frequencyMap);
-                log.info("MemoryCueService: tag consolidation mapping for session {}: {}", sessionId, mapping);
-
-                for (MemoryCue cue : sessionCues) {
-                    if (cue.getStatus() != MemoryCueStatus.COMPLETED) continue;
-
-                    List<String> originalTags = new ArrayList<>(cue.getTags());
-                    List<String> newTags = new ArrayList<>();
-                    for (String tag : originalTags) {
-                        String canonical = mapping.getOrDefault(tag, tag);
-                        if (!newTags.contains(canonical)) {
-                            newTags.add(canonical);
-                        }
-                    }
-
-                    if (!newTags.equals(originalTags)) {
-                        cue.setTags(newTags);
-                        repository.save(cue);
-                        log.info("MemoryCueService: consolidated tags for cue {} from {} to {}",
-                                cue.getId(), originalTags, newTags);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("MemoryCueService: tag consolidation failed for session {}: {}", sessionId, e.getMessage());
-            }
-        }
     }
 
     private static List<List<MessageData>> splitBySwitches(List<MessageData> messages, List<Integer> switchPoints) {

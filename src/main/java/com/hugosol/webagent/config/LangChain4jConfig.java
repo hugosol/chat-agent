@@ -3,6 +3,8 @@ package com.hugosol.webagent.config;
 import com.hugosol.webagent.service.LlmCallLogService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,5 +57,10 @@ public class LangChain4jConfig {
                 .maxTokens(maxTokens)
                 .timeout(timeout)
                 .build();
+    }
+
+    @Bean
+    public EmbeddingModel embeddingModel() {
+        return new AllMiniLmL6V2EmbeddingModel();
     }
 }

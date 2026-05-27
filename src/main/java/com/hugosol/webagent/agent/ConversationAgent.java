@@ -1,6 +1,7 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
+import com.hugosol.webagent.dto.MemoryContent;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MessageRole;
@@ -45,38 +46,32 @@ public class ConversationAgent {
     }
 
     public void generateStream(List<MessageData> history, AgentMode mode,
-                                String topicSummary, String learningProfile,
+                                MemoryContent memoryContent,
                                 int messageId, StreamingChatResponseHandler handler) {
-        boolean hasMemory = (topicSummary != null && !topicSummary.isBlank())
-                || (learningProfile != null && !learningProfile.isBlank());
-        boolean injectMemory = messageId <= 3 && hasMemory;
-        generate(history, mode, topicSummary, learningProfile, injectMemory, handler);
+        generate(history, mode, memoryContent, handler);
     }
 
     public String buildPromptJson(List<MessageData> history, AgentMode mode,
-                                   String topicSummary, String learningProfile,
+                                   MemoryContent memoryContent,
                                    int messageId) {
-        boolean hasMemory = (topicSummary != null && !topicSummary.isBlank())
-                || (learningProfile != null && !learningProfile.isBlank());
-        boolean injectMemory = messageId <= 3 && hasMemory;
-        List<ChatMessage> messages = buildMessages(history, mode, topicSummary, learningProfile, injectMemory);
+        List<ChatMessage> messages = buildMessages(history, mode, memoryContent);
         return "[" + messages.stream()
                 .map(m -> "{\"role\":\"" + roleName(m) + "\",\"content\":" + jsonEscape(contentOf(m)) + "}")
                 .collect(Collectors.joining(",")) + "]";
     }
 
     private void generate(List<MessageData> history, AgentMode mode,
-                          String topicSummary, String learningProfile, boolean injectMemory,
-                          StreamingChatResponseHandler handler) {
-        List<ChatMessage> messages = buildMessages(history, mode, topicSummary, learningProfile, injectMemory);
+                           MemoryContent memoryContent,
+                           StreamingChatResponseHandler handler) {
+        List<ChatMessage> messages = buildMessages(history, mode, memoryContent);
 
         log.debug("ConversationAgent sending {} messages", messages.size());
         chatModel.chat(messages, handler);
     }
 
     private List<ChatMessage> buildMessages(List<MessageData> history, AgentMode mode,
-                                            String topicSummary, String learningProfile, boolean injectMemory) {
-        String systemContent = buildSystemContent(mode, topicSummary, learningProfile, injectMemory);
+                                             MemoryContent memoryContent) {
+        String systemContent = buildSystemContent(mode, memoryContent);
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(systemContent));
@@ -124,8 +119,7 @@ public class ConversationAgent {
         return sb.toString();
     }
 
-    private String buildSystemContent(AgentMode mode,
-                                       String topicSummary, String learningProfile, boolean injectMemory) {
+    private String buildSystemContent(AgentMode mode, MemoryContent memoryContent) {
         String description = modeDescriptions.getOrDefault(mode, "");
         String rules = modeRules.getOrDefault(mode, "");
 
@@ -133,14 +127,30 @@ public class ConversationAgent {
                 .replace("{Description}", description)
                 .replace("{Rules}", rules);
 
-        if (injectMemory) {
+        boolean hasUserMemory = memoryContent.topicSummary() != null && !memoryContent.topicSummary().isBlank()
+                || memoryContent.learningProfile() != null && !memoryContent.learningProfile().isBlank();
+        boolean hasRagMemory = memoryContent.memoryCuesText() != null && !memoryContent.memoryCuesText().isBlank();
+
+        if (hasUserMemory) {
+            String ts = memoryContent.topicSummary();
+            String lp = memoryContent.learningProfile();
             content = content
-                    .replace("{topicSummary}", topicSummary.isEmpty() ? "" : "[Conversation Memory]\n" + topicSummary)
-                    .replace("{learningProfile}", learningProfile.isEmpty() ? "" : "[Your Learning Profile]\n" + learningProfile)
+                    .replace("{topicSummary}", ts != null && !ts.isBlank()
+                            ? "[Conversation Memory]\n" + ts : "")
+                    .replace("{memoryCues}", "")
+                    .replace("{learningProfile}", lp != null && !lp.isBlank()
+                            ? "[Your Learning Profile]\n" + lp : "")
+                    .replace("{activeEngagement}", ACTIVE_ENGAGEMENT_TEXT);
+        } else if (hasRagMemory) {
+            content = content
+                    .replace("{topicSummary}", "")
+                    .replace("{memoryCues}", "[Memory Cues]\n" + memoryContent.memoryCuesText())
+                    .replace("{learningProfile}", "")
                     .replace("{activeEngagement}", ACTIVE_ENGAGEMENT_TEXT);
         } else {
             content = content
                     .replace("{topicSummary}", "")
+                    .replace("{memoryCues}", "")
                     .replace("{learningProfile}", "")
                     .replace("{activeEngagement}", "");
         }

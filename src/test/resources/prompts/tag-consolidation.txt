@@ -1,3 +1,0 @@
-E2E_MARKER_TAG_CONSOLIDATION
-You are consolidating tags. Merge equivalent tags into canonical forms.
-{tagList}

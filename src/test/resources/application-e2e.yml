@@ -29,6 +29,7 @@ app:
   prompt-directory: classpath:prompts
   memory:
     async: false
+    store-path: target/embedding-store-e2e.json
   security:
     permit-all-paths:
       - /**
