@@ -24,7 +24,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +56,7 @@ class TurnProcessorTest {
     private MemoryService memoryService;
 
     private AppProperties appProperties;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @BeforeEach
     void setUp() {
@@ -267,9 +271,26 @@ class TurnProcessorTest {
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
     }
 
+    @Test
+    void registersPendingCorrectionFutureWithSessionService() throws Exception {
+        setupConversationAgent("ok", 0);
+        TurnProcessor processor = newProcessor();
+        CountDownLatch latch = new CountDownLatch(1);
+
+        processor.processTurn("s1", "test", 1, new StubCallback() {
+            @Override
+            public void onCorrections(List<CorrectionData> corrs, int msgId) {
+                latch.countDown();
+            }
+        });
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(sessionService).addPendingCorrection(eq("s1"), any(CompletableFuture.class));
+    }
+
     private TurnProcessor newProcessor() {
         CoachGraphBuilder builder = new CoachGraphBuilder(correctionNode);
-        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, memoryService, appProperties);
+        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, memoryService, appProperties, executor);
     }
 
     private void setupConversationAgent(String responseText, int totalTokens) {

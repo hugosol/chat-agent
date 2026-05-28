@@ -10,6 +10,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -272,5 +275,65 @@ class SessionServiceTest {
 
         service.recordTokens("s1", AgentType.CONVERSATION, 120000);
         assertThat(service.isTokenWarning("s1")).isTrue();
+    }
+
+    @Test
+    void addPendingCorrection_registersFutureForSession() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        service.addPendingCorrection("s1", future);
+    }
+
+    @Test
+    void waitForPendingCorrections_waitsForCompletedFuture() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        service.addPendingCorrection("s1", future);
+
+        service.waitForPendingCorrections("s1", 1000);
+    }
+
+    @Test
+    void waitForPendingCorrections_doesNothingForSessionWithNoPendingFutures() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+
+        service.waitForPendingCorrections("s1", 1000);
+    }
+
+    @Test
+    void waitForPendingCorrections_doesNothingForUnknownSession() {
+        service.waitForPendingCorrections("unknown", 1000);
+    }
+
+    @Test
+    void waitForPendingCorrections_waitsForInProgressFuture() throws Exception {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CountDownLatch latch = new CountDownLatch(1);
+
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try {
+                latch.await(2, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
+        });
+        service.addPendingCorrection("s1", future);
+
+        service.waitForPendingCorrections("s1", 5000);
+    }
+
+    @Test
+    void waitForPendingCorrections_timedOutReturnsWithoutThrowing() throws Exception {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CountDownLatch latch = new CountDownLatch(1);
+
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try {
+                latch.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
+        });
+        service.addPendingCorrection("s1", future);
+
+        service.waitForPendingCorrections("s1", 100);
     }
 }

@@ -158,6 +158,7 @@ public class CoachMessageHandler implements MessageHandler {
                 sessionService.getUsageRatio(sessionId)));
 
         try {
+            sessionService.waitForPendingCorrections(sessionId, 10_000);
             List<MessageData> messages = sessionService.getMessages(sessionId);
             List<CorrectionData> corrections = sessionService.getCorrections(sessionId);
             ReportResult report = reportAgent.generate(messages, corrections);

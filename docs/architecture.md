@@ -171,6 +171,7 @@ START → correction → END
   → 回调通过 TurnProcessor.TurnCallback 通知 CoachMessageHandler
 
 [用户 End Session]
+  → SessionService.waitForPendingCorrections(sessionId, 10s) → 等待所有 pending correction 完成（超时则 cancel）
   → ReportAgent.generate(messages, corrections) → 生成报告
   → SessionStore.completeSession(sessionId, messages, corrections, report) → H2 持久化
   → MemoryService.generateMemoryAsync(userId, report, mode, sessionId) → 异步保存 Topic 摘要 + 合并 Profile 记忆
@@ -400,7 +401,7 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, EARLIER_TODAY, YESTERDAY, A_FEW_D
 | **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` + `memoryService` + `memoryCueService` 并行执行 |
 | **日志写入** | LLM 调用时即时异步写入 | `LoggableChatModel`（同步 Agent）在 `chat()` 调用点拦截；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
 | **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
-| **记忆写入** | MemoryService + MemoryCueService 异步触发 | `memoryExecutor` (core=4, max=8) 上同时运行 Topic 直接写入 + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
+| **记忆写入** | MemoryService + MemoryCueService 异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Topic 直接写入 + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
 | **RAG 检索** | TurnProcessor Round 4+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，top-K=2，userId×AgentMode 隔离，结果注入 System Prompt `{memoryCues}` |
 
 ### 会话生命周期
@@ -413,12 +414,12 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, EARLIER_TODAY, YESTERDAY, A_FEW_D
 
 [用户点击 End Session]
   ↓
-   ┌─ memoryExecutor (并行):
+   ┌─ llmRequestExecutor (并行):
    │    reportAgent.generate() → ReportResult
    │    → SessionStore.completeSession() → H2
    │    → MemoryService.generateMemoryAsync() → Topic 直接写入 + Profile Merge → H2
-  │
-  └─ memoryExecutor (并行，与上不互斥):
+   │
+   └─ llmRequestExecutor (并行，与上不互斥):
        MemoryCueService.generateCuesAsync()
        → detectSwitches (话题切换点)
        → generateCue per segment (并行)
@@ -578,7 +579,7 @@ web-agent/
 │       ├── LoggableChatModel.java          // ChatLanguageModel 包装器，拦截 chat(String) 写入日志
 │       ├── SecurityConfig.java             // Spring Security filter chain + 登录事件日志
 │       ├── WebSocketConfig.java            // WebSocket Handler 注册（同源策略）
-│       ├── AsyncConfig.java                // memoryExecutor + llmLogExecutor + embeddingExecutor 线程池配置
+│       ├── AsyncConfig.java                // llmRequestExecutor + llmLogExecutor + embeddingExecutor 线程池配置
 │       ├── AppProperties.java              // @ConfigurationProperties(prefix="app") 包含 security.permit-all-paths
 │       ├── PasswordEncoderConfig.java      // BCryptPasswordEncoder bean（独立配置，非 web 环境可用）
 │       ├── DataInitializer.java            // CommandLineRunner：从 app.initial-users 种子用户
