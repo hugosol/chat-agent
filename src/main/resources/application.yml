@@ -42,7 +42,7 @@ app:
     user-memory-rounds: 1
     retrieval:
       top-k: 2
-      similarity-threshold: 0.65
+      similarity-threshold: 0.5
   security:
     permit-all-paths:
       - /login/**

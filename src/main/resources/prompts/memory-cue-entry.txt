@@ -4,8 +4,8 @@ You are the memory curator for an English conversation coach. Summarize this con
 
 Output a single JSON object with exactly these two fields, all in English:
 
-- "topic": A short topic name (3-7 words) describing what this segment is about.
-- "summary": A concise summary of the key points discussed (2-4 sentences). Do NOT truncate — include all relevant details.
+- "topic": A short topic name (3-{cueTopicMaxWords} words) describing what this segment is about.
+- "summary": A concise summary of the key points discussed (2-{cueSummaryMaxSentences} sentences). Do NOT truncate — include all relevant details.
 
 Output ONLY the JSON object. No markdown, no explanations, no surrounding text.
 

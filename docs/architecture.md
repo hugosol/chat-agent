@@ -47,8 +47,8 @@
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
-| 36 | 双轨记忆系统 | User Memory（合并摘要，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 RAG 语义检索注入 MemoryCue |
-| 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（prompt/response/tokens/duration）。同步 Agent 通过 `LoggableChatModel` 包装器透明拦截，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
+| 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 RAG 语义检索注入 MemoryCue |
+| 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `LoggableChatModel` 包装器透明拦截，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
 | 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，top-2 结果 (cosine ≥ 0.6) 注入 System Prompt `{memoryCues}` 占位符。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
 
@@ -173,7 +173,7 @@ START → correction → END
 [用户 End Session]
   → ReportAgent.generate(messages, corrections) → 生成报告
   → SessionStore.completeSession(sessionId, messages, corrections, report) → H2 持久化
-  → MemoryService.generateMemoryAsync(userId, report, mode, sessionId) → 异步合并 Topic + Profile 记忆
+  → MemoryService.generateMemoryAsync(userId, report, mode, sessionId) → 异步保存 Topic 摘要 + 合并 Profile 记忆
   → MemoryCueService.generateCuesAsync(sessionId, userId, mode, messages) → 异步生成结构化 MemoryCue（与上并行，步骤：话题切换检测 → 分段摘要生成 → EmbeddingService.indexAsync() 向量化）
   → SessionService.remove(sessionId, wsId) → 释放 state + TokenTracker + sessionToWs 映射
 
@@ -242,7 +242,13 @@ prompts/daily_talk/
 ### 2. CorrectionAgent (`prompts/correction.txt`)
 
 ```
-You are an English coach analyzing a learner's spoken English.
+You are an English coach analyzing a Chinese adult's spoken English.
+
+CRITICAL RULE — Speech-to-Text Misrecognition: If an apparent "error" could be
+a speech recognition mistake (homophone confusion: their/there; phonetically
+similar words: think/sink), do NOT flag it. Only flag errors with clear evidence
+(grammar structure errors, Chinese-to-English literal translations).
+
 Given the user's latest utterance, identify errors in these 5 categories:
 
 1. GRAMMAR: tense, subject-verb agreement, articles, prepositions, word order
@@ -314,23 +320,25 @@ Errors: {allCorrections}
     └──────────────┘ └──────────────┘ │ sessionId    │ │ summary                 │
                                       └──────────────┘  │ status (MemoryCueStatus) │
                                                         └─────────────────────────┘
-                                                        ┌─────────────────────────┐
-                                                        │      LlmCallLog         │
-                                                        │─────────────────────────│
-                                                        │ id (PK)                 │
-                                                        │ sessionId (nullable)    │
-                                                        │ userId (nullable)       │
-                                                        │ agentType               │
-                                                        │ mode                    │
-                                                        │ model                   │
-                                                        │ requestPrompt (CLOB)    │
-                                                        │ responseText (CLOB)     │
-                                                        │ inputTokens (nullable)  │
-                                                        │ outputTokens (nullable) │
-                                                        │ durationMs              │
-                                                        │ status                  │
-                                                        │ errorMessage (nullable) │
-                                                        └─────────────────────────┘
+                                                         ┌─────────────────────────┐
+                                                         │      LlmCallLog         │
+                                                         │─────────────────────────│
+                                                         │ id (PK)                 │
+                                                         │ sessionId (nullable)    │
+                                                         │ userId (nullable)       │
+                                                         │ agentType               │
+                                                         │ mode                    │
+                                                         │ model                   │
+                                                         │ requestPrompt (CLOB)    │
+                                                         │ systemPrompt (CLOB)     │
+                                                         │ chatHistory (CLOB)      │
+                                                         │ responseText (CLOB)     │
+                                                         │ inputTokens (nullable)  │
+                                                         │ outputTokens (nullable) │
+                                                         │ durationMs              │
+                                                         │ status                  │
+                                                         │ errorMessage (nullable) │
+                                                         └─────────────────────────┘
 
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
@@ -338,6 +346,7 @@ Enum: SessionStatus { ACTIVE, COMPLETED }
 Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAILY_TALK("Daily Talk", "daily_talk") }
 Enum: MemoryType { TOPIC_SUMMARY, LEARNING_PROFILE }
 Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
+Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, EARLIER_TODAY, YESTERDAY, A_FEW_DAYS_AGO, ABOUT_A_WEEK_AGO, A_FEW_WEEKS_AGO, ABOUT_A_MONTH_AGO, A_WHILE_AGO }
 ```
 
 > **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。
@@ -391,7 +400,7 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 | **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` + `memoryService` + `memoryCueService` 并行执行 |
 | **日志写入** | LLM 调用时即时异步写入 | `LoggableChatModel`（同步 Agent）在 `chat()` 调用点拦截；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
 | **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
-| **记忆写入** | MemoryService + MemoryCueService 异步触发 | `memoryExecutor` (core=4, max=8) 上同时运行 Topic Merge + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
+| **记忆写入** | MemoryService + MemoryCueService 异步触发 | `memoryExecutor` (core=4, max=8) 上同时运行 Topic 直接写入 + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
 | **RAG 检索** | TurnProcessor Round 4+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，top-K=2，userId×AgentMode 隔离，结果注入 System Prompt `{memoryCues}` |
 
 ### 会话生命周期
@@ -404,10 +413,10 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 
 [用户点击 End Session]
   ↓
-  ┌─ memoryExecutor (并行):
-  │    reportAgent.generate() → ReportResult
-  │    → SessionStore.completeSession() → H2
-  │    → MemoryService.generateMemoryAsync() → Topic Merge + Profile Merge → H2
+   ┌─ memoryExecutor (并行):
+   │    reportAgent.generate() → ReportResult
+   │    → SessionStore.completeSession() → H2
+   │    → MemoryService.generateMemoryAsync() → Topic 直接写入 + Profile Merge → H2
   │
   └─ memoryExecutor (并行，与上不互斥):
        MemoryCueService.generateCuesAsync()
@@ -504,7 +513,7 @@ web-agent/
 │   │   ├── ConversationAgent.java          // 角色扮演对话（Prompt 模板替换 + DeepSeek 调用）
 │   │   ├── CorrectionAgent.java            // 5类纠错分析（JSON 解析 LLM 输出）
 │   │   ├── ReportAgent.java                // 会话报告生成
-│   │   ├── MemoryAgent.java                // Topic + Learning Profile 合并（跨会话记忆）
+│   │   ├── MemoryAgent.java                // Learning Profile 合并（跨会话记忆，Topic 直接写入）
 │   │   └── MemoryCueAgent.java             // 两步 LLM：话题切换检测 + 分段结构化摘要生成
 │   │
 │   ├── dto/                              // 数据传输
@@ -556,7 +565,7 @@ web-agent/
 │   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
 │   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图 + RAG 检索)
 │   │   ├── SessionStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
-│   │   ├── MemoryService.java              // 异步 Topic + Learning Profile 合并（含 sessionId 追溯）
+│   │   ├── MemoryService.java              // 异步保存 Topic 摘要 + Learning Profile 合并（含 sessionId 追溯）
 │   │   ├── MemoryCueService.java           // 异步 MemoryCue 生成（话题分割 + 分段摘要 → EmbeddingService.indexAsync）
 │   │   ├── EmbeddingService.java            // ONNX 向量化 + InMemoryEmbeddingStore 管理（init/search/indexAsync/saveToDisk）
 │   │   ├── LlmCallLogService.java          // 异步 LLM 调用日志写入 + 启动时清理 3 天前记录

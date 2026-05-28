@@ -19,22 +19,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Component
 public class TurnProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(TurnProcessor.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     private final CompiledGraph<CoachState> graph;
     private final ConversationAgent conversationAgent;
     private final SessionService sessionService;
     private final LlmCallLogService llmCallLogService;
     private final EmbeddingService embeddingService;
+    private final MemoryService memoryService;
     private final AppProperties appProperties;
 
     public interface TurnCallback {
@@ -49,12 +56,14 @@ public class TurnProcessor {
                           SessionService sessionService,
                           LlmCallLogService llmCallLogService,
                           EmbeddingService embeddingService,
+                          MemoryService memoryService,
                           AppProperties appProperties) {
         this.graph = graphBuilder.getCompiledGraph();
         this.conversationAgent = conversationAgent;
         this.sessionService = sessionService;
         this.llmCallLogService = llmCallLogService;
         this.embeddingService = embeddingService;
+        this.memoryService = memoryService;
         this.appProperties = appProperties;
     }
 
@@ -78,7 +87,8 @@ public class TurnProcessor {
 
         final MemoryContent memoryContent;
         if (messageId <= userMemoryRounds) {
-            memoryContent = new MemoryContent(topicSummary, learningProfile, null);
+            LocalDateTime topicCreatedAt = memoryService.loadTopicCreatedAt(userId, finalMode);
+            memoryContent = new MemoryContent(topicSummary, learningProfile, null, topicCreatedAt, null);
         } else {
             int topK = appProperties.getMemory().getRetrieval().getTopK();
             double threshold = appProperties.getMemory().getRetrieval().getSimilarityThreshold();
@@ -87,11 +97,14 @@ public class TurnProcessor {
                 String memoryCuesText = ragResults.stream()
                         .map(m -> m.topic() + ": " + m.summary())
                         .collect(Collectors.joining(", as well as, "));
+                List<LocalDateTime> cueCreatedAts = ragResults.stream()
+                        .map(CueMatch::createdAt)
+                        .collect(Collectors.toList());
                 log.info("TurnProcessor: RAG retrieved {} cues for session {} messageId {}",
                         ragResults.size(), sessionId, messageId);
-                memoryContent = new MemoryContent(null, null, memoryCuesText);
+                memoryContent = new MemoryContent(null, null, memoryCuesText, null, cueCreatedAts);
             } else {
-                memoryContent = new MemoryContent(null, null, null);
+                memoryContent = new MemoryContent(null, null, null, null, null);
             }
         }
 
@@ -125,8 +138,13 @@ public class TurnProcessor {
                                         ? response.tokenUsage().outputTokenCount() : 0;
                                 long duration = System.currentTimeMillis() - startTime;
 
+                                String[] split = splitPromptJson(promptJson);
+                                String systemPrompt = split[0];
+                                String chatHistory = split[1];
+
                                 llmCallLogService.saveAsync(sessionId, userId, "CONVERSATION", modeName,
-                                        promptJson, agentText, inputTokens, outputTokens,
+                                        promptJson, systemPrompt, chatHistory,
+                                        agentText, inputTokens, outputTokens,
                                         duration, "SUCCESS", null);
                             }
 
@@ -178,5 +196,30 @@ public class TurnProcessor {
                 callback.onError("Correction error: " + e.getMessage());
             }
         });
+    }
+
+    static String[] splitPromptJson(String promptJson) {
+        try {
+            JsonNode array = mapper.readTree(promptJson);
+            String systemPrompt = null;
+            List<Map<String, String>> historyEntries = new ArrayList<>();
+            for (JsonNode node : array) {
+                String role = node.has("role") ? node.get("role").asText() : "";
+                String content = node.has("content") ? node.get("content").asText() : "";
+                if ("system".equals(role)) {
+                    systemPrompt = content;
+                } else if (!role.isEmpty()) {
+                    Map<String, String> entry = new LinkedHashMap<>();
+                    entry.put("role", role);
+                    entry.put("content", content);
+                    historyEntries.add(entry);
+                }
+            }
+            String chatHistory = historyEntries.isEmpty() ? null : mapper.writeValueAsString(historyEntries);
+            return new String[]{ systemPrompt, chatHistory };
+        } catch (Exception e) {
+            log.warn("TurnProcessor: failed to parse prompt JSON for logging: {}", e.getMessage());
+            return new String[]{ null, null };
+        }
     }
 }

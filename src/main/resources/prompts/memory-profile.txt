@@ -14,6 +14,6 @@ Rules:
 - Track trends: if an error pattern appears repeatedly across sessions, emphasize it. If it improves, note the progress.
 - Include: key grammar/vocabulary/fluency weaknesses, notable improvements, and an overall assessment of the user's current level.
 - If the previous profile is empty, create a fresh profile from the new session data.
-- Keep the total output under 400 characters.
+- Keep the total output under {profileMaxLength} characters.
 - Output ONLY the profile text. No titles, no markdown, no JSON, no explanations.
 - Write entirely in English.

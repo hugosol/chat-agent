@@ -76,4 +76,9 @@ public class UserMemory extends BaseEntity {
 
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+
+    @Transient
+    public String getTimeLabel(java.time.LocalDateTime referenceTime) {
+        return TimeLabel.computeLabel(getCreateTime(), referenceTime);
+    }
 }

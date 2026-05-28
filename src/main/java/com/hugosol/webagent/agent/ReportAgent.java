@@ -44,7 +44,10 @@ public class ReportAgent {
 
     private ReportResult parseReport(String response) {
         try {
-            Map<String, Object> sections = objectMapper.readValue(response, Map.class);
+            Map<String, Object> sections = objectMapper
+                    .readerFor(Map.class)
+                    .with(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS)
+                    .readValue(response);
             return new ReportResult(
                     getString(sections, "overallAssessment"),
                     getString(sections, "topicSummary"),

@@ -28,6 +28,12 @@ public class LlmCallLog extends BaseEntity {
     @Column(name = "request_prompt", columnDefinition = "CLOB")
     private String requestPrompt;
 
+    @Column(name = "system_prompt", columnDefinition = "CLOB")
+    private String systemPrompt;
+
+    @Column(name = "chat_history", columnDefinition = "CLOB")
+    private String chatHistory;
+
     @Column(name = "response_text", columnDefinition = "CLOB")
     private String responseText;
 
@@ -66,6 +72,12 @@ public class LlmCallLog extends BaseEntity {
 
     public String getRequestPrompt() { return requestPrompt; }
     public void setRequestPrompt(String requestPrompt) { this.requestPrompt = requestPrompt; }
+
+    public String getSystemPrompt() { return systemPrompt; }
+    public void setSystemPrompt(String systemPrompt) { this.systemPrompt = systemPrompt; }
+
+    public String getChatHistory() { return chatHistory; }
+    public void setChatHistory(String chatHistory) { this.chatHistory = chatHistory; }
 
     public String getResponseText() { return responseText; }
     public void setResponseText(String responseText) { this.responseText = responseText; }

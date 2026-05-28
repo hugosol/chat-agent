@@ -60,6 +60,8 @@ class LoggableChatModelTest {
         verify(logService).saveAsync(
                 isNull(), isNull(), isNull(), isNull(),
                 eq("{\"text\":\"Fix this grammar\"}"),
+                eq("Fix this grammar"),
+                isNull(),
                 eq("Corrected text"),
                 isNull(), isNull(),
                 durationCaptor.capture(),
@@ -81,6 +83,8 @@ class LoggableChatModelTest {
         verify(logService).saveAsync(
                 isNull(), isNull(), isNull(), isNull(),
                 eq("{\"text\":\"Bad prompt\"}"),
+                eq("Bad prompt"),
+                isNull(),
                 isNull(),
                 isNull(), isNull(),
                 durationCaptor.capture(),

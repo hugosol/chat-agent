@@ -47,7 +47,6 @@ class MemoryServiceTest {
     @Test
     void generateMemoryAsync_submitsBothTasks() throws Exception {
         ReportResult report = new ReportResult("overall", "topic data", "error summary", 7, "takeaway");
-        when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic merged");
         when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile merged");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.TOPIC_SUMMARY), any()))
                 .thenReturn(Optional.of(new UserMemory("u1", MemoryType.TOPIC_SUMMARY, "old-topic", 1)));
@@ -58,9 +57,15 @@ class MemoryServiceTest {
 
         Thread.sleep(200);
 
-        verify(memoryAgent, times(1)).mergeTopic(eq("old-topic"), eq("topic data"));
         verify(memoryAgent, times(1)).mergeProfile(eq("old-profile"), eq("error summary"));
         verify(repository, times(2)).save(any(UserMemory.class));
+
+        ArgumentCaptor<UserMemory> captor = ArgumentCaptor.forClass(UserMemory.class);
+        verify(repository, times(2)).save(captor.capture());
+        UserMemory topic = captor.getAllValues().stream()
+                .filter(m -> m.getType() == MemoryType.TOPIC_SUMMARY).findFirst().orElseThrow();
+        assertThat(topic.getContent()).isEqualTo("topic data");
+        assertThat(topic.getVersion()).isEqualTo(2);
     }
 
     @Test
@@ -68,7 +73,6 @@ class MemoryServiceTest {
         ReportResult report = new ReportResult("new summary", "new topics", "new errors", 7, "takeaway");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(anyString(), any(MemoryType.class), any()))
                 .thenReturn(Optional.empty());
-        when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic v1");
         when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile v1");
 
         service.generateMemoryAsync("user-1", report, AgentMode.WORKPLACE_STANDUP);
@@ -80,7 +84,7 @@ class MemoryServiceTest {
         UserMemory topic = captor.getAllValues().stream()
                 .filter(m -> m.getType() == MemoryType.TOPIC_SUMMARY).findFirst().orElseThrow();
         assertThat(topic.getVersion()).isEqualTo(1);
-        assertThat(topic.getContent()).isEqualTo("topic v1");
+        assertThat(topic.getContent()).isEqualTo("new topics");
 
         UserMemory profile = captor.getAllValues().stream()
                 .filter(m -> m.getType() == MemoryType.LEARNING_PROFILE).findFirst().orElseThrow();
@@ -88,19 +92,22 @@ class MemoryServiceTest {
     }
 
     @Test
-    void generateMemoryAsync_handlesMergeFailureGracefully() throws Exception {
+    void generateMemoryAsync_handlesProfileMergeFailureGracefully() throws Exception {
         ReportResult report = new ReportResult("overall", "topics", "errors", 7, "takeaway");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(anyString(), any(MemoryType.class), any()))
                 .thenReturn(Optional.empty());
-        when(memoryAgent.mergeTopic(anyString(), anyString())).thenThrow(new RuntimeException("LLM error"));
-        when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile ok");
+        when(memoryAgent.mergeProfile(anyString(), anyString())).thenThrow(new RuntimeException("LLM error"));
 
         service.generateMemoryAsync("user-1", report, AgentMode.WORKPLACE_STANDUP);
         Thread.sleep(200);
 
-        verify(memoryAgent, times(1)).mergeTopic(anyString(), anyString());
         verify(memoryAgent, times(1)).mergeProfile(anyString(), anyString());
         verify(repository, times(1)).save(any(UserMemory.class));
+
+        ArgumentCaptor<UserMemory> captor = ArgumentCaptor.forClass(UserMemory.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getType()).isEqualTo(MemoryType.TOPIC_SUMMARY);
+        assertThat(captor.getValue().getContent()).isEqualTo("topics");
     }
 
     @Test
@@ -136,7 +143,6 @@ class MemoryServiceTest {
     @Test
     void generateMemoryAsync_savesTopicMemoryWithMode() throws Exception {
         ReportResult report = new ReportResult("overall", "topic data", "errors", 7, "takeaway");
-        when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic merged");
         when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile merged");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.TOPIC_SUMMARY), eq(AgentMode.DAILY_TALK)))
                 .thenReturn(Optional.empty());
@@ -152,7 +158,7 @@ class MemoryServiceTest {
         UserMemory topic = captor.getAllValues().stream()
                 .filter(m -> m.getType() == MemoryType.TOPIC_SUMMARY).findFirst().orElseThrow();
         assertThat(topic.getMode()).isEqualTo(AgentMode.DAILY_TALK);
-        assertThat(topic.getContent()).isEqualTo("topic merged");
+        assertThat(topic.getContent()).isEqualTo("topic data");
 
         UserMemory profile = captor.getAllValues().stream()
                 .filter(m -> m.getType() == MemoryType.LEARNING_PROFILE).findFirst().orElseThrow();
@@ -184,7 +190,6 @@ class MemoryServiceTest {
     @Test
     void generateMemoryAsync_passesSessionIdToSavedRecords() throws Exception {
         ReportResult report = new ReportResult("overall", "topic data", "errors", 7, "takeaway");
-        when(memoryAgent.mergeTopic(anyString(), anyString())).thenReturn("topic merged");
         when(memoryAgent.mergeProfile(anyString(), anyString())).thenReturn("profile merged");
         when(repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(eq("user-1"), eq(MemoryType.TOPIC_SUMMARY), any()))
                 .thenReturn(Optional.empty());

@@ -2,6 +2,7 @@ package com.hugosol.webagent.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
@@ -27,10 +28,13 @@ public class MemoryCueAgent {
     private final String splitTemplate;
     private final String entryTemplate;
 
-    public MemoryCueAgent(ChatLanguageModel chatModel, PromptLoader promptLoader) {
+    public MemoryCueAgent(ChatLanguageModel chatModel, PromptLoader promptLoader, AppProperties appProperties) {
         this.chatModel = chatModel;
         this.splitTemplate = promptLoader.load("memory-cue-split.txt");
-        this.entryTemplate = promptLoader.load("memory-cue-entry.txt");
+        String raw = promptLoader.load("memory-cue-entry.txt");
+        this.entryTemplate = raw
+                .replace("{cueTopicMaxWords}", String.valueOf(appProperties.getMemory().getCueTopicMaxWords()))
+                .replace("{cueSummaryMaxSentences}", String.valueOf(appProperties.getMemory().getCueSummaryMaxSentences()));
     }
 
     public record CueResult(String topic, String summary) {}

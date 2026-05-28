@@ -29,13 +29,15 @@ public class LoggableChatModel implements ChatLanguageModel {
             String response = delegate.chat(prompt);
             long duration = System.currentTimeMillis() - startTime;
             logService.saveAsync(null, null, null, null,
-                    escapeAndWrap(prompt), response,
+                    escapeAndWrap(prompt), prompt, null,
+                    response,
                     null, null, duration, "SUCCESS", null);
             return response;
         } catch (RuntimeException e) {
             long duration = System.currentTimeMillis() - startTime;
             logService.saveAsync(null, null, null, null,
-                    escapeAndWrap(prompt), null,
+                    escapeAndWrap(prompt), prompt, null,
+                    null,
                     null, null, duration, "ERROR", e.getMessage());
             throw e;
         }

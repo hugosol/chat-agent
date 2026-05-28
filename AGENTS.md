@@ -86,7 +86,7 @@ com.hugosol.webagent/
 │                    # SessionStore (entity persistence), MemoryService, MemoryCueService,
 │                    # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
 ├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport,
-│                    # UserProgress, UserMemory, MemoryCue, AgentMode, MemoryCueStatus, ...
+│                    # UserProgress, UserMemory, MemoryCue, AgentMode, MemoryCueStatus, TimeLabel, ...
 ├── repository/      # Spring Data JPA repos (8: User, Session, Message, ErrorRecord, SessionReport,
 │                    # UserProgress, UserMemory, MemoryCue, LlmCallLog)
 ├── dto/             # Data transfer records: MessageData, CorrectionData, MemoryContent, CueMatch
@@ -152,14 +152,14 @@ Server → Client:
 - **UserId fallback**: `requireUserId()` returns `"anonymous"` if `ws.getPrincipal()` is null. Production always has a Principal (Spring Security interceptor); E2E profile has no auth so this gracefully bypasses.
 - **Config-driven security**: No `@ConditionalOnProperty` or `@Profile` on `SecurityConfig`. All path-level auth control is via `app.security.permit-all-paths` in YAML.
 - **Memory injection**: Round 1: User Memory (topicSummary + learningProfile) via System Prompt injection. Round 2+: RAG-based MemoryCue retrieval via `EmbeddingService` semantic search (ONNX all-MiniLM-L6-v2, cosine similarity ≥ 0.6, top-2 results). `ConversationAgent` accepts `MemoryContent` DTO to encapsulate all memory data.
-- **MemoryCue module**: `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `memoryExecutor`, parallel with Report and Memory Merge. Completed cues are vectorized asynchronously by `EmbeddingService.indexAsync()`. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
+- **MemoryCue module**: `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `memoryExecutor`, parallel with Report and Profile Merge. Completed cues are vectorized asynchronously by `EmbeddingService.indexAsync()`. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
 - **RAG retrieval**: `EmbeddingService` with `InMemoryEmbeddingStore` + ONNX embeddings. Store persists to `./data/embedding-store.json` on disk, with corrupted-file fallback to H2 rebuild. Data isolated by `userId × AgentMode` at both H2 and vector store layers. Dedicated `embeddingExecutor` thread pool (core=2, max=2). Configurable via `app.memory.retrieval.*`.
-- **Thread pool**: `memoryExecutor` expanded to core=4, max=8 to handle MemoryCue split + parallel segment generation + Report + Topic/Profile Merge concurrently.
+- **Thread pool**: `memoryExecutor` expanded to core=4, max=8 to handle MemoryCue split + parallel segment generation + Report + Profile Merge concurrently. Topic Memory is now a direct write (no LLM merge).
 
 ## Logging
 
 - **File logs** (`logback-spring.xml`): Only active with `local` profile. Console keeps INFO level; file writes DEBUG level to `./logs/english-coach.YYYY-MM-DD.log` with daily rolling and 3-day retention. `ReportAgent` and `MemoryAgent` prompt/response printing has been downgraded from `log.info` to `log.debug` to keep the console clean.
-- **LLM Call Log** (`llm_call_logs` table): Every LLM API call is persisted asynchronously — prompt, response, token usage, duration, status. Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via `LoggableChatModel` wrapper on `ChatLanguageModel` bean. Streaming agent (ConversationAgent) is logged manually in `TurnProcessor.onCompleteResponse()` with full metadata (sessionId, userId, agentType, mode, input/output tokens). Records older than 3 days are cleaned up on startup via `LlmCallLogService.cleanupOnStartup()`. Query via H2 console: `SELECT * FROM llm_call_logs ORDER BY create_time DESC`.
+- **LLM Call Log** (`llm_call_logs` table): Every LLM API call is persisted asynchronously — `request_prompt` (full prompt blob), `system_prompt` and `chat_history` (split for structured querying), `response_text`, token usage (input/output), duration (ms), and status (SUCCESS/ERROR). Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via `LoggableChatModel` wrapper on `ChatLanguageModel` bean — prompt stored in `system_prompt`, `chat_history` is null. Streaming agent (ConversationAgent) is logged manually in `TurnProcessor.onCompleteResponse()` with full metadata (sessionId, userId, agentType, mode, input/output tokens) — prompt JSON parsed into `system_prompt` and `chat_history`. Records older than 3 days are cleaned up on startup via `LlmCallLogService.cleanupOnStartup()`. Query via H2 console: `SELECT * FROM llm_call_logs ORDER BY create_time DESC`.
 - **`llmLogExecutor` thread pool**: core=2, max=4, dedicated to async LLM call log writes (defined in `AsyncConfig`).
 
 ## Agent skills

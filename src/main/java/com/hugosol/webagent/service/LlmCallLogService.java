@@ -32,6 +32,15 @@ public class LlmCallLogService {
                           String requestPrompt, String responseText,
                           Integer inputTokens, Integer outputTokens,
                           Long durationMs, String status, String errorMessage) {
+        saveAsync(sessionId, userId, agentType, mode, requestPrompt, null, null,
+                responseText, inputTokens, outputTokens, durationMs, status, errorMessage);
+    }
+
+    public void saveAsync(String sessionId, String userId, String agentType, String mode,
+                          String requestPrompt, String systemPrompt, String chatHistory,
+                          String responseText,
+                          Integer inputTokens, Integer outputTokens,
+                          Long durationMs, String status, String errorMessage) {
         llmLogExecutor.execute(() -> {
             LlmCallLog logEntry = new LlmCallLog();
             logEntry.setSessionId(sessionId);
@@ -40,6 +49,8 @@ public class LlmCallLogService {
             logEntry.setMode(mode);
             logEntry.setModel(modelName);
             logEntry.setRequestPrompt(requestPrompt);
+            logEntry.setSystemPrompt(systemPrompt);
+            logEntry.setChatHistory(chatHistory);
             logEntry.setResponseText(responseText);
             logEntry.setInputTokens(inputTokens);
             logEntry.setOutputTokens(outputTokens);

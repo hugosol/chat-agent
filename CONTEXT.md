@@ -58,9 +58,9 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
 | **User Memory** | A persistent summary record in H2 that captures a Learner's conversation topics or learning progress, surviving across Practice sessions | Memory, memory record, profile |
-| **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a 500-character summary of conversation topics discussed across past Practice sessions of the same AgentMode (mode-scoped isolation). | Topic summary, conversation memory |
+| **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a summary of the conversation topics from the most recent Practice session of the same AgentMode (mode-scoped isolation). Each session end writes the new topic summary directly as a new version (INSERT, version++); old versions are retained as immutable history. RAG MemoryCue retrieval handles cross-session topic recall. | Topic summary, conversation memory |
 | **Learning Profile** | A User Memory of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
-| **Memory Merge** | An LLM-driven process that combines an old User Memory (version N) with a newly completed session's Report to produce an updated version (N+1) | Incremental update, memory consolidation |
+| **Memory Merge** | An LLM-driven process that combines an old Learning Profile (version N) with a newly completed session's Report to produce an updated version (N+1). Topic Memory no longer uses merge — it directly writes the new session's topic summary as a new version. | Incremental update, memory consolidation |
 | **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first Turn's System Prompt (messageId ≤ 1) so the Agent can naturally bring up past context | Context injection, memory recall |
 | **Active Engagement** | A System Prompt instruction directing the Agent to proactively bring up unfinished topics and ask questions based on the injected memory | Initiative prompt, engagement instruction |
 | **Memory Version** | A sequential integer on each User Memory record, starting at 1 and incremented by each Memory Merge operation | Version number, revision counter |
@@ -69,14 +69,14 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary)` pair in structured JSON | Segment summarization, cue generation |
 | **MemoryCue Retrieval** | Vector semantic retrieval of historical MemoryCue records using ONNX embeddings (all-MiniLM-L6-v2, 384 dimensions). Starting from Round 2 (after User Memory's 1-turn window), each user message triggers a cosine-similarity search against past cues filtered by userId × AgentMode, injecting top-2 matches into the System Prompt. | RAG retrieval, semantic search, vector recall |
 | **EmbeddingService** | The RAG vectorization module: manages InMemoryEmbeddingStore lifecycle (init from disk or H2, async indexing, search with metadata filtering, JSON disk serialization). Uses a dedicated `embeddingExecutor` thread pool for ONNX CPU-bound operations. | Vector service, embedding module |
-| **CueMatch** | A DTO record returned by `EmbeddingService.search()` containing `(cueId, topic, summary, score)`, decoupled from JPA entities. | Search result, match record |
-| **MemoryContent** | A DTO record encapsulating all memory data injected into the System Prompt: `(topicSummary, learningProfile, memoryCuesText)`. Replaces three separate parameters in ConversationAgent and TurnProcessor. | Prompt payload, memory injection package |
+| **CueMatch** | A DTO record returned by `EmbeddingService.search()` containing `(cueId, topic, summary, score, createdAt)`, decoupled from JPA entities. `createdAt` carries the original MemoryCue creation time for time-aware labeling in the System Prompt. | Search result, match record |
+| **MemoryContent** | A DTO record encapsulating all memory data injected into the System Prompt: `(topicSummary, learningProfile, memoryCuesText, topicCreatedAt, cueCreatedAts)`. The timestamp fields enable time-aware labeling (e.g., `[from yesterday]`) in the System Prompt. Replaces three separate parameters in ConversationAgent and TurnProcessor. | Prompt payload, memory injection package |
 
 ## Observability
 
 | Term | Definition | Aliases to avoid |
 |------|------------|----------------|
-| **LLM Call Log** | Every LLM API call is persisted as a row in the `llm_call_logs` table: prompt, response, token usage (input/output), duration (ms), and status (SUCCESS/ERROR). Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via a `LoggableChatModel` wrapper; the ConversationAgent (streaming) is logged manually via `TurnProcessor`. Writes are async (non-blocking) and records older than 3 days are cleaned up on startup. Used for debugging and cost tracking. | LLM log, call log, API log |
+| **LLM Call Log** | Every LLM API call is persisted as a row in the `llm_call_logs` table: `request_prompt` (full prompt blob), `system_prompt` and `chat_history` (split for structured querying), `response_text`, token usage (input/output), duration (ms), and status (SUCCESS/ERROR). Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via a `LoggableChatModel` wrapper; the ConversationAgent (streaming) is logged manually via `TurnProcessor`. Writes are async (non-blocking) and records older than 3 days are cleaned up on startup. Used for debugging and cost tracking. | LLM log, call log, API log |
 
 ## Data Isolation
 
@@ -100,9 +100,9 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 - A **Tab takeover** occurs when a Learner resumes their own Practice session from a different tab, displacing the previous Active Tab.
 - A **Stale Tab** self-heals via a **Visibility resume** that triggers a **State rebuild**.
 - A **Learner** has zero or more **User Memory** records, each identified by type.
-- A **Practice session** end triggers one **Memory Merge** per **User Memory** type (Topic Memory and Learning Profile), executed asynchronously alongside **MemoryCue** generation.
+- A **Practice session** end triggers a direct-write of the new **Topic Memory** (INSERT new version) and one **Memory Merge** for **Learning Profile**, executed asynchronously alongside **MemoryCue** generation.
 - The first **Turn** of a new Practice session includes a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt (messageId ≤ 1).
-- A **Memory Merge** reads the previous **Memory Version**, generates a new one, and inserts it — old versions remain as immutable history.
+- A **Topic Memory** write reads the latest **Memory Version**, increments it, and inserts a new row directly from the session Report — no LLM merge. A **Learning Profile Merge** uses an LLM call to combine the previous and new profiles before inserting. Old versions remain as immutable history.
 - Each **User Memory** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
 - A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status. After all segments complete, **Tag Consolidation** merges equivalent tags across all historical MemoryCue rows for the same Learner+Mode into canonical forms in-place.
 
@@ -138,7 +138,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 >
 > **Dev:** "Does the Agent remember what we talked about last week?"
 >
-> **Domain expert:** "Yes — at session end, a Memory Merge runs asynchronously. It combines the old Topic Memory with the new Report to produce an updated version. On the next Practice session's first Turn, a Memory Injection puts the Topic Memory and Learning Profile into the System Prompt."
+> **Domain expert:** "Yes — at session end, the new Topic Memory is saved directly as a new version. The Learning Profile runs a Memory Merge that combines the old profile with the new error data. On the next Practice session's first Turn, a Memory Injection puts the latest Topic Memory and Learning Profile into the System Prompt."
 >
 > **Dev:** "So the Agent just knows 'Hugo went to Japan' without me re-telling it?"
 >

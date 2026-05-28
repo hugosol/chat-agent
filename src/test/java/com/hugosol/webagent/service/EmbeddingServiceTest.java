@@ -19,6 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Executors;
 
@@ -55,8 +56,9 @@ class EmbeddingServiceTest {
 
     @Test
     void indexAsync_addsEntryWithCorrectMetadata() throws Exception {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 28, 10, 0);
         service.indexAsync("cue-1", "Travel Plans", "Discussed Japan trip details",
-                AgentMode.WORKPLACE_STANDUP, "user-1").get();
+                AgentMode.WORKPLACE_STANDUP, "user-1", now).get();
 
         var result = store.search(EmbeddingSearchRequest.builder()
                 .queryEmbedding(embeddingModel.embed("Travel Plans Discussed Japan trip details").content())
@@ -66,8 +68,10 @@ class EmbeddingServiceTest {
         var embedded = result.matches().get(0).embedded();
         assertThat(embedded.metadata().getString("cueId")).isEqualTo("cue-1");
         assertThat(embedded.metadata().getString("topic")).isEqualTo("Travel Plans");
+        assertThat(embedded.metadata().getString("summary")).isEqualTo("Discussed Japan trip details");
         assertThat(embedded.metadata().getString("mode")).isEqualTo("WORKPLACE_STANDUP");
         assertThat(embedded.metadata().getString("userId")).isEqualTo("user-1");
+        assertThat(embedded.metadata().getString("createdAt")).isNotNull();
     }
 
     @Test
@@ -81,7 +85,21 @@ class EmbeddingServiceTest {
         assertThat(results).hasSize(1);
         assertThat(results.get(0).cueId()).isEqualTo("cue-1");
         assertThat(results.get(0).topic()).isEqualTo("Work Standup");
+        assertThat(results.get(0).summary()).isEqualTo(summary);
         assertThat(results.get(0).score()).isGreaterThanOrEqualTo(0.6);
+    }
+
+    @Test
+    void search_returnsSummaryWithoutTopicDuplication() {
+        indexEntry("cue-1", "Work Standup", "Discussed login module",
+                AgentMode.WORKPLACE_STANDUP, "user-1");
+
+        List<CueMatch> results = service.search("Work Standup Discussed login module",
+                AgentMode.WORKPLACE_STANDUP, "user-1", 2, 0.5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).summary()).isEqualTo("Discussed login module");
+        assertThat(results.get(0).summary()).doesNotContain("Work Standup");
     }
 
     @Test
@@ -148,6 +166,7 @@ class EmbeddingServiceTest {
                 AgentMode.WORKPLACE_STANDUP, "user-1");
         Path filePath = tempDir.resolve("existing-store.json");
         store.serializeToFile(filePath);
+        Files.writeString(tempDir.resolve("existing-store.json.version"), "1");
 
         InMemoryEmbeddingStore<TextSegment> newStore = new InMemoryEmbeddingStore<>();
         EmbeddingService newService = new EmbeddingService(
@@ -167,6 +186,34 @@ class EmbeddingServiceTest {
                 .maxResults(5)
                 .build());
         assertThat(results.matches()).hasSize(1);
+    }
+
+    @Test
+    void init_migratesFromOldStoreWithoutVersionFile() throws Exception {
+        indexEntry("cue-old", "Old Topic", "old summary text",
+                AgentMode.WORKPLACE_STANDUP, "user-1");
+        Path filePath = tempDir.resolve("old-store.json");
+        store.serializeToFile(filePath);
+
+        InMemoryEmbeddingStore<TextSegment> newStore = new InMemoryEmbeddingStore<>();
+        EmbeddingService newService = new EmbeddingService(
+                embeddingModel, newStore, repository, appProperties,
+                Executors.newSingleThreadExecutor()) {
+            @Override
+            protected Path getStorePath() {
+                return filePath;
+            }
+        };
+
+        when(repository.findAllByStatus(MemoryCueStatus.COMPLETED)).thenReturn(List.of(
+                cue("cue-h2", "H2 Topic", "h2 summary text", AgentMode.WORKPLACE_STANDUP, "user-1")
+        ));
+        newService.init();
+
+        assertThat(newService.search("H2 Topic h2 summary text",
+                AgentMode.WORKPLACE_STANDUP, "user-1", 5, 0.0)).hasSize(1);
+        assertThat(Files.exists(tempDir.resolve("old-store.json.version"))).isTrue();
+        assertThat(Files.readString(tempDir.resolve("old-store.json.version")).trim()).isEqualTo("1");
     }
 
     @Test
@@ -202,6 +249,7 @@ class EmbeddingServiceTest {
         var segment = TextSegment.from(text);
         segment.metadata().add("cueId", cueId);
         segment.metadata().add("topic", topic);
+        segment.metadata().add("summary", summary);
         segment.metadata().add("mode", mode.name());
         segment.metadata().add("userId", userId);
         store.add(embedded, segment);

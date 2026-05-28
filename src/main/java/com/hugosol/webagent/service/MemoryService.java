@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.ExecutorService;
 
 @Service
@@ -40,9 +41,7 @@ public class MemoryService {
 
     public void generateMemoryAsync(String userId, ReportResult report, AgentMode mode, String sessionId) {
         executor.execute(() -> generateSingle(userId, MemoryType.TOPIC_SUMMARY, mode, sessionId,
-                () -> memoryAgent.mergeTopic(
-                        loadLatestContent(userId, MemoryType.TOPIC_SUMMARY, mode),
-                        report.topicSummary())));
+                report::topicSummary));
         executor.execute(() -> generateSingle(userId, MemoryType.LEARNING_PROFILE, null, sessionId,
                 () -> memoryAgent.mergeProfile(
                         loadLatestContent(userId, MemoryType.LEARNING_PROFILE, null),
@@ -57,6 +56,12 @@ public class MemoryService {
 
     public String loadLatestContent(String userId, String type, AgentMode mode) {
         return loadLatestContent(userId, MemoryType.valueOf(type), mode);
+    }
+
+    public LocalDateTime loadTopicCreatedAt(String userId, AgentMode mode) {
+        return repository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(userId, MemoryType.TOPIC_SUMMARY, mode)
+                .map(UserMemory::getCreateTime)
+                .orElse(null);
     }
 
     private void generateSingle(String userId, MemoryType type, AgentMode mode, String sessionId, MemoryGenerateTask task) {
