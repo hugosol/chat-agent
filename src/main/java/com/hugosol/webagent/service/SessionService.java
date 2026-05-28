@@ -13,7 +13,10 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Component
 public class SessionService {
@@ -22,6 +25,7 @@ public class SessionService {
 
     private final Map<String, CoachState> activeStates = new ConcurrentHashMap<>();
     private final Map<String, String> sessionToWs = new ConcurrentHashMap<>();
+    private final Map<String, List<CompletableFuture<Void>>> pendingCorrections = new ConcurrentHashMap<>();
     private final TokenTracker tokenTracker;
     private final MemoryService memoryService;
 
@@ -154,5 +158,26 @@ public class SessionService {
 
     public boolean isTokenWarning(String sessionId) {
         return tokenTracker.isWarning(sessionId, AgentType.CONVERSATION);
+    }
+
+    public void addPendingCorrection(String sessionId, CompletableFuture<Void> future) {
+        pendingCorrections.computeIfAbsent(sessionId, k -> new ArrayList<>()).add(future);
+    }
+
+    public void waitForPendingCorrections(String sessionId, long timeoutMs) {
+        List<CompletableFuture<Void>> futures = pendingCorrections.remove(sessionId);
+        if (futures == null || futures.isEmpty()) {
+            return;
+        }
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            log.warn("Timed out waiting for {} pending corrections for session {}",
+                    futures.size(), sessionId);
+            futures.forEach(f -> f.cancel(true));
+        } catch (Exception e) {
+            log.warn("Error waiting for pending corrections for session {}: {}", sessionId, e.getMessage());
+        }
     }
 }

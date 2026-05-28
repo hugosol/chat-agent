@@ -27,7 +27,7 @@ public class MemoryService {
 
     public MemoryService(MemoryAgent memoryAgent,
                          UserMemoryRepository repository,
-                         @Qualifier("memoryExecutor") ExecutorService executor,
+                         @Qualifier("llmRequestExecutor") ExecutorService executor,
                          TransactionTemplate transactionTemplate) {
         this.memoryAgent = memoryAgent;
         this.repository = repository;

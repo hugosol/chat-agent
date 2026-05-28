@@ -48,17 +48,17 @@ public class AsyncConfig {
     }
 
     @Bean
-    @Qualifier("memoryExecutor")
-    public ExecutorService memoryExecutor() {
+    @Qualifier("llmRequestExecutor")
+    public ExecutorService llmRequestExecutor() {
         if (!asyncEnabled) {
-            log.info("Memory executor configured as synchronous (e2e/test mode)");
+            log.info("LLM request executor configured as synchronous (e2e/test mode)");
             return new DirectExecutorService();
         }
 
         ThreadFactory threadFactory = r -> {
             ThreadFactory defaultFactory = Executors.defaultThreadFactory();
             Thread t = defaultFactory.newThread(r);
-            t.setName("memory-" + t.getName());
+            t.setName("llm-request-" + t.getName());
             t.setDaemon(true);
             return t;
         };
@@ -72,7 +72,7 @@ public class AsyncConfig {
                 new ThreadPoolExecutor.CallerRunsPolicy()
         );
         executor.allowCoreThreadTimeOut(true);
-        log.info("Memory executor configured: core=4, max=8, async mode");
+        log.info("LLM request executor configured: core=4, max=8, async mode");
         return executor;
     }
 

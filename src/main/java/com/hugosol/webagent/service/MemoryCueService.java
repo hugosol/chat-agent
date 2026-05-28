@@ -30,7 +30,7 @@ public class MemoryCueService {
     public MemoryCueService(MemoryCueAgent agent,
                             MemoryCueRepository repository,
                             EmbeddingService embeddingService,
-                            @Qualifier("memoryExecutor") ExecutorService executor) {
+                            @Qualifier("llmRequestExecutor") ExecutorService executor) {
         this.agent = agent;
         this.repository = repository;
         this.embeddingService = embeddingService;

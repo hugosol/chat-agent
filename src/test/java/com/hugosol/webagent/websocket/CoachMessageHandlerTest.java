@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -32,10 +33,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -235,6 +238,10 @@ class CoachMessageHandlerTest {
         when(reportAgent.generate(any(), any())).thenReturn(reportResult);
 
         handler.onEndSession(ws);
+
+        InOrder order = inOrder(sessionService);
+        order.verify(sessionService).waitForPendingCorrections(eq("s1"), anyLong());
+        order.verify(sessionService).getCorrections("s1");
 
         verify(sessionStore).completeSession(eq("s1"), any(), any(), eq(reportResult));
         verify(memoryService).generateMemoryAsync("user1", reportResult, AgentMode.WORKPLACE_STANDUP, "s1");
