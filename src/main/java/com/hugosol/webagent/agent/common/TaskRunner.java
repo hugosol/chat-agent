@@ -31,7 +31,7 @@ public class TaskRunner {
     }
 
     @SuppressWarnings("unchecked")
-    public <P, R> R execute(TaskName name, P params, TaskContext ctx) {
+    public <P, R> R requestModel(TaskName name, P params, TaskContext ctx) {
         TaskDefinition<P, R> def = (TaskDefinition<P, R>) registry.get(name);
         if (def == null) {
             throw new IllegalStateException("No task registered for: " + name);

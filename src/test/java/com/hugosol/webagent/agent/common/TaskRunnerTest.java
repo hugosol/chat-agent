@@ -62,7 +62,7 @@ class TaskRunnerTest {
                 .build());
 
         TaskContext ctx = new TaskContext("s1", "u1", "WORKPLACE_STANDUP");
-        String result = runner.execute(TaskName.CORRECTION, "World", ctx);
+        String result = runner.requestModel(TaskName.CORRECTION, "World", ctx);
 
         assertThat(result).isEqualTo("[parsed output]");
         assertThat(((StubChatModel) chatModel).lastPrompt).isEqualTo("Hello World");
@@ -91,7 +91,7 @@ class TaskRunnerTest {
                 .build());
 
         TaskContext ctx = new TaskContext("s1", "u1", "WORKPLACE_STANDUP");
-        String result = runner.execute(TaskName.CORRECTION, "test", ctx);
+        String result = runner.requestModel(TaskName.CORRECTION, "test", ctx);
 
         assertThat(result).isNull();
 
@@ -117,7 +117,7 @@ class TaskRunnerTest {
                 .build());
 
         TaskContext ctx = new TaskContext("s2", "u2", "DAILY_TALK");
-        assertThatThrownBy(() -> runner.execute(TaskName.REPORT, "input", ctx))
+        assertThatThrownBy(() -> runner.requestModel(TaskName.REPORT, "input", ctx))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("parse error");
     }
@@ -136,7 +136,7 @@ class TaskRunnerTest {
                 .build());
 
         TaskContext ctx = new TaskContext("s3", "u3", "WORKPLACE_STANDUP");
-        String result = runner.execute(TaskName.CORRECTION, "whatever", ctx);
+        String result = runner.requestModel(TaskName.CORRECTION, "whatever", ctx);
 
         assertThat(result).isNull();
 
@@ -153,7 +153,7 @@ class TaskRunnerTest {
     @Test
     void unregisteredTask_throwsIllegalStateException() {
         TaskContext ctx = new TaskContext("s4", "u4", null);
-        assertThatThrownBy(() -> runner.execute(TaskName.CORRECTION, "input", ctx))
+        assertThatThrownBy(() -> runner.requestModel(TaskName.CORRECTION, "input", ctx))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No task registered");
     }

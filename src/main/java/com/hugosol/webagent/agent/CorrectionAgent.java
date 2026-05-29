@@ -42,7 +42,7 @@ public class CorrectionAgent {
             return Collections.emptyList();
         }
 
-        List<CorrectionData> result = runner.execute(TaskName.CORRECTION,
+        List<CorrectionData> result = runner.requestModel(TaskName.CORRECTION,
                 new CorrectionParams(userInput), ctx);
         return result != null ? result : Collections.emptyList();
     }

@@ -60,14 +60,14 @@ public class MemoryCueAgent {
 
     public List<Integer> detectSwitches(List<MessageData> messages, AgentMode mode, TaskContext ctx) {
         log.debug("MemoryCueAgent detectSwitches...");
-        List<Integer> result = runner.execute(TaskName.CHAT_SWITCHES,
+        List<Integer> result = runner.requestModel(TaskName.CHAT_SWITCHES,
                 new SwitchParams(messages), ctx);
         return result != null ? result : Collections.emptyList();
     }
 
     public CueResult generateCue(List<MessageData> messages, AgentMode mode, int segmentIndex, TaskContext ctx) {
         log.debug("MemoryCueAgent generateCue segment {}...", segmentIndex);
-        CueResult result = runner.execute(TaskName.GENERATE_MEMORY_CUE,
+        CueResult result = runner.requestModel(TaskName.GENERATE_MEMORY_CUE,
                 new CueParams(messages, segmentIndex), ctx);
         if (result == null) {
             throw new RuntimeException("Failed to parse cue JSON: SWALLOW returned null");

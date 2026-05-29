@@ -42,7 +42,7 @@ public class ReportAgent {
 
     public ReportResult generate(List<MessageData> messages, List<CorrectionData> allCorrections, TaskContext ctx) {
         log.debug("ReportAgent generating...");
-        ReportResult result = runner.execute(TaskName.REPORT,
+        ReportResult result = runner.requestModel(TaskName.REPORT,
                 new ReportParams(messages, allCorrections), ctx);
         return result != null ? result : new ReportResult("", "", "", 0, "");
     }

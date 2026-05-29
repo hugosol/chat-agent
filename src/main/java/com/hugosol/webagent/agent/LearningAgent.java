@@ -38,7 +38,7 @@ public class LearningAgent {
 
     public String mergeProfile(String oldProfile, String errorSummary, TaskContext ctx) {
         log.debug("LearningAgent mergeProfile...");
-        String result = runner.execute(TaskName.MERGE_LEARNING,
+        String result = runner.requestModel(TaskName.MERGE_LEARNING,
                 new MergeLearningParams(oldProfile, errorSummary), ctx);
         return result != null ? result : "";
     }
