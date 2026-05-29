@@ -255,3 +255,50 @@ ConversationAgent 使用 `StreamingChatLanguageModel`（流式回调），调用
 - TaskName 枚举新增值时，需要同步在受影响的 Agent 中注册对应 TaskDefinition；编译器和运行时注册检查会双重保证
 - 各 Agent 的 `paramBuilder` 是纯函数（P → Map<String, String>），天然支持单元测试（不依赖 LLM）
 - `CorrectionNode` 是唯一通过 langgraph4j 图节点间接调用 Agent 的场景——CorrectionNode 需要从 CoachState 获取 sessionId/userId/mode 构造 TaskContext
+
+## Implementation Plan
+
+7 个垂直切片的 issue 已发布到 `.scratch/agent-template-consolidation/issues/`，按依赖顺序排列：
+
+| # | Issue | 类型 | 阻塞于 | 说明 |
+|---|-------|------|--------|------|
+| 01 | [TaskRunner 核心基础设施](issues/01-taskrunner-core.md) | AFK | — | 新建 5 个类 + TaskRunnerTest |
+| 02 | [CorrectionAgent 迁移](issues/02-correction-agent-migration.md) | AFK | 01 | 迁移 + CorrectionNode 适配 |
+| 03 | [ReportAgent 迁移](issues/03-report-agent-migration.md) | AFK | 01 | 迁移 + CoachMessageHandler 适配 |
+| 04 | [MemoryAgent → LearningAgent](issues/04-memory-agent-to-learning-agent.md) | AFK | 01 | 重命名 + 迁移 + MemoryService 适配 |
+| 05 | [MemoryCueAgent 迁移](issues/05-memory-cue-agent-migration.md) | AFK | 01 | 双任务注册 + MemoryCueService 适配 |
+| 06 | [删除 LoggableChatModel](issues/06-remove-loggable-chat-model.md) | AFK | 02-05 | 删除包装层 + Bean 解包装 + 消除双日志 |
+| 07 | [更新文档](issues/07-update-documentation.md) | AFK | 06 | 更新 architecture.md + AGENTS.md + 可选 ADR |
+
+### 执行顺序
+
+```
+01 (TaskRunner 核心) ──┬── 02 (CorrectionAgent)
+                       ├── 03 (ReportAgent)
+                       ├── 04 (LearningAgent)
+                       └── 05 (MemoryCueAgent)
+                              │
+                              ▼
+                       06 (删除 LoggableChatModel)
+                              │
+                              ▼
+                       07 (文档更新)
+```
+
+Slices 02-05 相互独立，可并行执行；但推荐按 02→03→04→05 顺序逐一完成（每个完成后运行 `mvn test` 验证）。
+
+### 过渡期双日志说明
+
+Slices 02-05 完成后、Slice 06 完成前，同步 Agent 的 LLM 调用会被双重记录：
+- **TaskRunner**：写入含完整 `sessionId`/`userId`/`agentType`/`mode` 的日志（正确的记录）
+- **LoggableChatModel**：写入 metadata 全 null 的日志（过渡期残留）
+
+此双日志现象在 Slice 06 删除 `LoggableChatModel` 后自动消失。无功能退化。
+
+### 文档更新计划（Slice 07）
+
+| 文件 | 改动 |
+|------|------|
+| `docs/architecture.md` | 决策日志新增 #40（TaskRunner 模式）；#37 修正 LoggableChatModel→TaskRunner；§八日志写入行修正；§十 agent/ 目录更新（+TaskRunner 系列、MemoryAgent→LearningAgent）；§十 config/ 删除 LoggableChatModel |
+| `AGENTS.md` | Package 列表更新 agent/（+TaskRunner 系列、MemoryAgent→LearningAgent）；"Two LLM beans" 段移除 LoggableChatModel；"LLM Call Log" 段修正 |
+| `docs/adr/taskrunner-sync-agent-pattern.md`（可选） | 新建 ADR：设计动机、TaskName/TaskDefinition 模式、排除 ConversationAgent 原因、新增 Agent 指南 |
