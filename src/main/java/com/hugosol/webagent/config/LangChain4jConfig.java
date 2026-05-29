@@ -1,6 +1,5 @@
 package com.hugosol.webagent.config;
 
-import com.hugosol.webagent.service.LlmCallLogService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -35,8 +34,8 @@ public class LangChain4jConfig {
     private Duration timeout;
 
     @Bean
-    public ChatLanguageModel chatLanguageModel(LlmCallLogService llmCallLogService) {
-        var delegate = OpenAiChatModel.builder()
+    public ChatLanguageModel chatLanguageModel() {
+        return OpenAiChatModel.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .modelName(modelName)
@@ -44,7 +43,6 @@ public class LangChain4jConfig {
                 .maxTokens(maxTokens)
                 .timeout(timeout)
                 .build();
-        return new LoggableChatModel(delegate, llmCallLogService);
     }
 
     @Bean

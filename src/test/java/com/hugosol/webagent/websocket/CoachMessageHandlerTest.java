@@ -1,6 +1,5 @@
 package com.hugosol.webagent.websocket;
 
-import com.hugosol.webagent.agent.ReportAgent;
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.model.AgentMode;
@@ -9,10 +8,9 @@ import com.hugosol.webagent.model.Session;
 import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
-import com.hugosol.webagent.service.MemoryCueService;
-import com.hugosol.webagent.service.MemoryService;
+import com.hugosol.webagent.service.SessionComplete;
 import com.hugosol.webagent.service.SessionService;
-import com.hugosol.webagent.service.SessionStore;
+import com.hugosol.webagent.service.SessionDbStore;
 import com.hugosol.webagent.service.TurnProcessor;
 import com.hugosol.webagent.service.TurnProcessor.TurnCallback;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,16 +51,10 @@ class CoachMessageHandlerTest {
     private TurnProcessor turnProcessor;
 
     @Mock
-    private ReportAgent reportAgent;
+    private SessionComplete sessionComplete;
 
     @Mock
-    private SessionStore sessionStore;
-
-    @Mock
-    private MemoryService memoryService;
-
-    @Mock
-    private MemoryCueService memoryCueService;
+    private SessionDbStore sessionStore;
 
     @Mock
     private ProtocolDispatcher protocol;
@@ -78,7 +70,7 @@ class CoachMessageHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new CoachMessageHandler(sessionService, turnProcessor,
-                reportAgent, sessionStore, memoryService, memoryCueService, protocol);
+                sessionComplete, sessionStore, protocol);
         when(ws.getPrincipal()).thenReturn(principal);
         when(principal.getName()).thenReturn("user1");
     }
@@ -235,17 +227,17 @@ class CoachMessageHandlerTest {
         when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
 
         ReportResult reportResult = new ReportResult("Great", "topics discussed", "none", 8, "practice");
-        when(reportAgent.generate(any(), any())).thenReturn(reportResult);
+        when(sessionComplete.complete(eq("s1"), any(), any(), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP)))
+                .thenReturn(reportResult);
 
         handler.onEndSession(ws);
 
         InOrder order = inOrder(sessionService);
         order.verify(sessionService).waitForPendingCorrections(eq("s1"), anyLong());
         order.verify(sessionService).getCorrections("s1");
+        order.verify(sessionService).remove("s1");
 
-        verify(sessionStore).completeSession(eq("s1"), any(), any(), eq(reportResult));
-        verify(memoryService).generateMemoryAsync("user1", reportResult, AgentMode.WORKPLACE_STANDUP, "s1");
-        verify(sessionService).remove("s1");
+        verify(sessionComplete).complete(eq("s1"), any(), any(), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP));
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);
         verify(protocol, atLeastOnce()).send(eq(ws), captor.capture());
@@ -265,21 +257,30 @@ class CoachMessageHandlerTest {
     }
 
     @Test
-    void onEndSessionErrorDuringReportSendsError() throws IOException {
+    void onEndSessionReportFailedStillSendsReport() throws IOException {
         when(ws.getId()).thenReturn("ws1");
         when(sessionService.getSessionId("ws1")).thenReturn("s1");
         when(sessionService.getMessages("s1")).thenReturn(List.of());
         when(sessionService.getCorrections("s1")).thenReturn(List.of());
         when(sessionService.getUsageRatio("s1")).thenReturn(0.2);
-        when(reportAgent.generate(any(), any())).thenThrow(new RuntimeException("report failed"));
+        when(sessionService.getUserId("s1")).thenReturn("user1");
+        when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
+
+        ReportResult fallbackReport = new ReportResult("failed message", "N/A", "N/A", -1, "N/A");
+        when(sessionComplete.complete(eq("s1"), any(), any(), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP)))
+                .thenReturn(fallbackReport);
 
         handler.onEndSession(ws);
+
+        verify(sessionService).remove("s1");
 
         ArgumentCaptor<ServerMessage> captor = ArgumentCaptor.forClass(ServerMessage.class);
         verify(protocol, atLeastOnce()).send(eq(ws), captor.capture());
         ServerMessage last = captor.getValue();
-        assertThat(last).isInstanceOf(ServerMessage.ErrorMessage.class);
-        assertThat(((ServerMessage.ErrorMessage) last).message()).contains("report failed");
+        assertThat(last).isInstanceOf(ServerMessage.SessionReportMessage.class);
+        var reportMsg = (ServerMessage.SessionReportMessage) last;
+        assertThat(reportMsg.report().fluencyScore()).isEqualTo(-1);
+        assertThat(reportMsg.report().topicSummary()).isEqualTo("N/A");
     }
 
     @Test

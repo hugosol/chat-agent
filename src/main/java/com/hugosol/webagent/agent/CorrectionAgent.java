@@ -1,43 +1,50 @@
 package com.hugosol.webagent.agent;
 
+import com.hugosol.webagent.agent.common.ErrorStrategy;
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskDefinition;
+import com.hugosol.webagent.agent.common.TaskName;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class CorrectionAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CorrectionAgent.class);
-    private final ChatLanguageModel chatModel;
-    private final String promptTemplate;
+    private final TaskRunner runner;
     private final ObjectMapper objectMapper;
 
-    public CorrectionAgent(ChatLanguageModel chatModel, PromptLoader promptLoader, ObjectMapper objectMapper) {
-        this.chatModel = chatModel;
-        this.promptTemplate = promptLoader.load("correction.txt");
+    public CorrectionAgent(TaskRunner runner, PromptLoader promptLoader, ObjectMapper objectMapper) {
+        this.runner = runner;
         this.objectMapper = objectMapper;
+        String template = promptLoader.load("correction.txt");
+        runner.register(TaskName.CORRECTION, TaskDefinition
+                .<CorrectionParams, List<CorrectionData>>builder()
+                .template(template)
+                .paramBuilder(p -> Map.of("userInput", p.userInput()))
+                .parser(this::parseResponse)
+                .errorStrategy(ErrorStrategy.SWALLOW)
+                .build());
     }
 
-    public List<CorrectionData> analyze(String userInput) {
+    public List<CorrectionData> analyze(String userInput, TaskContext ctx) {
         if (userInput == null || userInput.isBlank()) {
             return Collections.emptyList();
         }
 
-        String prompt = promptTemplate.replace("{userInput}", userInput);
-
-        log.debug("CorrectionAgent prompt length: {}", prompt.length());
-        String response = chatModel.chat(prompt);
-        log.debug("CorrectionAgent raw response: {}", response);
-
-        return parseResponse(response);
+        List<CorrectionData> result = runner.requestModel(TaskName.CORRECTION,
+                new CorrectionParams(userInput), ctx);
+        return result != null ? result : Collections.emptyList();
     }
 
     private List<CorrectionData> parseResponse(String response) {
@@ -63,4 +70,6 @@ public class CorrectionAgent {
         }
         return "";
     }
+
+    private record CorrectionParams(String userInput) {}
 }

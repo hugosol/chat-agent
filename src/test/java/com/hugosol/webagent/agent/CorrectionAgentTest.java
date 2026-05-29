@@ -1,8 +1,11 @@
 package com.hugosol.webagent.agent;
 
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.model.ErrorType;
+import com.hugosol.webagent.service.LlmCallLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -15,6 +18,7 @@ import org.springframework.core.io.DefaultResourceLoader;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class CorrectionAgentTest {
 
@@ -45,18 +49,20 @@ class CorrectionAgentTest {
     void setUp() {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
-        agent = new CorrectionAgent(chatModel, promptLoader, new ObjectMapper());
+        LlmCallLogService logService = mock(LlmCallLogService.class);
+        TaskRunner runner = new TaskRunner(chatModel, logService);
+        agent = new CorrectionAgent(runner, promptLoader, new ObjectMapper());
     }
 
     @Test
     void nullInputReturnsEmptyList() {
-        List<CorrectionData> result = agent.analyze(null);
+        List<CorrectionData> result = agent.analyze(null, new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
         assertThat(result).isEmpty();
     }
 
     @Test
     void blankInputReturnsEmptyList() {
-        List<CorrectionData> result = agent.analyze("   ");
+        List<CorrectionData> result = agent.analyze("   ", new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
         assertThat(result).isEmpty();
     }
 
@@ -68,7 +74,8 @@ class CorrectionAgentTest {
                   {"type": "CHINGLISH", "original": "open the light", "corrected": "turn on the light", "explanation": "c"}
                 ]""");
 
-        List<CorrectionData> result = agent.analyze("he go to open the light");
+        List<CorrectionData> result = agent.analyze("he go to open the light",
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getType()).isEqualTo(ErrorType.GRAMMAR);
@@ -83,7 +90,8 @@ class CorrectionAgentTest {
                 "[{\"type\":\"GRAMMAR\",\"original\":\"x\",\"corrected\":\"y\",\"explanation\":\"z\"}]\n" +
                 "Hope that helps!");
 
-        List<CorrectionData> result = agent.analyze("test input");
+        List<CorrectionData> result = agent.analyze("test input",
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getType()).isEqualTo(ErrorType.GRAMMAR);
@@ -92,28 +100,31 @@ class CorrectionAgentTest {
     @Test
     void noBracketsReturnsEmptyList() {
         chatModel.setResponse("No corrections needed today.");
-        List<CorrectionData> result = agent.analyze("test");
+        List<CorrectionData> result = agent.analyze("test",
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
         assertThat(result).isEmpty();
     }
 
     @Test
     void invalidJsonReturnsEmptyList() {
         chatModel.setResponse("[{\"type\":\"GRAMMAR\", broken json");
-        List<CorrectionData> result = agent.analyze("test");
+        List<CorrectionData> result = agent.analyze("test",
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
         assertThat(result).isEmpty();
     }
 
     @Test
     void emptyJsonArrayReturnsEmptyList() {
         chatModel.setResponse("[]");
-        List<CorrectionData> result = agent.analyze("test");
+        List<CorrectionData> result = agent.analyze("test",
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
         assertThat(result).isEmpty();
     }
 
     @Test
     void userInputIsSubstitutedIntoPrompt() {
         chatModel.setResponse("[]");
-        agent.analyze("I go to school");
+        agent.analyze("I go to school", new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
         assertThat(chatModel.lastPrompt).isEqualTo("Correction prompt: I go to school");
     }
 }

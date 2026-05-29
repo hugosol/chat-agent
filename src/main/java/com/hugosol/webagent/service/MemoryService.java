@@ -1,6 +1,7 @@
 package com.hugosol.webagent.service;
 
-import com.hugosol.webagent.agent.MemoryAgent;
+import com.hugosol.webagent.agent.LearningAgent;
+import com.hugosol.webagent.agent.common.TaskContext;
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MemoryType;
@@ -20,16 +21,16 @@ public class MemoryService {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryService.class);
 
-    private final MemoryAgent memoryAgent;
+    private final LearningAgent learningAgent;
     private final UserMemoryRepository repository;
     private final ExecutorService executor;
     private final TransactionTemplate transactionTemplate;
 
-    public MemoryService(MemoryAgent memoryAgent,
+    public MemoryService(LearningAgent learningAgent,
                          UserMemoryRepository repository,
                          @Qualifier("llmRequestExecutor") ExecutorService executor,
                          TransactionTemplate transactionTemplate) {
-        this.memoryAgent = memoryAgent;
+        this.learningAgent = learningAgent;
         this.repository = repository;
         this.executor = executor;
         this.transactionTemplate = transactionTemplate;
@@ -43,9 +44,10 @@ public class MemoryService {
         executor.execute(() -> generateSingle(userId, MemoryType.TOPIC_SUMMARY, mode, sessionId,
                 report::topicSummary));
         executor.execute(() -> generateSingle(userId, MemoryType.LEARNING_PROFILE, null, sessionId,
-                () -> memoryAgent.mergeProfile(
+                () -> learningAgent.mergeProfile(
                         loadLatestContent(userId, MemoryType.LEARNING_PROFILE, null),
-                        report.errorSummary())));
+                        report.errorSummary(),
+                        new TaskContext(sessionId, userId, null))));
     }
 
     public String loadLatestContent(String userId, MemoryType type, AgentMode mode) {

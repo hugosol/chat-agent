@@ -2,11 +2,15 @@ package com.hugosol.webagent.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hugosol.webagent.agent.common.ErrorStrategy;
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskDefinition;
+import com.hugosol.webagent.agent.common.TaskName;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
-import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,34 +29,72 @@ public class MemoryCueAgent {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final Pattern JSON_ARRAY_PATTERN = Pattern.compile("\\[\\s*\\d+(?:\\s*,\\s*\\d+)*\\s*]");
 
-    private final ChatLanguageModel chatModel;
-    private final String splitTemplate;
-    private final String entryTemplate;
+    private final TaskRunner runner;
 
-    public MemoryCueAgent(ChatLanguageModel chatModel, PromptLoader promptLoader, AppProperties appProperties) {
-        this.chatModel = chatModel;
-        this.splitTemplate = promptLoader.load("memory-cue-split.txt");
+    public MemoryCueAgent(TaskRunner runner, PromptLoader promptLoader, AppProperties appProperties) {
+        this.runner = runner;
+
+        String splitTemplate = promptLoader.load("memory-cue-split.txt");
+        runner.register(TaskName.CHAT_SWITCHES, TaskDefinition
+                .<SwitchParams, List<Integer>>builder()
+                .template(splitTemplate)
+                .paramBuilder(p -> Map.of("messages", buildLabeledMessages(p.messages())))
+                .parser(this::parseSwitches)
+                .errorStrategy(ErrorStrategy.SWALLOW)
+                .build());
+
         String raw = promptLoader.load("memory-cue-entry.txt");
-        this.entryTemplate = raw
+        String entryTemplate = raw
                 .replace("{cueTopicMaxWords}", String.valueOf(appProperties.getMemory().getCueTopicMaxWords()))
                 .replace("{cueSummaryMaxSentences}", String.valueOf(appProperties.getMemory().getCueSummaryMaxSentences()));
+        runner.register(TaskName.GENERATE_MEMORY_CUE, TaskDefinition
+                .<CueParams, CueResult>builder()
+                .template(entryTemplate)
+                .paramBuilder(p -> Map.of("segment", buildSegmentText(p.messages())))
+                .parser(this::parseCue)
+                .errorStrategy(ErrorStrategy.SWALLOW)
+                .build());
     }
 
     public record CueResult(String topic, String summary) {}
 
-    public List<Integer> detectSwitches(List<MessageData> messages, AgentMode mode) {
+    public List<Integer> detectSwitches(List<MessageData> messages, AgentMode mode, TaskContext ctx) {
+        log.debug("MemoryCueAgent detectSwitches...");
+        List<Integer> result = runner.requestModel(TaskName.CHAT_SWITCHES,
+                new SwitchParams(messages), ctx);
+        return result != null ? result : Collections.emptyList();
+    }
+
+    public CueResult generateCue(List<MessageData> messages, AgentMode mode, int segmentIndex, TaskContext ctx) {
+        log.debug("MemoryCueAgent generateCue segment {}...", segmentIndex);
+        CueResult result = runner.requestModel(TaskName.GENERATE_MEMORY_CUE,
+                new CueParams(messages, segmentIndex), ctx);
+        if (result == null) {
+            throw new RuntimeException("Failed to parse cue JSON: SWALLOW returned null");
+        }
+        return result;
+    }
+
+    private String buildLabeledMessages(List<MessageData> messages) {
         StringBuilder labeled = new StringBuilder();
         for (MessageData msg : messages) {
             labeled.append("[MSG#").append(msg.getMessageId()).append("] ")
                     .append(msg.getRole().name()).append(": ")
                     .append(msg.getContent()).append("\n");
         }
+        return labeled.toString();
+    }
 
-        String prompt = splitTemplate.replace("{messages}", labeled.toString());
-        log.debug("MemoryCueAgent detectSwitches prompt length: {}", prompt.length());
-        String response = chatModel.chat(prompt);
-        log.debug("MemoryCueAgent detectSwitches response: {}", response);
+    private String buildSegmentText(List<MessageData> messages) {
+        StringBuilder segment = new StringBuilder();
+        for (MessageData msg : messages) {
+            segment.append(msg.getRole().name()).append(": ")
+                    .append(msg.getContent()).append("\n");
+        }
+        return segment.toString();
+    }
 
+    private List<Integer> parseSwitches(String response) {
         Matcher matcher = JSON_ARRAY_PATTERN.matcher(response);
         if (matcher.find()) {
             try {
@@ -69,18 +112,7 @@ public class MemoryCueAgent {
         return Collections.emptyList();
     }
 
-    public CueResult generateCue(List<MessageData> messages, AgentMode mode, int segmentIndex) {
-        StringBuilder segment = new StringBuilder();
-        for (MessageData msg : messages) {
-            segment.append(msg.getRole().name()).append(": ")
-                    .append(msg.getContent()).append("\n");
-        }
-
-        String prompt = entryTemplate.replace("{segment}", segment.toString());
-        log.debug("MemoryCueAgent generateCue segment {} prompt length: {}", segmentIndex, prompt.length());
-        String response = chatModel.chat(prompt);
-        log.debug("MemoryCueAgent generateCue segment {} response: {}", segmentIndex, response);
-
+    private CueResult parseCue(String response) {
         try {
             JsonNode node = mapper.readTree(response);
             String topic = node.has("topic") ? node.get("topic").asText() : "";
@@ -90,4 +122,7 @@ public class MemoryCueAgent {
             throw new RuntimeException("Failed to parse cue JSON: " + e.getMessage(), e);
         }
     }
+
+    private record SwitchParams(List<MessageData> messages) {}
+    private record CueParams(List<MessageData> messages, int segmentIndex) {}
 }

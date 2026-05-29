@@ -1,10 +1,13 @@
 package com.hugosol.webagent.agent;
 
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MessageRole;
+import com.hugosol.webagent.service.LlmCallLogService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -17,6 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class MemoryCueAgentTest {
 
@@ -47,7 +51,9 @@ class MemoryCueAgentTest {
     void setUp() {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
-        agent = new MemoryCueAgent(chatModel, promptLoader, new AppProperties());
+        LlmCallLogService logService = mock(LlmCallLogService.class);
+        TaskRunner runner = new TaskRunner(chatModel, logService);
+        agent = new MemoryCueAgent(runner, promptLoader, new AppProperties());
     }
 
     @Test
@@ -56,7 +62,7 @@ class MemoryCueAgentTest {
 
         List<Integer> result = agent.detectSwitches(List.of(
                 msg(0, "Hello"), msg(1, "Hi there")
-        ), AgentMode.WORKPLACE_STANDUP);
+        ), AgentMode.WORKPLACE_STANDUP, new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result).isEmpty();
     }
@@ -65,7 +71,8 @@ class MemoryCueAgentTest {
     void detectSwitches_returnsSingleSwitchIndex() {
         chatModel.setResponse("[3]");
 
-        List<Integer> result = agent.detectSwitches(buildMessages(6), AgentMode.DAILY_TALK);
+        List<Integer> result = agent.detectSwitches(buildMessages(6), AgentMode.DAILY_TALK,
+                new TaskContext("s1", "u1", "DAILY_TALK"));
 
         assertThat(result).containsExactly(3);
     }
@@ -74,7 +81,8 @@ class MemoryCueAgentTest {
     void detectSwitches_returnsMultipleSwitchIndexes() {
         chatModel.setResponse("[2, 5]");
 
-        List<Integer> result = agent.detectSwitches(buildMessages(8), AgentMode.WORKPLACE_STANDUP);
+        List<Integer> result = agent.detectSwitches(buildMessages(8), AgentMode.WORKPLACE_STANDUP,
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result).containsExactly(2, 5);
     }
@@ -83,7 +91,8 @@ class MemoryCueAgentTest {
     void detectSwitches_handlesExtraTextBeforeJson() {
         chatModel.setResponse("The topic switches at these points: [3]");
 
-        List<Integer> result = agent.detectSwitches(buildMessages(6), AgentMode.WORKPLACE_STANDUP);
+        List<Integer> result = agent.detectSwitches(buildMessages(6), AgentMode.WORKPLACE_STANDUP,
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result).containsExactly(3);
     }
@@ -94,7 +103,8 @@ class MemoryCueAgentTest {
 
         var result = agent.generateCue(
                 List.of(msg(0, "I went to Japan"), msg(1, "That sounds fun")),
-                AgentMode.WORKPLACE_STANDUP, 0);
+                AgentMode.WORKPLACE_STANDUP, 0,
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result.topic()).isEqualTo("Travel");
         assertThat(result.summary()).isEqualTo("Talked about Japan trip");
@@ -105,7 +115,8 @@ class MemoryCueAgentTest {
         chatModel.setResponse("not valid json");
 
         assertThatThrownBy(() -> agent.generateCue(
-                List.of(msg(0, "Hi")), AgentMode.DAILY_TALK, 0))
+                List.of(msg(0, "Hi")), AgentMode.DAILY_TALK, 0,
+                new TaskContext("s1", "u1", "DAILY_TALK")))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Failed to parse");
     }
@@ -114,7 +125,8 @@ class MemoryCueAgentTest {
     void detectSwitches_injectsMessageIndexesInPrompt() {
         chatModel.setResponse("[]");
 
-        agent.detectSwitches(buildMessages(4), AgentMode.WORKPLACE_STANDUP);
+        agent.detectSwitches(buildMessages(4), AgentMode.WORKPLACE_STANDUP,
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(chatModel.lastPrompt).contains("[MSG#0]");
         assertThat(chatModel.lastPrompt).contains("[MSG#1]");

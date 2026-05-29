@@ -1,6 +1,7 @@
 package com.hugosol.webagent.graph.nodes;
 
 import com.hugosol.webagent.agent.CorrectionAgent;
+import com.hugosol.webagent.agent.common.TaskContext;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
 import org.bsc.langgraph4j.action.NodeAction;
@@ -26,7 +27,8 @@ public class CorrectionNode implements NodeAction<CoachState> {
         log.info("CorrectionNode: analyzing user input");
 
         String userInput = state.userInput();
-        List<CorrectionData> corrections = correctionAgent.analyze(userInput);
+        TaskContext ctx = new TaskContext(state.sessionId(), state.userId(), state.mode());
+        List<CorrectionData> corrections = correctionAgent.analyze(userInput, ctx);
 
         if (!corrections.isEmpty()) {
             log.info("CorrectionNode: found {} corrections", corrections.size());

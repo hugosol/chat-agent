@@ -1,11 +1,14 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.ErrorType;
 import com.hugosol.webagent.model.MessageRole;
+import com.hugosol.webagent.service.LlmCallLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -18,6 +21,7 @@ import org.springframework.core.io.DefaultResourceLoader;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class ReportAgentTest {
 
@@ -48,7 +52,9 @@ class ReportAgentTest {
     void setUp() {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
-        agent = new ReportAgent(chatModel, promptLoader, new ObjectMapper());
+        LlmCallLogService logService = mock(LlmCallLogService.class);
+        TaskRunner runner = new TaskRunner(chatModel, logService);
+        agent = new ReportAgent(runner, promptLoader, new ObjectMapper());
     }
 
     @Test
@@ -64,7 +70,8 @@ class ReportAgentTest {
 
         ReportResult result = agent.generate(
                 List.of(new MessageData(MessageRole.USER, "I go yesterday", 1)),
-                List.of()
+                List.of(),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP")
         );
 
         assertThat(result.overallAssessment()).isEqualTo("Good progress");
@@ -77,7 +84,8 @@ class ReportAgentTest {
     @Test
     void missingKeysDefaultToEmptyOrZero() {
         chatModel.setResponse("{}");
-        ReportResult result = agent.generate(List.of(), List.of());
+        ReportResult result = agent.generate(List.of(), List.of(),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result.overallAssessment()).isEmpty();
         assertThat(result.topicSummary()).isEmpty();
@@ -89,7 +97,8 @@ class ReportAgentTest {
     @Test
     void invalidJsonFallsBackToRawResponse() {
         chatModel.setResponse("Some unstructured report text");
-        ReportResult result = agent.generate(List.of(), List.of());
+        ReportResult result = agent.generate(List.of(), List.of(),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result.overallAssessment()).isEqualTo("Some unstructured report text");
         assertThat(result.errorSummary()).isEmpty();
@@ -107,7 +116,8 @@ class ReportAgentTest {
                         new MessageData(MessageRole.CORRECTION, "corrected: hello", 1),
                         new MessageData(MessageRole.USER, "How are you", 2)
                 ),
-                List.of()
+                List.of(),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP")
         );
 
         assertThat(chatModel.lastPrompt).contains("USER: Hello");
@@ -122,7 +132,8 @@ class ReportAgentTest {
 
         agent.generate(
                 List.of(new MessageData(MessageRole.USER, "he go", 1)),
-                List.of(new CorrectionData(ErrorType.GRAMMAR, "he go", "he goes", "s"))
+                List.of(new CorrectionData(ErrorType.GRAMMAR, "he go", "he goes", "s")),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP")
         );
 
         assertThat(chatModel.lastPrompt).contains("\"type\"");
@@ -136,7 +147,8 @@ class ReportAgentTest {
 
         agent.generate(
                 List.of(new MessageData(MessageRole.USER, "test", 1)),
-                List.of()
+                List.of(),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP")
         );
 
         assertThat(chatModel.lastPrompt).contains("No errors recorded");
@@ -146,7 +158,8 @@ class ReportAgentTest {
     void partialJsonUsesDefaultsForMissingFields() {
         chatModel.setResponse("{\"fluencyScore\":5}");
 
-        ReportResult result = agent.generate(List.of(), List.of());
+        ReportResult result = agent.generate(List.of(), List.of(),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result.fluencyScore()).isEqualTo(5);
         assertThat(result.overallAssessment()).isEmpty();
@@ -158,7 +171,8 @@ class ReportAgentTest {
     void nestedObjectValuesAreSerializedToString() {
         chatModel.setResponse("{\"errorSummary\":{\"GRAMMAR\":3,\"CHINGLISH\":1},\"fluencyScore\":\"7\"}");
 
-        ReportResult result = agent.generate(List.of(), List.of());
+        ReportResult result = agent.generate(List.of(), List.of(),
+                new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result.errorSummary()).contains("GRAMMAR");
         assertThat(result.errorSummary()).contains("CHINGLISH");

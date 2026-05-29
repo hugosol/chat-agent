@@ -53,8 +53,8 @@ class MemoryCueServiceTest {
 
     @Test
     void noSwitch_writesOneCompletedRecordAndIndexes() {
-        when(agent.detectSwitches(any(), any())).thenReturn(List.of());
-        when(agent.generateCue(any(), any(), anyInt()))
+        when(agent.detectSwitches(any(), any(), any())).thenReturn(List.of());
+        when(agent.generateCue(any(), any(), anyInt(), any()))
                 .thenReturn(new MemoryCueAgent.CueResult("Travel", "summary"));
 
         service.generateCuesAsync("s1", "user-1", AgentMode.WORKPLACE_STANDUP, List.of(msg("Hi"))).join();
@@ -70,8 +70,8 @@ class MemoryCueServiceTest {
 
     @Test
     void withSwitch_writesMultipleCompletedRecordsAndIndexesBoth() {
-        when(agent.detectSwitches(any(), any())).thenReturn(List.of(2));
-        when(agent.generateCue(any(), any(), anyInt()))
+        when(agent.detectSwitches(any(), any(), any())).thenReturn(List.of(2));
+        when(agent.generateCue(any(), any(), anyInt(), any()))
                 .thenReturn(new MemoryCueAgent.CueResult("Topic1", "sum1"))
                 .thenReturn(new MemoryCueAgent.CueResult("Topic2", "sum2"));
 
@@ -79,8 +79,8 @@ class MemoryCueServiceTest {
                 msg("msg0"), msg("msg1"), msg("msg2"), msg("msg3"), msg("msg4"));
         service.generateCuesAsync("s1", "user-1", AgentMode.DAILY_TALK, messages).join();
 
-        verify(agent).detectSwitches(any(), eq(AgentMode.DAILY_TALK));
-        verify(agent, times(2)).generateCue(any(), any(), anyInt());
+        verify(agent).detectSwitches(any(), eq(AgentMode.DAILY_TALK), any());
+        verify(agent, times(2)).generateCue(any(), any(), anyInt(), any());
         assertThat(savedCues).hasSize(2);
 
         verify(embeddingService, times(2)).indexAsync(any(), anyString(), anyString(),
@@ -89,23 +89,23 @@ class MemoryCueServiceTest {
 
     @Test
     void firstCallFailed_skipsIndexing() {
-        when(agent.detectSwitches(any(), any())).thenThrow(new RuntimeException("LLM timeout"));
+        when(agent.detectSwitches(any(), any(), any())).thenThrow(new RuntimeException("LLM timeout"));
 
         service.generateCuesAsync("s1", "user-1", AgentMode.WORKPLACE_STANDUP, List.of(msg("Hi"))).join();
 
         assertThat(savedCues).hasSize(1);
         assertThat(savedCues.get(0).getStatus()).isEqualTo(MemoryCueStatus.FIRST_CALL_FAILED);
         assertThat(savedCues.get(0).getSegmentIndex()).isEqualTo(-1);
-        verify(agent, never()).generateCue(any(), any(), anyInt());
+        verify(agent, never()).generateCue(any(), any(), anyInt(), any());
         verify(embeddingService, never()).indexAsync(any(), anyString(), anyString(), any(), anyString(), isNull());
     }
 
     @Test
     void segmentGenerateFails_indexesOnlyCompleted() {
-        when(agent.detectSwitches(any(), any())).thenReturn(List.of(1));
-        when(agent.generateCue(any(), any(), eq(0)))
+        when(agent.detectSwitches(any(), any(), any())).thenReturn(List.of(1));
+        when(agent.generateCue(any(), any(), eq(0), any()))
                 .thenReturn(new MemoryCueAgent.CueResult("OK", "sum"));
-        when(agent.generateCue(any(), any(), eq(1)))
+        when(agent.generateCue(any(), any(), eq(1), any()))
                 .thenThrow(new RuntimeException("parse error"));
 
         List<MessageData> messages = List.of(msg("a"), msg("b"), msg("c"));

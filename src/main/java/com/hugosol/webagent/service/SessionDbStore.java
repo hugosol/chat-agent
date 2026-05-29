@@ -11,12 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-public class SessionStore {
+public class SessionDbStore {
 
-    private static final Logger log = LoggerFactory.getLogger(SessionStore.class);
+    private static final Logger log = LoggerFactory.getLogger(SessionDbStore.class);
 
     private final EntityMapper mapper;
     private final SessionRepository sessionRepository;
@@ -25,7 +26,7 @@ public class SessionStore {
     private final SessionReportRepository sessionReportRepository;
     private final UserProgressRepository userProgressRepository;
 
-    public SessionStore(EntityMapper mapper,
+    public SessionDbStore(EntityMapper mapper,
                           SessionRepository sessionRepository,
                           MessageRepository messageRepository,
                           ErrorRecordRepository errorRecordRepository,
@@ -44,7 +45,7 @@ public class SessionStore {
         Session session = new Session(mode);
         session.setUserId(userId);
         session = sessionRepository.save(session);
-        log.info("SessionStore: created session {} for user {}", session.getId(), userId);
+        log.info("SessionDbStore: created session {} for user {}", session.getId(), userId);
         return session;
     }
 
@@ -56,7 +57,12 @@ public class SessionStore {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
 
-        session.complete();
+        if (report != null) {
+            session.complete();
+        } else {
+            session.setStatus(SessionStatus.FAILED);
+            session.setEndTime(LocalDateTime.now());
+        }
         sessionRepository.save(session);
 
         List<Message> savedMessages = mapper.buildMessages(sessionId, messages);
@@ -65,13 +71,17 @@ public class SessionStore {
         List<ErrorRecord> errorRecords = mapper.buildErrorRecords(sessionId, corrections, savedMessages);
         errorRecordRepository.saveAll(errorRecords);
 
-        SessionReport sessionReport = mapper.buildReport(sessionId, report);
-        sessionReportRepository.save(sessionReport);
-
-        updateUserProgress(session);
-
-        log.info("SessionStore: completed session {}", sessionId);
-        return sessionReport;
+        if (report != null) {
+            SessionReport sessionReport = mapper.buildReport(sessionId, report);
+            sessionReportRepository.save(sessionReport);
+            updateUserProgress(session);
+            log.info("SessionDbStore: completed session {}", sessionId);
+            return sessionReport;
+        } else {
+            updateUserProgress(session);
+            log.info("SessionDbStore: failed session {}", sessionId);
+            return null;
+        }
     }
 
     public List<Session> getHistory(String userId) {

@@ -9,16 +9,13 @@ import com.hugosol.webagent.protocol.ClientMessage;
 import com.hugosol.webagent.protocol.MessageHandler;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
-import com.hugosol.webagent.agent.ReportAgent;
-import com.hugosol.webagent.service.SessionStore;
+import com.hugosol.webagent.service.SessionComplete;
+import com.hugosol.webagent.service.SessionDbStore;
 import com.hugosol.webagent.service.SessionService;
-import com.hugosol.webagent.service.MemoryCueService;
-import com.hugosol.webagent.service.MemoryService;
 import com.hugosol.webagent.service.TurnProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
@@ -34,32 +31,25 @@ public class CoachMessageHandler implements MessageHandler {
 
     private final SessionService sessionService;
     private final TurnProcessor turnProcessor;
-    private final ReportAgent reportAgent;
-    private final SessionStore sessionStore;
-    private final MemoryService memoryService;
-    private final MemoryCueService memoryCueService;
+    private final SessionComplete sessionComplete;
+    private final SessionDbStore sessionStore;
     private final ProtocolDispatcher protocol;
 
     public CoachMessageHandler(SessionService sessionService,
                                TurnProcessor turnProcessor,
-                               ReportAgent reportAgent,
-                               SessionStore sessionStore,
-                               MemoryService memoryService,
-                               MemoryCueService memoryCueService,
+                               SessionComplete sessionComplete,
+                               SessionDbStore sessionStore,
                                ProtocolDispatcher protocol) {
         this.sessionService = sessionService;
         this.turnProcessor = turnProcessor;
-        this.reportAgent = reportAgent;
+        this.sessionComplete = sessionComplete;
         this.sessionStore = sessionStore;
-        this.memoryService = memoryService;
-        this.memoryCueService = memoryCueService;
         this.protocol = protocol;
     }
 
     private String requireUserId(WebSocketSession ws) {
         Principal principal = ws.getPrincipal();
         if (principal == null) {
-            //suppose only e2e test would come to this branch, for normal case will block the request by spring-security
             log.warn("No principal on WebSocket session {} — using anonymous", ws.getId());
             return "anonymous";
         }
@@ -157,38 +147,27 @@ public class CoachMessageHandler implements MessageHandler {
         protocol.send(ws, new ServerMessage.StateUpdate("PROCESSING",
                 sessionService.getUsageRatio(sessionId)));
 
-        try {
-            sessionService.waitForPendingCorrections(sessionId, 10_000);
-            List<MessageData> messages = sessionService.getMessages(sessionId);
-            List<CorrectionData> corrections = sessionService.getCorrections(sessionId);
-            ReportResult report = reportAgent.generate(messages, corrections);
+        sessionService.waitForPendingCorrections(sessionId, 10_000);
+        List<MessageData> messages = sessionService.getMessages(sessionId);
+        List<CorrectionData> corrections = sessionService.getCorrections(sessionId);
+        String userId = sessionService.getUserId(sessionId);
+        AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
 
-            sessionStore.completeSession(sessionId, messages, corrections, report);
+        ReportResult report = sessionComplete.complete(sessionId, messages, corrections, userId, mode);
 
-            String userId = sessionService.getUserId(sessionId);
-            if (userId != null) {
-                AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
-                memoryService.generateMemoryAsync(userId, report, mode, sessionId);
-                memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
-            }
+        sessionService.remove(sessionId);
 
-            sessionService.remove(sessionId);
+        var reportData = new ServerMessage.ReportData(
+                report != null ? report.overallAssessment() : "",
+                report != null ? report.topicSummary() : "",
+                report != null ? report.fluencyScore() : 0,
+                report != null ? report.errorSummary() : "",
+                report != null ? report.keyTakeaway() : ""
+        );
+        protocol.send(ws, new ServerMessage.SessionReportMessage(reportData));
 
-            var reportData = new ServerMessage.ReportData(
-                    report != null ? report.overallAssessment() : "",
-                    report != null ? report.topicSummary() : "",
-                    report != null ? report.fluencyScore() : 0,
-                    report != null ? report.errorSummary() : "",
-                    report != null ? report.keyTakeaway() : ""
-            );
-            protocol.send(ws, new ServerMessage.SessionReportMessage(reportData));
-
-            long elapsed = System.currentTimeMillis() - startTime;
-            log.info("Conversation close latency: {}s", String.format("%.1f", elapsed / 1000.0));
-        } catch (Exception e) {
-            log.error("Error ending session", e);
-            protocol.send(ws, new ServerMessage.ErrorMessage("Failed to end session: " + e.getMessage()));
-        }
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.info("Conversation close latency: {}s", String.format("%.1f", elapsed / 1000.0));
     }
 
     @Override
