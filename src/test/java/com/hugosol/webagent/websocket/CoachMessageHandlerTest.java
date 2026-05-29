@@ -235,7 +235,7 @@ class CoachMessageHandlerTest {
         when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
 
         ReportResult reportResult = new ReportResult("Great", "topics discussed", "none", 8, "practice");
-        when(reportAgent.generate(any(), any())).thenReturn(reportResult);
+        when(reportAgent.generate(any(), any(), any())).thenReturn(reportResult);
 
         handler.onEndSession(ws);
 
@@ -271,7 +271,9 @@ class CoachMessageHandlerTest {
         when(sessionService.getMessages("s1")).thenReturn(List.of());
         when(sessionService.getCorrections("s1")).thenReturn(List.of());
         when(sessionService.getUsageRatio("s1")).thenReturn(0.2);
-        when(reportAgent.generate(any(), any())).thenThrow(new RuntimeException("report failed"));
+        when(sessionService.getUserId("s1")).thenReturn("user1");
+        when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
+        when(reportAgent.generate(any(), any(), any())).thenThrow(new RuntimeException("report failed"));
 
         handler.onEndSession(ws);
 

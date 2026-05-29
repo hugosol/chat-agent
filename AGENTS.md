@@ -33,7 +33,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 - **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/webagent/e2e/`. Five IT test classes: `EnglishCoachSessionIT`, `EnglishCoachResumeIT`, `EnglishCoachMemoryIT`, `DailyTalkIT`, `EnglishCoachMemoryCueIT`. WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`. Uses `@ActiveProfiles("e2e")` + `application-e2e.yml` with `permit-all-paths: [/**]` to bypass authentication.
 - **Package**: `com.hugosol.webagent` (note: Maven `groupId` is `com.example` — ignore that, it's vestigial).
 - **DeepSeek via LangChain4j**: uses OpenAI-compatible adapter (`dev.langchain4j:langchain4j-open-ai`). Default model is `deepseek-v4-flash` (see `application.yml`, not README which says `deepseek-chat`).
-- **Two LLM beans**: `ChatLanguageModel` (sync, for CorrectionAgent/ReportAgent) + `StreamingChatLanguageModel` (`OpenAiStreamingChatModel`, for ConversationAgent). Both in `LangChain4jConfig`.
+- **Two LLM beans**: `ChatLanguageModel` (sync, used by `TaskRunner` for all sync agents) + `StreamingChatLanguageModel` (`OpenAiStreamingChatModel`, for ConversationAgent). Both in `LangChain4jConfig`. `ChatLanguageModel` is returned directly without `LoggableChatModel` wrapper — logging is handled by `TaskRunner`.
 - **langgraph4j**: `org.bsc.langgraph4j:langgraph4j-core:1.8.16` — independent library, NOT a LangChain4j subproject. State channels use `Channels.base(() -> default)` and `Channels.appender(ArrayList::new)`, **not** `Channels.of()`.
 - **1-node graph**: `START → correction → END`. Only CorrectionNode remains in the graph. Conversation was extracted to Service layer for streaming.
 - **Parallel execution**: `TurnProcessor.processTurn()` launches conversation synchronously on the caller thread (generates prompt, registers streaming handler, returns immediately — tokens stream via OkHttp dispatch threads) and correction (graph) via `CompletableFuture.runAsync(task, llmRequestExecutor)`. Conversation tokens stream to frontend immediately; correction results arrive asynchronously.
@@ -79,7 +79,7 @@ No `.env` file support — use `local` profile (`application-local.yml`, gitigno
 com.hugosol.webagent/
 ├── graph/           # LangGraph: CoachState (7 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
-├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, MemoryAgent, MemoryCueAgent
+├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent, TaskRunner (sync engine)
 ├── websocket/       # CoachWebSocketHandler (WS entry), CoachMessageHandler (protocol logic)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
@@ -91,7 +91,7 @@ com.hugosol.webagent/
 │                    # UserProgress, UserMemory, MemoryCue, LlmCallLog)
 ├── dto/             # Data transfer records: MessageData, CorrectionData, MemoryContent, CueMatch
 ├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AsyncConfig,
-│                    # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader, LoggableChatModel
+│                    # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
 └── speech/          # (vacant — V2 will add STT/TTS adapters when needed)
 
 src/test/java/com/hugosol/webagent/e2e/
@@ -158,8 +158,8 @@ Server → Client:
 
 ## Logging
 
-- **File logs** (`logback-spring.xml`): Only active with `local` profile. Console keeps INFO level; file writes DEBUG level to `./logs/english-coach.YYYY-MM-DD.log` with daily rolling and 3-day retention. `ReportAgent` and `MemoryAgent` prompt/response printing has been downgraded from `log.info` to `log.debug` to keep the console clean.
-- **LLM Call Log** (`llm_call_logs` table): Every LLM API call is persisted asynchronously — `request_prompt` (full prompt blob), `system_prompt` and `chat_history` (split for structured querying), `response_text`, token usage (input/output), duration (ms), and status (SUCCESS/ERROR). Sync agents (Correction, Report, Memory, MemoryCue) are intercepted transparently via `LoggableChatModel` wrapper on `ChatLanguageModel` bean — prompt stored in `system_prompt`, `chat_history` is null. Streaming agent (ConversationAgent) is logged manually in `TurnProcessor.onCompleteResponse()` with full metadata (sessionId, userId, agentType, mode, input/output tokens) — prompt JSON parsed into `system_prompt` and `chat_history`. Records older than 3 days are cleaned up on startup via `LlmCallLogService.cleanupOnStartup()`. Query via H2 console: `SELECT * FROM llm_call_logs ORDER BY create_time DESC`.
+- **File logs** (`logback-spring.xml`): Only active with `local` profile. Console keeps INFO level; file writes DEBUG level to `./logs/english-coach.YYYY-MM-DD.log` with daily rolling and 3-day retention. `ReportAgent` and `LearningAgent` prompt/response printing has been downgraded from `log.info` to `log.debug` to keep the console clean.
+- **LLM Call Log** (`llm_call_logs` table): Every LLM API call is persisted asynchronously — `request_prompt` (full prompt blob), `system_prompt` and `chat_history` (split for structured querying), `response_text`, token usage (input/output), duration (ms), and status (SUCCESS/ERROR). Sync agents (Correction, Report, Learning, MemoryCue) log via `TaskRunner.execute()` with full runtime context (sessionId, userId, agentType, mode) — prompt stored in `system_prompt`, `chat_history` is null. Streaming agent (ConversationAgent) is logged manually in `TurnProcessor.onCompleteResponse()` with full metadata (sessionId, userId, agentType, mode, input/output tokens) — prompt JSON parsed into `system_prompt` and `chat_history`. Records older than 3 days are cleaned up on startup via `LlmCallLogService.cleanupOnStartup()`. Query via H2 console: `SELECT * FROM llm_call_logs ORDER BY create_time DESC`.
 - **`llmLogExecutor` thread pool**: core=2, max=4, dedicated to async LLM call log writes (defined in `AsyncConfig`).
 
 ## Agent skills

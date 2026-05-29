@@ -10,6 +10,7 @@ import com.hugosol.webagent.protocol.MessageHandler;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
 import com.hugosol.webagent.agent.ReportAgent;
+import com.hugosol.webagent.agent.TaskContext;
 import com.hugosol.webagent.service.SessionStore;
 import com.hugosol.webagent.service.SessionService;
 import com.hugosol.webagent.service.MemoryCueService;
@@ -18,7 +19,6 @@ import com.hugosol.webagent.service.TurnProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
@@ -161,13 +161,14 @@ public class CoachMessageHandler implements MessageHandler {
             sessionService.waitForPendingCorrections(sessionId, 10_000);
             List<MessageData> messages = sessionService.getMessages(sessionId);
             List<CorrectionData> corrections = sessionService.getCorrections(sessionId);
-            ReportResult report = reportAgent.generate(messages, corrections);
+            String userId = sessionService.getUserId(sessionId);
+            AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
+            ReportResult report = reportAgent.generate(messages, corrections,
+                    new TaskContext(sessionId, userId, mode.name()));
 
             sessionStore.completeSession(sessionId, messages, corrections, report);
 
-            String userId = sessionService.getUserId(sessionId);
             if (userId != null) {
-                AgentMode mode = AgentMode.valueOf(sessionService.getMode(sessionId));
                 memoryService.generateMemoryAsync(userId, report, mode, sessionId);
                 memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
             }

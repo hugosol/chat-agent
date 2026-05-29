@@ -21,7 +21,7 @@
 | 7 | Agent 核心能力 | 角色扮演 + 自然纠错 + 对话后报告 + 学习进度追踪 + 跨会话记忆（User Memory + MemoryCue 双轨） |
 | 8 | 纠错机制 | Agent 口头自然纠正（融入对话不打断） |
 | 9 | LangGraph 深度 | 深度：HITL + Checkpoint + 持久化 |
-| 10 | Agent 架构 | 五 Agent 协作：Conversation + Correction + Report + Memory + MemoryCue |
+| 10 | Agent 架构 | 五 Agent 协作：Conversation + Correction + Report + Learning + MemoryCue，同步 Agent 统一委托 TaskRunner |
 | 11 | 前端技术 | 原生 HTML + Vanilla JS |
 | 12 | 通信协议 | WebSocket |
 | 13 | 数据库 | H2 文件模式 |
@@ -48,7 +48,8 @@
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
 | 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 RAG 语义检索注入 MemoryCue |
-| 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `LoggableChatModel` 包装器透明拦截，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
+| 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `TaskRunner` 统一管理 LLM 调用生命周期与日志，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
+| 40 | TaskRunner 同步 Agent 模式 | 抽取 `TaskRunner` 深模块统一管理同步 Agent 的 LLM 调用生命周期。Agent 构造时通过 `runner.register(name, task)` 注册 `TaskDefinition`（模板 + paramBuilder + parser + errorStrategy），运行时通过 `runner.execute(name, params, ctx)` 触发 LLM 调用。`TaskName` 枚举管理 5 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）。删除 `LoggableChatModel` 包装层，日志能力由 TaskRunner 内生提供，含完整 sessionId/userId/agentType/mode 上下文字段。`MemoryAgent` 重命名为 `LearningAgent`（职责退化，仅保留 learningProfile 合并）。
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
 | 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，top-2 结果 (cosine ≥ 0.6) 注入 System Prompt `{memoryCues}` 占位符。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
 
@@ -399,7 +400,7 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, EARLIER_TODAY, YESTERDAY, A_FEW_D
 | **Checkpoint / 恢复** | MemorySaver | `CompileConfig.builder().checkpointSaver(new MemorySaver())`，每个会话 `threadId`，刷新页面恢复 |
 | **前端展示** | 全部消息 + 折叠旧消息 | 可滚动聊天区，顶部 token 进度条，旧消息折叠到 "Show earlier" 后 |
 | **写入时机** | 会话结束时统一持久化 | `reportAgent` → `saveSession` + `memoryService` + `memoryCueService` 并行执行 |
-| **日志写入** | LLM 调用时即时异步写入 | `LoggableChatModel`（同步 Agent）在 `chat()` 调用点拦截；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
+| **日志写入** | LLM 调用时即时异步写入 | `TaskRunner.execute()`（同步 Agent）在调用点内生写入完整上下文字段；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
 | **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
 | **记忆写入** | MemoryService + MemoryCueService 异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Topic 直接写入 + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
 | **RAG 检索** | TurnProcessor Round 4+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，top-K=2，userId×AgentMode 隔离，结果注入 System Prompt `{memoryCues}` |
@@ -511,11 +512,16 @@ web-agent/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
 │   ├── agent/                              // Agent 调用封装
-│   │   ├── ConversationAgent.java          // 角色扮演对话（Prompt 模板替换 + DeepSeek 调用）
-│   │   ├── CorrectionAgent.java            // 5类纠错分析（JSON 解析 LLM 输出）
-│   │   ├── ReportAgent.java                // 会话报告生成
-│   │   ├── MemoryAgent.java                // Learning Profile 合并（跨会话记忆，Topic 直接写入）
-│   │   └── MemoryCueAgent.java             // 两步 LLM：话题切换检测 + 分段结构化摘要生成
+│   │   ├── ConversationAgent.java          // 角色扮演对话（Prompt 模板替换 + DeepSeek 流式调用）
+│   │   ├── CorrectionAgent.java            // 5类纠错分析（JSON 解析 LLM 输出，委托 TaskRunner）
+│   │   ├── ReportAgent.java                // 会话报告生成（委托 TaskRunner）
+│   │   ├── LearningAgent.java              // Learning Profile 合并（跨会话记忆，委托 TaskRunner，原 MemoryAgent）
+│   │   ├── MemoryCueAgent.java             // 两步 LLM：话题切换检测 + 分段结构化摘要生成（委托 TaskRunner）
+│   │   ├── TaskRunner.java                 // 同步 Agent LLM 调用执行引擎（注册表 + execute + 日志 + 错误处理）
+│   │   ├── TaskDefinition.java             // 任务描述对象（Builder 模式：template + paramBuilder + parser + errorStrategy）
+│   │   ├── TaskName.java                   // 任务名枚举（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）
+│   │   ├── TaskContext.java                // 运行时上下文 record（sessionId, userId, mode）
+│   │   └── ErrorStrategy.java              // 错误策略枚举（SWALLOW / THROW）
 │   │
 │   ├── dto/                              // 数据传输
 │   │   ├── MessageData.java              // 消息数据 (role, content, messageId)
@@ -576,7 +582,6 @@ web-agent/
 │   │
 │   └── config/                             // 配置类
 │       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel + OpenAiStreamingChatModel) Bean 配置
-│       ├── LoggableChatModel.java          // ChatLanguageModel 包装器，拦截 chat(String) 写入日志
 │       ├── SecurityConfig.java             // Spring Security filter chain + 登录事件日志
 │       ├── WebSocketConfig.java            // WebSocket Handler 注册（同源策略）
 │       ├── AsyncConfig.java                // llmRequestExecutor + llmLogExecutor + embeddingExecutor 线程池配置

@@ -284,7 +284,7 @@ class ConversationAgentTest {
 
     @Test
     void applyTimeLabelsToCues_addsTimePrefixToEachCue() {
-        var now = java.time.LocalDateTime.of(2026, 5, 28, 12, 0);
+        var now = java.time.LocalDateTime.now();
         var yesterday = now.minusDays(1);
         var lastWeek = now.minusDays(5);
 
@@ -298,7 +298,7 @@ class ConversationAgentTest {
 
     @Test
     void applyTimeLabelsToCues_skipsNullCreatedAt() {
-        var yesterday = java.time.LocalDateTime.of(2026, 5, 27, 12, 0);
+        var yesterday = java.time.LocalDateTime.now().minusDays(1);
 
         String result = ConversationAgent.applyTimeLabelsToCues(
                 "Topic A: details, as well as, Topic B: details",

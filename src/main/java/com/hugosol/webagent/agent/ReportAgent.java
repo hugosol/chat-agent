@@ -5,7 +5,6 @@ import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.MessageRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -17,29 +16,30 @@ import java.util.Map;
 public class ReportAgent {
 
     private static final Logger log = LoggerFactory.getLogger(ReportAgent.class);
-    private final ChatLanguageModel chatModel;
-    private final String promptTemplate;
+    private final TaskRunner runner;
     private final ObjectMapper objectMapper;
 
-    public ReportAgent(ChatLanguageModel chatModel, PromptLoader promptLoader, ObjectMapper objectMapper) {
-        this.chatModel = chatModel;
-        this.promptTemplate = promptLoader.load("report.txt");
+    public ReportAgent(TaskRunner runner, PromptLoader promptLoader, ObjectMapper objectMapper) {
+        this.runner = runner;
         this.objectMapper = objectMapper;
+        String template = promptLoader.load("report.txt");
+        runner.register(TaskName.REPORT, TaskDefinition
+                .<ReportParams, ReportResult>builder()
+                .template(template)
+                .paramBuilder(p -> Map.of(
+                        "fullConversation", buildConversationText(p.messages()),
+                        "allCorrections", buildErrorsText(p.corrections())
+                ))
+                .parser(this::parseReport)
+                .errorStrategy(ErrorStrategy.SWALLOW)
+                .build());
     }
 
-    public ReportResult generate(List<MessageData> messages, List<CorrectionData> allCorrections) {
-        String conversationText = buildConversationText(messages);
-        String errorsText = buildErrorsText(allCorrections);
-
-        String prompt = promptTemplate
-                .replace("{fullConversation}", conversationText)
-                .replace("{allCorrections}", errorsText);
-
-        log.debug("ReportAgent INPUT:\n{}", prompt);
-        String response = chatModel.chat(prompt);
-        log.debug("ReportAgent OUTPUT:\n{}", response);
-
-        return parseReport(response);
+    public ReportResult generate(List<MessageData> messages, List<CorrectionData> allCorrections, TaskContext ctx) {
+        log.debug("ReportAgent generating...");
+        ReportResult result = runner.execute(TaskName.REPORT,
+                new ReportParams(messages, allCorrections), ctx);
+        return result != null ? result : new ReportResult("", "", "", 0, "");
     }
 
     private ReportResult parseReport(String response) {
@@ -105,4 +105,6 @@ public class ReportAgent {
             int fluencyScore,
             String keyTakeaway
     ) {}
+
+    private record ReportParams(List<MessageData> messages, List<CorrectionData> corrections) {}
 }

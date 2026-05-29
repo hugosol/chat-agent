@@ -1,6 +1,7 @@
 package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.agent.MemoryCueAgent;
+import com.hugosol.webagent.agent.TaskContext;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MemoryCue;
@@ -39,11 +40,12 @@ public class MemoryCueService {
 
     public CompletableFuture<Void> generateCuesAsync(String sessionId, String userId, AgentMode mode, List<MessageData> messages) {
         long startTime = System.currentTimeMillis();
+        TaskContext ctx = new TaskContext(sessionId, userId, mode.name());
 
         return CompletableFuture.supplyAsync(() -> {
             List<Integer> switchPoints;
             try {
-                switchPoints = agent.detectSwitches(messages, mode);
+                switchPoints = agent.detectSwitches(messages, mode, ctx);
             } catch (Exception e) {
                 log.warn("MemoryCueService: detectSwitches failed for session {}: {}", sessionId, e.getMessage());
                 repository.save(new MemoryCue(sessionId, userId, mode, -1,
@@ -58,7 +60,7 @@ public class MemoryCueService {
                 final int segmentIndex = i;
                 futures.add(CompletableFuture.runAsync(() -> {
                     try {
-                        MemoryCueAgent.CueResult result = agent.generateCue(segments.get(segmentIndex), mode, segmentIndex);
+                        MemoryCueAgent.CueResult result = agent.generateCue(segments.get(segmentIndex), mode, segmentIndex, ctx);
                         MemoryCue cue = repository.save(new MemoryCue(sessionId, userId, mode, segmentIndex,
                                 result.topic(), result.summary(),
                                 MemoryCueStatus.COMPLETED));
