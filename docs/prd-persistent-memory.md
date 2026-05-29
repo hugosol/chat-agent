@@ -65,7 +65,7 @@ The Agent also receives an Active Engagement instruction when memory is present,
 
 ### 3. Async Memory Generation — Trigger Point
 
-**Decision**: Memory generation triggers in `CoachMessageHandler.onEndSession()`, immediately after `SessionStore.completeSession()` commits, before session cleanup. A single `MemoryService.generateMemoryAsync(userId, report)` call passes the `ReportAgent.ReportResult` object.
+**Decision**: Memory generation triggers in `CoachMessageHandler.onEndSession()`, immediately after `SessionDbStore.completeSession()` commits, before session cleanup. A single `MemoryService.generateMemoryAsync(userId, report)` call passes the `ReportAgent.ReportResult` object.
 
 **Rationale**: `completeSession()` has just committed the Report and all session data to H2. The `ReportResult` object is already in memory at the call site. No additional I/O is needed to gather input data. The call is fire-and-forget — execution moves to a background thread immediately.
 
@@ -213,7 +213,7 @@ Private helper methods handle reading the previous version, calling `MemoryAgent
 - `application.yml`: New `app.memory.async` property (default `true`)
 - `application-e2e.yml`: Sets `app.memory.async: false`
 
-**Components unchanged**: `CorrectionAgent`, `ReportAgent`, `CoachGraphBuilder`, `CoachWebSocketHandler`, `SessionStore`, `TokenTracker`, `EntityMapper`, `SessionCleanupLogoutHandler`, all repositories except the new one, frontend HTML/JS/CSS.
+**Components unchanged**: `CorrectionAgent`, `ReportAgent`, `CoachGraphBuilder`, `CoachWebSocketHandler`, `SessionDbStore`, `TokenTracker`, `EntityMapper`, `SessionCleanupLogoutHandler`, all repositories except the new one, frontend HTML/JS/CSS.
 
 ### 21. E2E Test Strategy
 
@@ -264,7 +264,7 @@ Test flow: Session1 → END → verify 2 UserMemory rows in H2 (version=1) → S
 
 ### Prior Art
 
-- Existing unit tests: `SessionStoreTest`, `SessionServiceTest`, `CoachMessageHandlerTest` use Mockito mocks and the `@ExtendWith(MockitoExtension.class)` pattern.
+- Existing unit tests: `SessionDbStoreTest`, `SessionServiceTest`, `CoachMessageHandlerTest` use Mockito mocks and the `@ExtendWith(MockitoExtension.class)` pattern.
 - Existing E2E tests: `EnglishCoachSessionIT` extends `E2ETestBase`, uses Playwright + WireMock, verifies DOM state and H2 data.
 - Existing repository tests: `UserRepositoryTest` uses `@DataJpaTest` with H2 in-memory database.
 - WireMock stubs: Follow the `WireMockStubs.registerAllStubs()` pattern — scenario state machines with `matchingJsonPath` body matchers.

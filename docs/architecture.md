@@ -50,7 +50,7 @@
 | 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 RAG 语义检索注入 MemoryCue |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `TaskRunner` 统一管理 LLM 调用生命周期与日志，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
 | 40 | TaskRunner 同步 Agent 模式 | 抽取 `TaskRunner` 深模块统一管理同步 Agent 的 LLM 调用生命周期。Agent 构造时通过 `runner.register(name, task)` 注册 `TaskDefinition`（模板 + paramBuilder + parser + errorStrategy），运行时通过 `runner.requestModel(name, params, ctx)` 触发 LLM 调用。`TaskName` 枚举管理 5 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）。删除 `LoggableChatModel` 包装层，日志能力由 TaskRunner 内生提供，含完整 sessionId/userId/agentType/mode 上下文字段。`MemoryAgent` 重命名为 `LearningAgent`（职责退化，仅保留 learningProfile 合并）。
-| 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `CoachMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionStore/MemoryService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
+| 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `CoachMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/MemoryService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
 | 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，top-2 结果 (cosine ≥ 0.6) 注入 System Prompt `{memoryCues}` 占位符。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
 
@@ -159,7 +159,7 @@ START → correction → END
 
 ```
 [用户 Start Session]
-  → SessionStore.createSession(mode, userId) → H2 写入 Session + userId
+  → SessionDbStore.createSession(mode, userId) → H2 写入 Session + userId
   → SessionService.init(sessionId, mode, userId, wsId) → 创建 CoachState (含 MODE) → activeStates Map + TokenTracker 初始化
 
 [每轮对话]
@@ -177,7 +177,7 @@ START → correction → END
   → SessionService 收集状态数据（messages, corrections, userId, mode）
   → SessionComplete.complete(sessionId, messages, corrections, userId, mode)
     → 报告 LLM 成功 → 生成 ReportResult；失败 → 降级报告（fluencyScore=-1）
-    → SessionStore.completeSession(sessionId, messages, corrections, report) → H2 持久化（null report → SessionStatus.FAILED）
+    → SessionDbStore.completeSession(sessionId, messages, corrections, report) → H2 持久化（null report → SessionStatus.FAILED）
     → MemoryService.generateMemoryAsync(userId, report, mode, sessionId) → 异步保存 Topic 摘要 + 合并 Profile 记忆
     → MemoryCueService.generateCuesAsync(sessionId, userId, mode, messages) → 异步生成结构化 MemoryCue
   → SessionService.remove(sessionId) → 释放 state + TokenTracker + sessionToWs 映射
@@ -574,7 +574,7 @@ web-agent/
 │   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
 │   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图 + RAG 检索)
 │   │   ├── SessionComplete.java            // 会话结束管线 (report+persist+async memory)
-│   │   ├── SessionStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
+│   │   ├── SessionDbStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
 │   │   ├── MemoryService.java              // 异步保存 Topic 摘要 + Learning Profile 合并（含 sessionId 追溯）
 │   │   ├── MemoryCueService.java           // 异步 MemoryCue 生成（话题分割 + 分段摘要 → EmbeddingService.indexAsync）
 │   │   ├── EmbeddingService.java            // ONNX 向量化 + InMemoryEmbeddingStore 管理（init/search/indexAsync/saveToDisk）
@@ -688,4 +688,4 @@ web-agent/
 | **13. E2E 测试** | Playwright + WireMock：`EnglishCoachSessionIT`（完整会话+3轮+sidebar+H2断言）、`EnglishCoachResumeIT`（页面刷新→会话恢复）。WireMock Scenario 状态机轮转 mock 数据，`matchingJsonPath` 区分 conversation/correction/report 请求。DOM 级等待（input 状态、correction bubble 数量、report modal 可见性）。截图自动保存到 `target/e2e-screenshots/`。 | 零外部依赖的全链路回归测试；WireMock 固定端口 19090 + shutdown hook 支持全量并行跑 |
 | **14. User 模块** | Spring Security form login + remember-me + BCrypt。User entity + UserRepository。AppProperties 配置 `permit-all-paths` 驱动权限。CoachState 加 `USER_ID` channel。`Session.userId` 数据隔离。`sessionToWs` 一对一翻转。SessionCleanupLogoutHandler 登出清理。E2E 用 `application-e2e.yml` + `permit-all-paths: [/**]` 绕过认证。`requireUserId` fallback `"anonymous"`。前端登录页 `login/main.html` + Visibility API 多标签自动 resume。 | 多用户认证 + 数据隔离 + 配置驱动权限 |
 | **15. AgentMode 合并** | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举（`displayName` + `templatePath`）；前端两个下拉框合并为一个；提示词拆分为 per-Mode `description.txt` + `rules.txt`，`conversation-system.txt` 退化为骨架模板；CoachState `SCENARIO` + `PERSONA` → `MODE`；协议 `scenario` + `persona` → `mode`；删除旧枚举类 | 消除不合理组合、降低选择成本、提示词按 Mode 独立定制、新增 Mode 只需加文件夹和模板 |
-| **16. 会话结束管线抽取** | `SessionComplete` 深模块：报告生成+持久化+异步记忆管线统一；`SessionStore.completeSession(null report)` → FAILED；`SessionStatus.FAILED` 枚举值；降级报告（fluencyScore=-1）+ 前端条件渲染；Handler 依赖 7→4 | 会话结束逻辑局部化，降级路径明确，前端不再展示 "0/10" |
+| **16. 会话结束管线抽取** | `SessionComplete` 深模块：报告生成+持久化+异步记忆管线统一；`SessionDbStore.completeSession(null report)` → FAILED；`SessionStatus.FAILED` 枚举值；降级报告（fluencyScore=-1）+ 前端条件渲染；Handler 依赖 7→4 | 会话结束逻辑局部化，降级路径明确，前端不再展示 "0/10" |

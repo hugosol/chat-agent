@@ -10,7 +10,7 @@ import com.hugosol.webagent.protocol.MessageHandler;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
 import com.hugosol.webagent.service.SessionComplete;
-import com.hugosol.webagent.service.SessionStore;
+import com.hugosol.webagent.service.SessionDbStore;
 import com.hugosol.webagent.service.SessionService;
 import com.hugosol.webagent.service.TurnProcessor;
 import org.slf4j.Logger;
@@ -32,13 +32,13 @@ public class CoachMessageHandler implements MessageHandler {
     private final SessionService sessionService;
     private final TurnProcessor turnProcessor;
     private final SessionComplete sessionComplete;
-    private final SessionStore sessionStore;
+    private final SessionDbStore sessionStore;
     private final ProtocolDispatcher protocol;
 
     public CoachMessageHandler(SessionService sessionService,
                                TurnProcessor turnProcessor,
                                SessionComplete sessionComplete,
-                               SessionStore sessionStore,
+                               SessionDbStore sessionStore,
                                ProtocolDispatcher protocol) {
         this.sessionService = sessionService;
         this.turnProcessor = turnProcessor;

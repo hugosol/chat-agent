@@ -10,7 +10,7 @@ import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
 import com.hugosol.webagent.service.SessionComplete;
 import com.hugosol.webagent.service.SessionService;
-import com.hugosol.webagent.service.SessionStore;
+import com.hugosol.webagent.service.SessionDbStore;
 import com.hugosol.webagent.service.TurnProcessor;
 import com.hugosol.webagent.service.TurnProcessor.TurnCallback;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class CoachMessageHandlerTest {
     private SessionComplete sessionComplete;
 
     @Mock
-    private SessionStore sessionStore;
+    private SessionDbStore sessionStore;
 
     @Mock
     private ProtocolDispatcher protocol;

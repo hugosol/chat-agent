@@ -70,7 +70,7 @@ No `.env` file support — use `local` profile (`application-local.yml`, gitigno
 
 - **H2 file database** at `./data/englishcoach` (the `data/` directory is gitignored).
 - `spring.jpa.hibernate.ddl-auto: update` — tables auto-created on first run.
-- Data is written to H2 **only at session end** (`SessionStore.completeSession()`). Runtime state stays in `SessionService.activeStates` (ConcurrentHashMap) + MemorySaver checkpoints.
+- Data is written to H2 **only at session end** (`SessionDbStore.completeSession()`). Runtime state stays in `SessionService.activeStates` (ConcurrentHashMap) + MemorySaver checkpoints.
 - H2 console enabled at `/h2-console`. Use `DB_CLOSE_DELAY=-1` to keep data alive between requests. With `local` profile, H2 console does not require login.
 
 ## Project Structure
@@ -84,7 +84,7 @@ com.hugosol.webagent/
 ├── websocket/       # CoachWebSocketHandler (WS entry), CoachMessageHandler (protocol logic)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
-│                    # SessionComplete (session-ending pipeline), SessionStore (entity persistence),
+│                    # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
 │                    # MemoryService, MemoryCueService,
 │                    # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
 ├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport,

@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 class SessionCompleteTest {
 
     @Mock
-    private SessionStore sessionStore;
+    private SessionDbStore sessionStore;
 
     @Mock
     private ReportAgent reportAgent;

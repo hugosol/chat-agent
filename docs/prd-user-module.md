@@ -184,7 +184,7 @@ There is no "forgot password" or "register" flow in this version. Users are crea
 |--------|-----------|-----------------|
 | SecurityConfig | `@WebMvcTest` + `@WithMockUser` | Login 302, unauthenticated redirect, logout redirect, `/login/**` permit, Remember-Me |
 | SessionService | Unit test (Mockito) | `sessionToWs` flip correctness, `getUserId`, `removeAllForUser` |
-| SessionStore | Unit test (Mockito) | `createSession` with userId, `getHistory` filtered by userId, `updateUserProgress` per-user |
+| SessionDbStore | Unit test (Mockito) | `createSession` with userId, `getHistory` filtered by userId, `updateUserProgress` per-user |
 | UserRepository | `@DataJpaTest` | `findByUsername` |
 | SessionRepository | `@DataJpaTest` | `findByUserIdOrderByStartTimeDesc` filter |
 | DataInitializer | Unit test | Creates user only when not exists, BCrypt hash verification |
@@ -192,7 +192,7 @@ There is no "forgot password" or "register" flow in this version. Users are crea
 
 ### Prior Art
 
-- Existing unit tests: `SessionStoreTest`, `SessionServiceTest`, `CoachMessageHandlerTest` — use Mockito mocks, verify method calls and state transitions.
+- Existing unit tests: `SessionDbStoreTest`, `SessionServiceTest`, `CoachMessageHandlerTest` — use Mockito mocks, verify method calls and state transitions.
 - Existing E2E tests: `EnglishCoachSessionIT`, `EnglishCoachResumeIT` — use `E2ETestBase`, Playwright, WireMock on port 19090.
 - Security tests: New file `SecurityConfigTest` following Spring Security's `@WebMvcTest` pattern with `SecurityMockMvcRequestPostProcessors`.
 

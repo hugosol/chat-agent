@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class SessionStoreTest {
+class SessionDbStoreTest {
 
     @Mock
     private EntityMapper mapper;
@@ -42,11 +42,11 @@ class SessionStoreTest {
     @Mock
     private UserProgressRepository userProgressRepository;
 
-    private SessionStore store;
+    private SessionDbStore store;
 
     @BeforeEach
     void setUp() {
-        store = new SessionStore(mapper, sessionRepository, messageRepository,
+        store = new SessionDbStore(mapper, sessionRepository, messageRepository,
                 errorRecordRepository, sessionReportRepository, userProgressRepository);
     }
 

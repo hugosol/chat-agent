@@ -21,12 +21,12 @@ public class SessionComplete {
             "Sorry, the session report generation failed. Your conversation and corrections have been saved.",
             "N/A", "N/A", -1, "N/A");
 
-    private final SessionStore sessionStore;
+    private final SessionDbStore sessionStore;
     private final ReportAgent reportAgent;
     private final MemoryService memoryService;
     private final MemoryCueService memoryCueService;
 
-    public SessionComplete(SessionStore sessionStore, ReportAgent reportAgent,
+    public SessionComplete(SessionDbStore sessionStore, ReportAgent reportAgent,
                            MemoryService memoryService, MemoryCueService memoryCueService) {
         this.sessionStore = sessionStore;
         this.reportAgent = reportAgent;

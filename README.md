@@ -152,7 +152,7 @@ CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor 
     │                              ├── MemoryCueService (async topic split + segment cues) ──► MemoryCueAgent → DeepSeek
     │                              │       └── EmbeddingService.indexAsync() → ONNX vectorization → embedding-store.json
     │                              ├── EmbeddingService (RAG search + index + disk persistence)
-    │                              └── SessionStore → H2 (JPA)
+    │                              └── SessionDbStore → H2 (JPA)
     │
     ▼
 AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
@@ -221,7 +221,7 @@ web-agent/
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
 │   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, TimeLabel, ...)
 │   ├── repository/     (Spring Data JPA)
-│   ├── service/        (SessionService, TurnProcessor, SessionStore, MemoryService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
+│   ├── service/        (SessionService, TurnProcessor, SessionDbStore, MemoryService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
 │   └── config/         (LangChain4jConfig, LoggableChatModel, SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml
