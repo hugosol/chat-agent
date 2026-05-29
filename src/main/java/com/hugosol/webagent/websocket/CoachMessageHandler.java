@@ -10,7 +10,7 @@ import com.hugosol.webagent.protocol.MessageHandler;
 import com.hugosol.webagent.protocol.ProtocolDispatcher;
 import com.hugosol.webagent.protocol.ServerMessage;
 import com.hugosol.webagent.agent.ReportAgent;
-import com.hugosol.webagent.agent.TaskContext;
+import com.hugosol.webagent.agent.common.TaskContext;
 import com.hugosol.webagent.service.SessionStore;
 import com.hugosol.webagent.service.SessionService;
 import com.hugosol.webagent.service.MemoryCueService;

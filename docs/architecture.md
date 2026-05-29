@@ -512,16 +512,17 @@ web-agent/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
 │   ├── agent/                              // Agent 调用封装
+│   │   ├── common/                         // 横切关注点：TaskRunner 公共模块
+│   │   │   ├── TaskRunner.java
+│   │   │   ├── TaskDefinition.java
+│   │   │   ├── TaskName.java
+│   │   │   ├── TaskContext.java
+│   │   │   └── ErrorStrategy.java
 │   │   ├── ConversationAgent.java          // 角色扮演对话（Prompt 模板替换 + DeepSeek 流式调用）
 │   │   ├── CorrectionAgent.java            // 5类纠错分析（JSON 解析 LLM 输出，委托 TaskRunner）
 │   │   ├── ReportAgent.java                // 会话报告生成（委托 TaskRunner）
 │   │   ├── LearningAgent.java              // Learning Profile 合并（跨会话记忆，委托 TaskRunner，原 MemoryAgent）
-│   │   ├── MemoryCueAgent.java             // 两步 LLM：话题切换检测 + 分段结构化摘要生成（委托 TaskRunner）
-│   │   ├── TaskRunner.java                 // 同步 Agent LLM 调用执行引擎（注册表 + execute + 日志 + 错误处理）
-│   │   ├── TaskDefinition.java             // 任务描述对象（Builder 模式：template + paramBuilder + parser + errorStrategy）
-│   │   ├── TaskName.java                   // 任务名枚举（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）
-│   │   ├── TaskContext.java                // 运行时上下文 record（sessionId, userId, mode）
-│   │   └── ErrorStrategy.java              // 错误策略枚举（SWALLOW / THROW）
+│   │   └── MemoryCueAgent.java             // 两步 LLM：话题切换检测 + 分段结构化摘要生成（委托 TaskRunner）
 │   │
 │   ├── dto/                              // 数据传输
 │   │   ├── MessageData.java              // 消息数据 (role, content, messageId)

@@ -1,4 +1,4 @@
-package com.hugosol.webagent.agent;
+package com.hugosol.webagent.agent.common;
 
 import java.util.Map;
 import java.util.function.Function;

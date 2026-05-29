@@ -1,4 +1,4 @@
-package com.hugosol.webagent.agent;
+package com.hugosol.webagent.agent.common;
 
 import com.hugosol.webagent.service.LlmCallLogService;
 import dev.langchain4j.model.chat.ChatLanguageModel;

@@ -1,7 +1,7 @@
 package com.hugosol.webagent.graph.nodes;
 
 import com.hugosol.webagent.agent.CorrectionAgent;
-import com.hugosol.webagent.agent.TaskContext;
+import com.hugosol.webagent.agent.common.TaskContext;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
 import org.bsc.langgraph4j.action.NodeAction;

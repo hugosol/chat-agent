@@ -2,6 +2,11 @@ package com.hugosol.webagent.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hugosol.webagent.agent.common.ErrorStrategy;
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskDefinition;
+import com.hugosol.webagent.agent.common.TaskName;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.MessageData;

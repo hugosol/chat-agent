@@ -1,5 +1,10 @@
 package com.hugosol.webagent.agent;
 
+import com.hugosol.webagent.agent.common.ErrorStrategy;
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskDefinition;
+import com.hugosol.webagent.agent.common.TaskName;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.fasterxml.jackson.core.type.TypeReference;

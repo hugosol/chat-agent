@@ -1,6 +1,8 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
+import com.hugosol.webagent.agent.common.TaskContext;
+import com.hugosol.webagent.agent.common.TaskRunner;
 import com.hugosol.webagent.config.PromptLoader;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;

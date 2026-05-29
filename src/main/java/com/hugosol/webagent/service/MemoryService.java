@@ -1,7 +1,7 @@
 package com.hugosol.webagent.service;
 
 import com.hugosol.webagent.agent.LearningAgent;
-import com.hugosol.webagent.agent.TaskContext;
+import com.hugosol.webagent.agent.common.TaskContext;
 import com.hugosol.webagent.agent.ReportAgent.ReportResult;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.MemoryType;
