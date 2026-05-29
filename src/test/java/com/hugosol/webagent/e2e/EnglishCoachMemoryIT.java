@@ -13,7 +13,7 @@ class EnglishCoachMemoryIT extends E2ETestBase {
 
     @BeforeEach
     void cleanMemoryTable() {
-        userMemoryRepository.deleteAll();
+        userLearningProfileRepository.deleteAll();
     }
 
     @Test
@@ -39,21 +39,16 @@ class EnglishCoachMemoryIT extends E2ETestBase {
 
         // Verify report modal contains topic summary
         String reportText = getReportModalText();
-        assertTrue(reportText.contains("Topic Summary"), "report should show topic summary section");
-        assertTrue(reportText.contains("Java developer"), "report should show topic content");
+        assertTrue(reportText.contains("Overall Assessment"), "report should show overall assessment section");
+        assertTrue(reportText.contains("Good job"), "report should show assessment content");
 
         // Verify Session1 H2 data
         Session session1 = sessionRepository.findById(sid1).orElseThrow();
         assertEquals(SessionStatus.COMPLETED, session1.getStatus());
 
-        // Verify UserMemory v1 was generated
-        var topicV1 = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
-                DEFAULT_USER_ID, MemoryType.TOPIC_SUMMARY, AgentMode.WORKPLACE_STANDUP);
-        assertTrue(topicV1.isPresent(), "topic memory should be generated");
-        assertEquals(1, topicV1.get().getVersion());
-
-        var profileV1 = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
-                DEFAULT_USER_ID, MemoryType.LEARNING_PROFILE, null);
+        // Verify UserLearningProfile v1 was generated (only LEARNING_PROFILE remains)
+        var profileV1 = userLearningProfileRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                DEFAULT_USER_ID, LearningType.LEARNING_PROFILE, null);
         assertTrue(profileV1.isPresent(), "learning profile should be generated");
         assertEquals(1, profileV1.get().getVersion());
 
@@ -80,22 +75,13 @@ class EnglishCoachMemoryIT extends E2ETestBase {
         Session session2 = sessionRepository.findById(sid2).orElseThrow();
         assertEquals(SessionStatus.COMPLETED, session2.getStatus());
 
-        // Verify UserMemory v2 was written as new version (direct write, no merge)
-        List<UserMemory> allTopic = userMemoryRepository.findByUserIdAndTypeAndModeOrderByVersionDesc(
-                DEFAULT_USER_ID, MemoryType.TOPIC_SUMMARY, AgentMode.WORKPLACE_STANDUP);
-        assertEquals(2, allTopic.size(), "should have 2 topic memory rows (v1 + v2)");
-
-        UserMemory topicV2row = allTopic.stream().filter(m -> m.getVersion() == 2).findFirst().orElseThrow();
-        assertTrue(topicV2row.getContent().contains("Java developer"),
-                "topic v2 should contain topic summary content");
-        assertEquals("anonymous", topicV2row.getUserId());
-
-        List<UserMemory> allProfile = userMemoryRepository.findByUserIdAndTypeAndModeOrderByVersionDesc(
-                DEFAULT_USER_ID, MemoryType.LEARNING_PROFILE, null);
+        // Verify LEARNING_PROFILE v2 was written as new version
+        List<UserLearningProfile> allProfile = userLearningProfileRepository.findByUserIdAndTypeAndModeOrderByVersionDesc(
+                DEFAULT_USER_ID, LearningType.LEARNING_PROFILE, null);
         assertEquals(2, allProfile.size(), "should have 2 learning profile rows (v1 + v2)");
 
-        UserMemory profileV1row = allProfile.stream().filter(m -> m.getVersion() == 1).findFirst().orElseThrow();
-        UserMemory profileV2row = allProfile.stream().filter(m -> m.getVersion() == 2).findFirst().orElseThrow();
+        UserLearningProfile profileV1row = allProfile.stream().filter(m -> m.getVersion() == 1).findFirst().orElseThrow();
+        UserLearningProfile profileV2row = allProfile.stream().filter(m -> m.getVersion() == 2).findFirst().orElseThrow();
         assertNotEquals(profileV1row.getContent(), profileV2row.getContent(),
                 "merged learning profile should differ from v1");
     }

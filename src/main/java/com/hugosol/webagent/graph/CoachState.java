@@ -21,7 +21,6 @@ public class CoachState extends AgentState {
     public static final String MESSAGES     = "messages";
     public static final String USER_INPUT   = "userInput";
     public static final String CORRECTIONS  = "corrections";
-    public static final String TOPIC_MEMORY = "topicMemory";
     public static final String LEARNING_PROFILE = "learningProfile";
     public static final String MEMORY_CUE_QUEUE = "memoryCueQueue";
 
@@ -33,7 +32,6 @@ public class CoachState extends AgentState {
             MESSAGES,     Channels.appender(ArrayList::new),
             USER_INPUT,   Channels.base(() -> ""),
             CORRECTIONS,  Channels.appender(ArrayList::new),
-            TOPIC_MEMORY,     Channels.base(() -> ""),
             LEARNING_PROFILE, Channels.base(() -> ""),
             MEMORY_CUE_QUEUE, Channels.base(MemoryCueQueue::new)
     );
@@ -43,8 +41,8 @@ public class CoachState extends AgentState {
     }
 
     public static Map<String, Object> initialState(String sessionId, String mode, String userId,
-                                                      String topicMemory, String learningProfile,
-                                                      MemoryCueQueue memoryCueQueue) {
+                                                       String learningProfile,
+                                                       MemoryCueQueue memoryCueQueue) {
         Map<String, Object> data = new HashMap<>();
         data.put(SESSION_ID, sessionId);
         data.put(MODE, mode);
@@ -53,7 +51,6 @@ public class CoachState extends AgentState {
         data.put(MESSAGES, new ArrayList<>());
         data.put(USER_INPUT, "");
         data.put(CORRECTIONS, new ArrayList<>());
-        data.put(TOPIC_MEMORY, topicMemory != null ? topicMemory : "");
         data.put(LEARNING_PROFILE, learningProfile != null ? learningProfile : "");
         data.put(MEMORY_CUE_QUEUE, memoryCueQueue);
         return data;
@@ -101,10 +98,6 @@ public class CoachState extends AgentState {
         if (list != null) {
             list.addAll(corrections);
         }
-    }
-
-    public String topicMemory() {
-        return this.<String>value(TOPIC_MEMORY).orElse("");
     }
 
     public String learningProfile() {

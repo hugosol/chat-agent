@@ -77,7 +77,7 @@ No `.env` file support — use `local` profile (`application-local.yml`, gitigno
 
 ```
 com.hugosol.webagent/
-├── graph/           # LangGraph: CoachState (7 channels incl. USER_ID + MODE) + 1 node + builder
+├── graph/           # LangGraph: CoachState (6 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
 ├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent
 │   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName, TaskContext, ErrorStrategy
@@ -85,12 +85,12 @@ com.hugosol.webagent/
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 │                    # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
-│                    # MemoryService, MemoryCueService,
+│                    # LearningProfileService, MemoryCueService,
 │                    # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
 ├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport,
-│                    # UserProgress, UserMemory, MemoryCue, AgentMode, MemoryCueStatus, TimeLabel, ...
+│                    # UserProgress, UserLearningProfile, MemoryCue, AgentMode, MemoryCueStatus, TimeLabel, ...
 ├── repository/      # Spring Data JPA repos (8: User, Session, Message, ErrorRecord, SessionReport,
-│                    # UserProgress, UserMemory, MemoryCue, LlmCallLog)
+│                    # UserProgress, UserLearningProfile, MemoryCue, LlmCallLog)
 ├── dto/             # Data transfer records: MessageData, CorrectionData, MemoryContent, CueMatch
 ├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AsyncConfig,
 │                    # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
@@ -153,10 +153,10 @@ Server → Client:
 - **Session resume**: disconnect only removes `sessionToWs` mapping, never calls `removeSession()`. State stays in `activeStates` until explicit `END_SESSION`. On reconnect, `RESUME_SESSION` validates `userId` ownership.
 - **UserId fallback**: `requireUserId()` returns `"anonymous"` if `ws.getPrincipal()` is null. Production always has a Principal (Spring Security interceptor); E2E profile has no auth so this gracefully bypasses.
 - **Config-driven security**: No `@ConditionalOnProperty` or `@Profile` on `SecurityConfig`. All path-level auth control is via `app.security.permit-all-paths` in YAML.
-- **Memory injection**: Round 1: User Memory (topicSummary + learningProfile) via System Prompt injection. Round 2+: RAG-based MemoryCue retrieval via `EmbeddingService` semantic search (ONNX all-MiniLM-L6-v2, cosine similarity ≥ 0.6), managed through `MemoryCueQueue` (capacity topK+1, LRU dedup, numbered list output). `ConversationAgent` accepts `MemoryContent` DTO to encapsulate all memory data.
+- **Memory injection**: Every round performs RAG semantic search against `EmbeddingService`. On round 1, if RAG returns no matches, a fallback loads the most recent session's last COMPLETED MemoryCue from H2 as a conversation continuity anchor with a time label. LearningProfile is injected on round 1 only. There is no dual-track switching between Topic Memory and RAG — all memory retrieval is unified through the embedding pipeline. `ConversationAgent` accepts `MemoryContent` DTO to encapsulate all memory data.
 - **MemoryCue module**: `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `llmRequestExecutor`, parallel with Report and Profile Merge. Completed cues are vectorized asynchronously by `EmbeddingService.indexAsync()`. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
 - **RAG retrieval**: `EmbeddingService` with `InMemoryEmbeddingStore` + ONNX embeddings. Store persists to `./data/embedding-store.json` on disk, with corrupted-file fallback to H2 rebuild. Data isolated by `userId × AgentMode` at both H2 and vector store layers. Dedicated `embeddingExecutor` thread pool (core=2, max=2). Configurable via `app.memory.retrieval.*`.
-- **Thread pool**: `llmRequestExecutor` (core=4, max=8) handles correction LLM calls (during turns) and memory processing (MemoryCue split + parallel segment generation + Report + Profile Merge, at session end, orchestrated via `SessionComplete`). Turn-time correction and end-session memory tasks do not overlap chronologically. Topic Memory is a direct write (no LLM merge).
+- **Thread pool**: `llmRequestExecutor` (core=4, max=8) handles correction LLM calls (during turns) and memory processing (MemoryCue split + parallel segment generation + Report + Profile Merge, at session end, orchestrated via `SessionComplete`). Turn-time correction and end-session memory tasks do not overlap chronologically.
 
 ## Logging
 

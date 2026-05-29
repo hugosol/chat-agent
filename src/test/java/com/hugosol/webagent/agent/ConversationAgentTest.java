@@ -219,17 +219,17 @@ class ConversationAgentTest {
     }
 
     @Test
-    void userMemoryInjection_containsTopicAndProfile() {
+    void lastConversationAndProfile_injectedIndependently() {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent("Talked about travel plans", "Past tense needs work", null),
+                new MemoryContent("earlier today", "Past tense needs work", null),
                 0,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("Conversation Memory");
-        assertThat(systemContent).contains("Talked about travel plans");
+        assertThat(systemContent).contains("The last conversation was earlier today");
+        assertThat(systemContent).contains("Pick up conversation naturally");
         assertThat(systemContent).contains("Your Learning Profile");
         assertThat(systemContent).contains("Past tense needs work");
         assertThat(systemContent).contains("Active Engagement");
@@ -248,7 +248,7 @@ class ConversationAgentTest {
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).doesNotContain("Conversation Memory");
+        assertThat(systemContent).doesNotContain("The last conversation was");
         assertThat(systemContent).doesNotContain("Your Learning Profile");
         assertThat(systemContent).contains("[Memory Cues]");
         assertThat(systemContent).contains("1. [from ");
@@ -266,7 +266,7 @@ class ConversationAgentTest {
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).doesNotContain("Conversation Memory");
+        assertThat(systemContent).doesNotContain("The last conversation was");
         assertThat(systemContent).doesNotContain("Memory Cues");
         assertThat(systemContent).doesNotContain("Active Engagement");
     }

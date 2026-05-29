@@ -3,8 +3,8 @@ package com.hugosol.webagent.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "user_memory")
-public class UserMemory extends BaseEntity {
+@Table(name = "user_learning_profiles")
+public class UserLearningProfile extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -18,7 +18,7 @@ public class UserMemory extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private MemoryType type;
+    private LearningType type;
 
     @Column(nullable = false)
     private Integer version;
@@ -30,16 +30,16 @@ public class UserMemory extends BaseEntity {
     @Column(length = 36)
     private String sessionId;
 
-    public UserMemory() {}
+    public UserLearningProfile() {}
 
-    public UserMemory(String userId, MemoryType type, String content, Integer version) {
+    public UserLearningProfile(String userId, LearningType type, String content, Integer version) {
         this.userId = userId;
         this.type = type;
         this.content = content;
         this.version = version;
     }
 
-    public UserMemory(String userId, MemoryType type, String content, Integer version, AgentMode mode) {
+    public UserLearningProfile(String userId, LearningType type, String content, Integer version, AgentMode mode) {
         this.userId = userId;
         this.type = type;
         this.content = content;
@@ -47,7 +47,7 @@ public class UserMemory extends BaseEntity {
         this.mode = mode;
     }
 
-    public UserMemory(String userId, MemoryType type, String content, Integer version, AgentMode mode, String sessionId) {
+    public UserLearningProfile(String userId, LearningType type, String content, Integer version, AgentMode mode, String sessionId) {
         this.userId = userId;
         this.type = type;
         this.content = content;
@@ -65,8 +65,8 @@ public class UserMemory extends BaseEntity {
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
 
-    public MemoryType getType() { return type; }
-    public void setType(MemoryType type) { this.type = type; }
+    public LearningType getType() { return type; }
+    public void setType(LearningType type) { this.type = type; }
 
     public Integer getVersion() { return version; }
     public void setVersion(Integer version) { this.version = version; }

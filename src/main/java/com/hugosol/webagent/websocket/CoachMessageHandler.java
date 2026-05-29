@@ -159,7 +159,6 @@ public class CoachMessageHandler implements MessageHandler {
 
         var reportData = new ServerMessage.ReportData(
                 report != null ? report.overallAssessment() : "",
-                report != null ? report.topicSummary() : "",
                 report != null ? report.fluencyScore() : 0,
                 report != null ? report.errorSummary() : "",
                 report != null ? report.keyTakeaway() : ""

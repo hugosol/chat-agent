@@ -39,7 +39,6 @@ app:
   prompt-directory: classpath:prompts
   memory:
     store-path: data/embedding-store.json
-    user-memory-rounds: 1
     retrieval:
       top-k: 2
       similarity-threshold: 0.6

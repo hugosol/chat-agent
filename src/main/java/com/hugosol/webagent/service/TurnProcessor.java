@@ -11,7 +11,10 @@ import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.AgentType;
+import com.hugosol.webagent.model.MemoryCueStatus;
 import com.hugosol.webagent.model.MessageRole;
+import com.hugosol.webagent.model.TimeLabel;
+import com.hugosol.webagent.repository.MemoryCueRepository;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import org.bsc.langgraph4j.CompiledGraph;
@@ -43,7 +46,8 @@ public class TurnProcessor {
     private final SessionService sessionService;
     private final LlmCallLogService llmCallLogService;
     private final EmbeddingService embeddingService;
-    private final MemoryService memoryService;
+    private final LearningProfileService learningProfileService;
+    private final MemoryCueRepository memoryCueRepository;
     private final AppProperties appProperties;
     private final ExecutorService executor;
 
@@ -59,7 +63,8 @@ public class TurnProcessor {
                           SessionService sessionService,
                           LlmCallLogService llmCallLogService,
                           EmbeddingService embeddingService,
-                          MemoryService memoryService,
+                          LearningProfileService learningProfileService,
+                          MemoryCueRepository memoryCueRepository,
                           AppProperties appProperties,
                           @org.springframework.beans.factory.annotation.Qualifier("llmRequestExecutor") ExecutorService executor) {
         this.graph = graphBuilder.getCompiledGraph();
@@ -67,7 +72,8 @@ public class TurnProcessor {
         this.sessionService = sessionService;
         this.llmCallLogService = llmCallLogService;
         this.embeddingService = embeddingService;
-        this.memoryService = memoryService;
+        this.learningProfileService = learningProfileService;
+        this.memoryCueRepository = memoryCueRepository;
         this.appProperties = appProperties;
         this.executor = executor;
     }
@@ -97,32 +103,44 @@ public class TurnProcessor {
 
     private MemoryContent resolveMemoryContext(String sessionId, String userInput, int messageId,
                                                 AgentMode mode, String userId) {
-        String topicSummary = sessionService.getTopicMemory(sessionId);
-        String learningProfile = sessionService.getLearningProfile(sessionId);
-
-        int userMemoryRounds = appProperties.getMemory().getUserMemoryRounds();
-
-        if (messageId <= userMemoryRounds) {
-            LocalDateTime topicCreatedAt = memoryService.loadTopicCreatedAt(userId, mode);
-            return new MemoryContent(topicSummary, learningProfile, null, topicCreatedAt);
-        }
-
         int topK = appProperties.getMemory().getRetrieval().getTopK();
         double threshold = appProperties.getMemory().getRetrieval().getSimilarityThreshold();
 
         MemoryCueQueue queue = sessionService.getMemoryCueQueue(sessionId);
-        int searchTopK = queue.isEmpty() ? topK + 1 : topK;
-
-        List<CueMatch> results = embeddingService.search(userInput, mode, userId, searchTopK, threshold);
+        List<CueMatch> results = embeddingService.search(userInput, mode, userId, topK, threshold);
         queue.push(results);
+
+        String learningProfile = messageId == 1
+                ? sessionService.getLearningProfile(sessionId) : null;
+
+        String lastConversationTimeLabel = null;
+
+        if (messageId == 1 && queue.isEmpty()) {
+            var fallback = memoryCueRepository.findTopByUserIdAndModeAndStatusOrderByCreateTimeDesc(
+                    userId, mode, MemoryCueStatus.COMPLETED);
+            if (fallback.isPresent()) {
+                var cue = fallback.get();
+                var now = java.time.LocalDateTime.now();
+                String label = TimeLabel.computeLabel(cue.getCreateTime(), now);
+                lastConversationTimeLabel = label;
+                queue.push(List.of(new CueMatch(
+                        cue.getId(),
+                        cue.getTopic(),
+                        cue.getSummary(),
+                        0.0,
+                        cue.getCreateTime())));
+                log.info("TurnProcessor: RAG empty on round 1, fallback anchor loaded for session {}",
+                        sessionId);
+            }
+        }
 
         List<CueMatch> entries = queue.getEntries();
         if (!entries.isEmpty()) {
             log.info("TurnProcessor: RAG retrieved {} new cues, queue now has {} entries for session {} messageId {}",
                     results.size(), entries.size(), sessionId, messageId);
-            return new MemoryContent(null, null, entries);
         }
-        return new MemoryContent(null, null, null);
+
+        return new MemoryContent(lastConversationTimeLabel, learningProfile, entries);
     }
 
     private void startConversation(String sessionId, List<MessageData> history, AgentMode mode,

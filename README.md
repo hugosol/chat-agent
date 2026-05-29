@@ -141,14 +141,14 @@ Spring Security  ──►  /login  ──►  /index.html  ──►  /ws/coach
     ▼
 CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor  ──►  LangGraph (1 node: correction)
     │                              │                        │
-    │                              │                        ├── messageId ≤ 1: User Memory (topicSummary + learningProfile)
-    │                              │                        ├── messageId ≥ 2: EmbeddingService.search() → RAG MemoryCue
+     │                              │                        ├── EmbeddingService.search() → RAG MemoryCue (every round)
+     │                              │                        ├── LearningProfile + last MemoryCue fallback (round 1 only)
     │                              │                        ├── Future A: ConversationAgent → DeepSeek (streaming)
     │                              │                        └── Future B: CorrectionNode → CorrectionAgent → DeepSeek
     │                              │
     │                              ├── SessionService (runtime state + token tracking)
     │                              ├── ReportAgent → DeepSeek (session-end)
-    │                              ├── MemoryService (Topic direct write + Profile merge) ──► MemoryAgent → DeepSeek
+    │                              ├── LearningProfileService (Topic direct write + Profile merge) ──► MemoryAgent → DeepSeek
     │                              ├── MemoryCueService (async topic split + segment cues) ──► MemoryCueAgent → DeepSeek
     │                              │       └── EmbeddingService.indexAsync() → ONNX vectorization → embedding-store.json
     │                              ├── EmbeddingService (RAG search + index + disk persistence)
@@ -185,7 +185,7 @@ START → CorrectionNode → END
 
 The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
 
-Topic Memory and Learning Profile are injected into the System Prompt for the first **turn** (messageId ≤ 1). From messageId ≥ 2, `EmbeddingService.search()` retrieves semantically relevant historical MemoryCue entries (top-2, cosine ≥ 0.6) and injects them via the `{memoryCues}` System Prompt placeholder. At session end, `MemoryService` directly saves the new Topic Memory as a new version and fires an async LLM merge for Learning Profile, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `memoryExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
+Every round performs RAG semantic search via `EmbeddingService.search()` against historical MemoryCue entries (top-2, cosine ≥ 0.6). On round 1, if RAG returns no matches, a fallback loads the most recent session's last COMPLETED MemoryCue from H2 as a conversation continuity anchor with a time label. LearningProfile is injected on round 1 only. There is no dual-track switching between Topic Memory and RAG — all memory retrieval is unified through the embedding pipeline. At session end, `LearningProfileService` directly saves the new Topic Memory as a new version and fires an async LLM merge for Learning Profile, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `memoryExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
 
 ## Project Structure
 
@@ -219,9 +219,9 @@ web-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserMemory, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, TimeLabel, ...)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserLearningProfile, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, TimeLabel, ...)
 │   ├── repository/     (Spring Data JPA)
-│   ├── service/        (SessionService, TurnProcessor, SessionDbStore, MemoryService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
+│   ├── service/        (SessionService, TurnProcessor, SessionDbStore, LearningProfileService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
 │   └── config/         (LangChain4jConfig, LoggableChatModel, SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml
@@ -237,7 +237,6 @@ web-agent/
 │       │   └── rules.txt                 ← 行为规则
 │       ├── correction.txt
 │       ├── report.txt
-│       ├── memory-topic.txt
 │       ├── memory-profile.txt
 │       ├── memory-cue-split.txt
 │       └── memory-cue-entry.txt
@@ -283,7 +282,6 @@ App-level configuration in `application.yml`:
 | `app.security.permit-all-paths` | `[/login/**]` | URL patterns that skip authentication |
 | `app.token-limit` | `128000` | Max LLM tokens per session |
 | `app.token-limit-ratio` | `0.8` | Warning threshold ratio |
-| `app.memory.user-memory-rounds` | `1` | Number of turns User Memory persists (messageId ≤ N) |
 | `app.memory.profile-max-length` | `400` | Learning Profile merged text max characters |
 | `app.memory.cue-topic-max-words` | `7` | MemoryCue topic name max word count |
 | `app.memory.cue-summary-max-sentences` | `4` | MemoryCue summary max sentence count |

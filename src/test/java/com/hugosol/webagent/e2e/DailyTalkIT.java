@@ -44,7 +44,7 @@ class DailyTalkIT extends E2ETestBase {
 
         assertTrue(isReportModalVisible(), "report modal should be visible");
         String reportText = getReportModalText();
-        assertTrue(reportText.contains("Topic Summary"), "report should show topic summary section");
+        assertTrue(reportText.contains("Overall Assessment"), "report should show overall assessment section");
 
         verifyH2Data(sid);
     }
@@ -66,13 +66,8 @@ class DailyTalkIT extends E2ETestBase {
         SessionReport report = sessionReportRepository.findBySessionId(sid).orElseThrow();
         assertNotNull(report.getSummary(), "report summary should not be null");
 
-        var topicMemory = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
-                DEFAULT_USER_ID, MemoryType.TOPIC_SUMMARY, AgentMode.DAILY_TALK);
-        assertTrue(topicMemory.isPresent(), "TOPIC_SUMMARY should exist with mode=DAILY_TALK");
-        assertEquals(AgentMode.DAILY_TALK, topicMemory.get().getMode());
-
-        var learningProfile = userMemoryRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
-                DEFAULT_USER_ID, MemoryType.LEARNING_PROFILE, null);
+        var learningProfile = userLearningProfileRepository.findTopByUserIdAndTypeAndModeOrderByVersionDesc(
+                DEFAULT_USER_ID, LearningType.LEARNING_PROFILE, null);
         assertTrue(learningProfile.isPresent(), "LEARNING_PROFILE should exist");
         assertNull(learningProfile.get().getMode(), "LEARNING_PROFILE mode should be null (cross-mode shared)");
     }

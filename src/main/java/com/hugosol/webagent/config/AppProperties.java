@@ -65,15 +65,11 @@ public class AppProperties {
     }
 
     public static class Memory {
-        private int userMemoryRounds = 3;
         private String storePath = "data/embedding-store.json";
         private int profileMaxLength = 400;
         private int cueTopicMaxWords = 7;
         private int cueSummaryMaxSentences = 4;
         private Retrieval retrieval = new Retrieval();
-
-        public int getUserMemoryRounds() { return userMemoryRounds; }
-        public void setUserMemoryRounds(int userMemoryRounds) { this.userMemoryRounds = userMemoryRounds; }
 
         public String getStorePath() { return storePath; }
         public void setStorePath(String storePath) { this.storePath = storePath; }
