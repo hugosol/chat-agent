@@ -21,6 +21,7 @@ class TaskRunnerTest {
 
     private TaskRunner runner;
     private ChatLanguageModel chatModel;
+    private ChatLanguageModel reportChatModel;
     private LlmCallLogService logService;
 
     private static class StubChatModel implements ChatLanguageModel {
@@ -46,8 +47,9 @@ class TaskRunnerTest {
     @BeforeEach
     void setUp() {
         chatModel = new StubChatModel();
+        reportChatModel = new StubChatModel();
         logService = mock(LlmCallLogService.class);
-        runner = new TaskRunner(chatModel, logService);
+        runner = new TaskRunner(chatModel, reportChatModel, logService);
     }
 
     @Test
@@ -126,7 +128,7 @@ class TaskRunnerTest {
     void llmApiFailure_withSwallowReturnsNull() {
         ((StubChatModel) chatModel).setResponse(null);
         StubFailingModel failingModel = new StubFailingModel(new RuntimeException("API timeout"));
-        runner = new TaskRunner(failingModel, logService);
+        runner = new TaskRunner(failingModel, reportChatModel, logService);
         runner.register(TaskName.CORRECTION, TaskDefinition
                 .<String, String>builder()
                 .template("test")
@@ -156,6 +158,58 @@ class TaskRunnerTest {
         assertThatThrownBy(() -> runner.requestModel(TaskName.CORRECTION, "input", ctx))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No task registered");
+    }
+
+    @Test
+    void reportTaskUsesReportModel() {
+        var defaultModel = new TrackingModel();
+        var reportModel = new TrackingModel();
+        runner = new TaskRunner(defaultModel, reportModel, logService);
+
+        runner.register(TaskName.REPORT, TaskDefinition
+                .<String, String>builder()
+                .template("{x}")
+                .paramBuilder(p -> Map.of("x", p))
+                .parser(r -> r)
+                .errorStrategy(ErrorStrategy.THROW)
+                .build());
+
+        runner.register(TaskName.CORRECTION, TaskDefinition
+                .<String, String>builder()
+                .template("{x}")
+                .paramBuilder(p -> Map.of("x", p))
+                .parser(r -> r)
+                .errorStrategy(ErrorStrategy.THROW)
+                .build());
+
+        TaskContext ctx = new TaskContext("s5", "u5", "WORKPLACE_STANDUP");
+        runner.requestModel(TaskName.REPORT, "input", ctx);
+
+        assertThat(reportModel.wasCalled).isTrue();
+        assertThat(defaultModel.wasCalled).isFalse();
+
+        defaultModel.wasCalled = false;
+        reportModel.wasCalled = false;
+
+        runner.requestModel(TaskName.CORRECTION, "input", ctx);
+
+        assertThat(defaultModel.wasCalled).isTrue();
+        assertThat(reportModel.wasCalled).isFalse();
+    }
+
+    private static class TrackingModel implements ChatLanguageModel {
+        boolean wasCalled = false;
+
+        @Override
+        public String chat(String prompt) {
+            wasCalled = true;
+            return "response";
+        }
+
+        @Override
+        public Response<AiMessage> generate(List<ChatMessage> messages) {
+            return null;
+        }
     }
 
     private static class StubFailingModel implements ChatLanguageModel {

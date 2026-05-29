@@ -1,25 +1,32 @@
 package com.hugosol.webagent.model;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 
 public enum TimeLabel {
-    JUST_NOW("just now", Duration.ofMinutes(5)),
-    A_FEW_MINUTES_AGO("a few minutes ago", Duration.ofHours(1)),
-    EARLIER_TODAY("earlier today", Duration.ofHours(12)),
-    YESTERDAY("yesterday", Duration.ofHours(48)),
-    A_FEW_DAYS_AGO("a few days ago", Duration.ofDays(7)),
-    ABOUT_A_WEEK_AGO("about a week ago", Duration.ofDays(14)),
-    A_FEW_WEEKS_AGO("a few weeks ago", Duration.ofDays(30)),
-    ABOUT_A_MONTH_AGO("about a month ago", Duration.ofDays(60)),
-    A_WHILE_AGO("a while ago", Duration.ofDays(365));
+    JUST_NOW("just now"),
+    A_FEW_MINUTES_AGO("a few minutes ago"),
+    LAST_NIGHT("last night"),
+    THIS_MORNING("this morning"),
+    THIS_AFTERNOON("this afternoon"),
+    THIS_EVENING("this evening"),
+    TONIGHT("tonight"),
+    YESTERDAY_MORNING("yesterday morning"),
+    YESTERDAY_AFTERNOON("yesterday afternoon"),
+    YESTERDAY_EVENING("yesterday evening"),
+    A_FEW_DAYS_AGO("a few days ago"),
+    ABOUT_A_WEEK_AGO("about a week ago"),
+    A_FEW_WEEKS_AGO("a few weeks ago"),
+    ABOUT_A_MONTH_AGO("about a month ago"),
+    A_WHILE_AGO("a while ago");
 
     private final String label;
-    private final Duration maxDuration;
 
-    TimeLabel(String label, Duration maxDuration) {
+    TimeLabel(String label) {
         this.label = label;
-        this.maxDuration = maxDuration;
     }
 
     public String getLabel() {
@@ -27,12 +34,43 @@ public enum TimeLabel {
     }
 
     public static String computeLabel(LocalDateTime eventTime, LocalDateTime referenceTime) {
+        if (eventTime == null) return "";
+
         Duration elapsed = Duration.between(eventTime, referenceTime);
-        for (TimeLabel tl : values()) {
-            if (elapsed.compareTo(tl.maxDuration) <= 0) {
-                return tl.label;
-            }
+        if (elapsed.isNegative()) return "";
+
+        if (elapsed.compareTo(Duration.ofMinutes(5)) <= 0) {
+            return JUST_NOW.label;
         }
+        if (elapsed.compareTo(Duration.ofHours(1)) <= 0) {
+            return A_FEW_MINUTES_AGO.label;
+        }
+
+        LocalDate eventDate = eventTime.toLocalDate();
+        LocalDate refDate = referenceTime.toLocalDate();
+        long daysBetween = ChronoUnit.DAYS.between(eventDate, refDate);
+
+        if (daysBetween == 0) {
+            return timeSlotLabel(eventTime.toLocalTime(), "this", true);
+        }
+        if (daysBetween == 1) {
+            return timeSlotLabel(eventTime.toLocalTime(), "yesterday", false);
+        }
+
+        long totalDays = elapsed.toDays();
+        if (totalDays <= 7) return A_FEW_DAYS_AGO.label;
+        if (totalDays <= 14) return ABOUT_A_WEEK_AGO.label;
+        if (totalDays <= 30) return A_FEW_WEEKS_AGO.label;
+        if (totalDays <= 60) return ABOUT_A_MONTH_AGO.label;
         return A_WHILE_AGO.label;
+    }
+
+    private static String timeSlotLabel(LocalTime time, String prefix, boolean isToday) {
+        int hour = time.getHour();
+        if (hour < 6) return LAST_NIGHT.label;
+        if (hour < 12) return isToday ? THIS_MORNING.label : YESTERDAY_MORNING.label;
+        if (hour < 18) return isToday ? THIS_AFTERNOON.label : YESTERDAY_AFTERNOON.label;
+        if (hour < 22) return isToday ? THIS_EVENING.label : YESTERDAY_EVENING.label;
+        return isToday ? TONIGHT.label : LAST_NIGHT.label;
     }
 }

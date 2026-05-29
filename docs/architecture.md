@@ -53,6 +53,8 @@
 | 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `CoachMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/MemoryService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
 | 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，top-2 结果 (cosine ≥ 0.6) 注入 System Prompt `{memoryCues}` 占位符。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
+| 42 | TimeLabel 时间感知增强 | `TimeLabel` 计算逻辑从 Duration 桶遍历改为日期+时段判断。≤5分钟 "just now"，≤1小时 "a few minutes ago"，其余按日期分段：今天按时段（last night / this morning / this afternoon / this evening / tonight），昨天同样按时段（last night / yesterday morning / yesterday afternoon / yesterday evening / last night），2天以上保持 "a few days ago" 等模糊标签。`computeLabel(LocalDateTime, LocalDateTime)` API 签名不变。 |
+| 43 | LLM max output tokens 按 Agent 配置 | 新增 `app.llm.max-output-tokens` 配置，支持按 Agent 类型独立设置最大输出 token 数。默认 2048，ReportAgent 使用 4096（报告需更长输出）。`LangChain4jConfig` 创建独立的 `ChatLanguageModel` bean（default / report），`TaskRunner` 按 `TaskName.REPORT` 路由到对应模型。`MaxOutputTokens` 通过 `@ConfigurationProperties` 绑定，未配置的 Agent 自动回退到 default。 |
 
 ---
 
@@ -352,7 +354,7 @@ Enum: SessionStatus { ACTIVE, COMPLETED, FAILED }
 Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAILY_TALK("Daily Talk", "daily_talk") }
 Enum: MemoryType { TOPIC_SUMMARY, LEARNING_PROFILE }
 Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
-Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, EARLIER_TODAY, YESTERDAY, A_FEW_DAYS_AGO, ABOUT_A_WEEK_AGO, A_FEW_WEEKS_AGO, ABOUT_A_MONTH_AGO, A_WHILE_AGO }
+Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AFTERNOON, THIS_EVENING, TONIGHT, YESTERDAY_MORNING, YESTERDAY_AFTERNOON, YESTERDAY_EVENING, A_FEW_DAYS_AGO, ABOUT_A_WEEK_AGO, A_FEW_WEEKS_AGO, ABOUT_A_MONTH_AGO, A_WHILE_AGO }（计算方式为日期+时段判断，非 Duration 桶遍历）
 ```
 
 > **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。

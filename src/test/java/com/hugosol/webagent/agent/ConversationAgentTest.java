@@ -285,27 +285,27 @@ class ConversationAgentTest {
     @Test
     void applyTimeLabelsToCues_addsTimePrefixToEachCue() {
         var now = java.time.LocalDateTime.now();
-        var yesterday = now.minusDays(1);
+        var yesterday9am = now.minusDays(1).withHour(9).withMinute(0).withSecond(0);
         var lastWeek = now.minusDays(5);
 
         String result = ConversationAgent.applyTimeLabelsToCues(
                 "Work Standup: discussed login, as well as, Travel: Japan trip",
-                List.of(yesterday, lastWeek));
+                List.of(yesterday9am, lastWeek));
 
         assertThat(result).isEqualTo(
-                "[from yesterday] Work Standup: discussed login, as well as, [from a few days ago] Travel: Japan trip");
+                "[from yesterday morning] Work Standup: discussed login, as well as, [from a few days ago] Travel: Japan trip");
     }
 
     @Test
     void applyTimeLabelsToCues_skipsNullCreatedAt() {
-        var yesterday = java.time.LocalDateTime.now().minusDays(1);
+        var yesterday9am = java.time.LocalDateTime.now().minusDays(1).withHour(9).withMinute(0).withSecond(0);
 
         String result = ConversationAgent.applyTimeLabelsToCues(
                 "Topic A: details, as well as, Topic B: details",
-                java.util.Arrays.asList(yesterday, null));
+                java.util.Arrays.asList(yesterday9am, null));
 
         assertThat(result).isEqualTo(
-                "[from yesterday] Topic A: details, as well as, Topic B: details");
+                "[from yesterday morning] Topic A: details, as well as, Topic B: details");
     }
 
     @Test

@@ -9,6 +9,7 @@ import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.time.Duration;
 
@@ -27,12 +28,16 @@ public class LangChain4jConfig {
     @Value("${langchain4j.openai.chat-model.temperature:0.7}")
     private double temperature;
 
-    @Value("${langchain4j.openai.chat-model.max-tokens:2048}")
-    private int maxTokens;
-
     @Value("${langchain4j.openai.chat-model.timeout:30s}")
     private Duration timeout;
 
+    private final AppProperties appProperties;
+
+    public LangChain4jConfig(AppProperties appProperties) {
+        this.appProperties = appProperties;
+    }
+
+    @Primary
     @Bean
     public ChatLanguageModel chatLanguageModel() {
         return OpenAiChatModel.builder()
@@ -40,7 +45,19 @@ public class LangChain4jConfig {
                 .apiKey(apiKey)
                 .modelName(modelName)
                 .temperature(temperature)
-                .maxTokens(maxTokens)
+                .maxTokens(appProperties.getLlm().getMaxOutputTokens().getDefaultValue())
+                .timeout(timeout)
+                .build();
+    }
+
+    @Bean
+    public ChatLanguageModel reportChatLanguageModel() {
+        return OpenAiChatModel.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .modelName(modelName)
+                .temperature(temperature)
+                .maxTokens(appProperties.getLlm().getMaxOutputTokens().getReport())
                 .timeout(timeout)
                 .build();
     }
@@ -52,7 +69,7 @@ public class LangChain4jConfig {
                 .apiKey(apiKey)
                 .modelName(modelName)
                 .temperature(temperature)
-                .maxTokens(maxTokens)
+                .maxTokens(appProperties.getLlm().getMaxOutputTokens().getConversation())
                 .timeout(timeout)
                 .build();
     }

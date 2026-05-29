@@ -50,7 +50,7 @@ class CorrectionAgentTest {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
         LlmCallLogService logService = mock(LlmCallLogService.class);
-        TaskRunner runner = new TaskRunner(chatModel, logService);
+        TaskRunner runner = new TaskRunner(chatModel, chatModel, logService);
         agent = new CorrectionAgent(runner, promptLoader, new ObjectMapper());
     }
 

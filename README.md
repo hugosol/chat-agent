@@ -289,6 +289,8 @@ App-level configuration in `application.yml`:
 | `app.memory.cue-summary-max-sentences` | `4` | MemoryCue summary max sentence count |
 | `app.memory.retrieval.top-k` | `2` | Max RAG search results per turn |
 | `app.memory.retrieval.similarity-threshold` | `0.6` | Minimum cosine similarity for RAG match |
+| `app.llm.max-output-tokens.default` | `2048` | Default max output tokens for all agents |
+| `app.llm.max-output-tokens.report` | `4096` | Max output tokens for ReportAgent (overrides default) |
 
 ## Known Limitations
 

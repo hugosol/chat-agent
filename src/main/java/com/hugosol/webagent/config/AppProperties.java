@@ -1,5 +1,6 @@
 package com.hugosol.webagent.config;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ public class AppProperties {
     private List<InitialUser> initialUsers = new ArrayList<>();
     private Security security = new Security();
     private Memory memory = new Memory();
+    private Llm llm = new Llm();
 
     public int getTokenLimit() { return tokenLimit; }
     public void setTokenLimit(int tokenLimit) { this.tokenLimit = tokenLimit; }
@@ -44,6 +46,14 @@ public class AppProperties {
         return memory;
     }
     public void setMemory(Memory memory) { this.memory = memory; }
+
+    public Llm getLlm() {
+        if (llm == null) {
+            llm = new Llm();
+        }
+        return llm;
+    }
+    public void setLlm(Llm llm) { this.llm = llm; }
 
     public record InitialUser(String username, String password) {}
 
@@ -95,5 +105,34 @@ public class AppProperties {
 
         public double getSimilarityThreshold() { return similarityThreshold; }
         public void setSimilarityThreshold(double similarityThreshold) { this.similarityThreshold = similarityThreshold; }
+    }
+
+    public static class Llm {
+        private MaxOutputTokens maxOutputTokens = new MaxOutputTokens();
+
+        public MaxOutputTokens getMaxOutputTokens() {
+            if (maxOutputTokens == null) {
+                maxOutputTokens = new MaxOutputTokens();
+            }
+            return maxOutputTokens;
+        }
+        public void setMaxOutputTokens(MaxOutputTokens maxOutputTokens) { this.maxOutputTokens = maxOutputTokens; }
+    }
+
+    public static class MaxOutputTokens {
+        @JsonProperty("default")
+        private int defaultValue = 2048;
+        private int report;
+
+        public int getDefaultValue() { return defaultValue; }
+        public void setDefaultValue(int defaultValue) { this.defaultValue = defaultValue; }
+
+        public int getReport() { return report > 0 ? report : getDefaultValue(); }
+        public void setReport(int report) { this.report = report; }
+
+        public int getConversation() { return getDefaultValue(); }
+        public int getCorrection() { return getDefaultValue(); }
+        public int getMemoryCue() { return getDefaultValue(); }
+        public int getLearning() { return getDefaultValue(); }
     }
 }
