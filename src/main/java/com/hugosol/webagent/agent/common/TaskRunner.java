@@ -4,6 +4,7 @@ import com.hugosol.webagent.service.LlmCallLogService;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -14,12 +15,16 @@ public class TaskRunner {
 
     private static final Logger log = LoggerFactory.getLogger(TaskRunner.class);
 
-    private final ChatLanguageModel chatModel;
+    private final ChatLanguageModel defaultChatModel;
+    private final ChatLanguageModel reportChatModel;
     private final LlmCallLogService logService;
     private final Map<TaskName, TaskDefinition<?, ?>> registry = new ConcurrentHashMap<>();
 
-    public TaskRunner(ChatLanguageModel chatModel, LlmCallLogService logService) {
-        this.chatModel = chatModel;
+    public TaskRunner(@Qualifier("chatLanguageModel") ChatLanguageModel defaultChatModel,
+                      @Qualifier("reportChatLanguageModel") ChatLanguageModel reportChatModel,
+                      LlmCallLogService logService) {
+        this.defaultChatModel = defaultChatModel;
+        this.reportChatModel = reportChatModel;
         this.logService = logService;
     }
 
@@ -40,10 +45,12 @@ public class TaskRunner {
         Map<String, String> placeholders = def.paramBuilder().apply(params);
         String prompt = fillTemplate(def.template(), placeholders);
 
+        ChatLanguageModel model = (name == TaskName.REPORT) ? reportChatModel : defaultChatModel;
+
         long startTime = System.currentTimeMillis();
         String response;
         try {
-            response = chatModel.chat(prompt);
+            response = model.chat(prompt);
         } catch (RuntimeException e) {
             long duration = System.currentTimeMillis() - startTime;
             logService.saveAsync(

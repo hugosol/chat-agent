@@ -43,7 +43,7 @@ class EnglishCoachMemoryCueIT extends E2ETestBase {
         takeScreenshot("memorycue-report");
 
         String reportText = getReportModalText();
-        assertTrue(reportText.contains("Topic Summary"), "report should show topic summary section");
+        assertTrue(reportText.contains("Overall Assessment"), "report should show overall assessment section");
 
         Thread.sleep(500);
 

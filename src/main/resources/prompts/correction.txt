@@ -14,6 +14,7 @@ Given the user's latest utterance, identify errors in these 5 categories:
 5. FLUENCY: missing transitions, excessive filler words, choppy or run-on sentences
 
 IMPORTANT: Only flag REAL errors. Do not invent issues. If the English is correct, return empty array.
+IMPORTANT: Use single quotes for quoting words inside JSON string values. Never use unescaped double quotes.
 
 Output ONLY a JSON array with this exact structure (no markdown, no explanation outside JSON):
 [

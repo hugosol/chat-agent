@@ -54,7 +54,7 @@ public abstract class E2ETestBase {
     protected SessionReportRepository sessionReportRepository;
 
     @Autowired
-    protected UserMemoryRepository userMemoryRepository;
+    protected UserLearningProfileRepository userLearningProfileRepository;
 
     @Autowired
     protected MemoryCueRepository memoryCueRepository;

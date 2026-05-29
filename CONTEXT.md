@@ -1,6 +1,6 @@
 # CONTEXT — English Coach
 
-English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（User Memory）。
+English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（UserLearningProfile）。
 
 ## People and Identity
 
@@ -57,20 +57,20 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
-| **User Memory** | A persistent summary record in H2 that captures a Learner's conversation topics or learning progress, surviving across Practice sessions | Memory, memory record, profile |
-| **Topic Memory** | A User Memory of type TOPIC_SUMMARY — a summary of the conversation topics from the most recent Practice session of the same AgentMode (mode-scoped isolation). Each session end writes the new topic summary directly as a new version (INSERT, version++); old versions are retained as immutable history. RAG MemoryCue retrieval handles cross-session topic recall. | Topic summary, conversation memory |
-| **Learning Profile** | A User Memory of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
+| **UserLearningProfile** | A persistent summary record in H2 that captures a Learner's conversation topics or learning progress, surviving across Practice sessions | Memory, memory record, profile |
+| **Learning Profile** | A UserLearningProfile of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
 | **Memory Merge** | An LLM-driven process that combines an old Learning Profile (version N) with a newly completed session's Report to produce an updated version (N+1). Topic Memory no longer uses merge — it directly writes the new session's topic summary as a new version. | Incremental update, memory consolidation |
-| **Memory Injection** | The act of inserting Topic Memory and Learning Profile into the first Turn's System Prompt (messageId ≤ 1) so the Agent can naturally bring up past context | Context injection, memory recall |
+| **Memory Injection** | The unified RAG pipeline that injects historical conversation context into each Turn's System Prompt. On each user message, EmbeddingService performs semantic search against past MemoryCue records. When RAG returns matches, they populate the MemoryCueQueue for cross-turn recall. When RAG returns no matches (cold start or topic gap), a fallback anchor — the most recent session's last completed MemoryCue — is loaded from H2 to provide conversation continuity. This fallback anchor survives approximately one round before eviction. LearningProfile is injected on the first Turn only. | Context injection, memory recall |
 | **Active Engagement** | A System Prompt instruction directing the Agent to proactively bring up unfinished topics and ask questions based on the injected memory | Initiative prompt, engagement instruction |
-| **Memory Version** | A sequential integer on each User Memory record, starting at 1 and incremented by each Memory Merge operation | Version number, revision counter |
+| **Memory Version** | A sequential integer on each UserLearningProfile record, starting at 1 and incremented by each Memory Merge operation | Version number, revision counter |
 | **MemoryCue** | A structured memory record in the `memory_cues` table — one row per conversation topic segment, containing topic and summary. Generated post-session by MemoryCueAgent via two-step LLM analysis (topic switch detection + per-segment summarization). Vectorized by EmbeddingService into an InMemoryEmbeddingStore for semantic RAG retrieval starting from Round 4. | Structured memory, topic cue |
 | **Memory Cue Split** | The first LLM step in MemoryCue generation: analyzes the full conversation transcript and detects topic switch points, returning a list of message index boundaries | Topic switch detection, split detection |
 | **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary)` pair in structured JSON | Segment summarization, cue generation |
-| **MemoryCue Retrieval** | Vector semantic retrieval of historical MemoryCue records using ONNX embeddings (all-MiniLM-L6-v2, 384 dimensions). Starting from Round 2 (after User Memory's 1-turn window), each user message triggers a cosine-similarity search against past cues filtered by userId × AgentMode, injecting top-2 matches into the System Prompt. | RAG retrieval, semantic search, vector recall |
+| **MemoryCueQueue** | An LRU ordered set (capacity = topK + 1) living in CoachState across Turns. The +1 extra slot is deliberate — it serves as an LRU buffer so newly-loaded matches don't immediately evict older entries. On first RAG load (queue empty), `topK + 1` results are pushed; on subsequent loads, `topK` results are pushed with dedup (same cueId refreshes to head). When full, the least-recently-accessed entry is evicted from the tail. Fallback anchor entries (inserted when RAG returns no matches) survive approximately one round before being evicted via FIFO — they help the Agent maintain continuity without polluting the long-term queue. The queue is sorted FIFO + dedup, not by relevance score. Injected into the System Prompt as a numbered list sorted tail→head (old→new) with time labels per entry. | LRU queue, memory queue, context queue |
+| **MemoryCue Retrieval** | Vector semantic retrieval of historical MemoryCue records using ONNX embeddings (all-MiniLM-L6-v2, 384 dimensions). Starting from Round 2 (after UserLearningProfile's 1-turn window), each user message triggers a cosine-similarity search against past cues filtered by userId × AgentMode. Results are managed through MemoryCueQueue — first load retrieves `topK + 1` entries, subsequent loads retrieve `topK` entries, with LRU dedup and eviction for cross-turn memory migration. | RAG retrieval, semantic search, vector recall |
 | **EmbeddingService** | The RAG vectorization module: manages InMemoryEmbeddingStore lifecycle (init from disk or H2, async indexing, search with metadata filtering, JSON disk serialization). Uses a dedicated `embeddingExecutor` thread pool for ONNX CPU-bound operations. | Vector service, embedding module |
 | **CueMatch** | A DTO record returned by `EmbeddingService.search()` containing `(cueId, topic, summary, score, createdAt)`, decoupled from JPA entities. `createdAt` carries the original MemoryCue creation time for time-aware labeling in the System Prompt. | Search result, match record |
-| **MemoryContent** | A DTO record encapsulating all memory data injected into the System Prompt: `(topicSummary, learningProfile, memoryCuesText, topicCreatedAt, cueCreatedAts)`. The timestamp fields enable time-aware labeling (e.g., `[from yesterday]`) in the System Prompt. Replaces three separate parameters in ConversationAgent and TurnProcessor. | Prompt payload, memory injection package |
+| **MemoryContent** | A DTO record encapsulating all memory data injected into the System Prompt: `(lastConversationTimeLabel, learningProfile, cueMatches)`. `cueMatches` carries a structured list of CueMatch records instead of pre-joined text, eliminating string-splitting fragility. Time labels are applied by ConversationAgent during prompt formatting. | Prompt payload, memory injection package |
 
 ## Observability
 
@@ -99,11 +99,11 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 - A **Practice session** has at most one **Active Tab** at any moment (via the Binding map).
 - A **Tab takeover** occurs when a Learner resumes their own Practice session from a different tab, displacing the previous Active Tab.
 - A **Stale Tab** self-heals via a **Visibility resume** that triggers a **State rebuild**.
-- A **Learner** has zero or more **User Memory** records, each identified by type.
+- A **Learner** has zero or more **UserLearningProfile** records, each identified by type.
 - A **Practice session** end triggers a direct-write of the new **Topic Memory** (INSERT new version) and one **Memory Merge** for **Learning Profile**, executed asynchronously alongside **MemoryCue** generation.
 - The first **Turn** of a new Practice session includes a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt (messageId ≤ 1).
 - A **Topic Memory** write reads the latest **Memory Version**, increments it, and inserts a new row directly from the session Report — no LLM merge. A **Learning Profile Merge** uses an LLM call to combine the previous and new profiles before inserting. Old versions remain as immutable history.
-- Each **User Memory** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
+- Each **UserLearningProfile** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
 - A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status. After all segments complete, **Tag Consolidation** merges equivalent tags across all historical MemoryCue rows for the same Learner+Mode into canonical forms in-place.
 
 ## Flagged Ambiguities
@@ -114,7 +114,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 
 - **Token** was used to mean both an LLM usage unit (counted by TokenTracker) and a CSRF token. **Resolution:** Use "LLM token" or "token usage" for the LLM context; use "CSRF token" for security context. Never say "token" alone.
 
-- **Memory** was used to mean both the in-memory runtime state (CoachState, Active states map) and the persistent cross-session User Memory entity. **Resolution:** Use "In-memory state" or "Active states map" for runtime; use "User Memory" for the persisted H2 record. Never say "memory" alone.
+- **Memory** was used to mean both the in-memory runtime state (CoachState, Active states map) and the persistent cross-session UserLearningProfile entity. **Resolution:** Use "In-memory state" or "Active states map" for runtime; use "UserLearningProfile" for the persisted H2 record. Never say "memory" alone.
 
 - **Resume** was used for both the WebSocket protocol message (RESUME_SESSION) and the Page Visibility API pattern (Visibility resume). **Resolution:** "Protocol resume" for the WebSocket message; "Visibility resume" for the tab-activation auto-refresh. Both restore UI state but through different triggers.
 
@@ -150,4 +150,4 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 >
 > **Dev:** "And does logout clean up the Active states map?"
 >
-> **Domain expert:** "Yes — the cleanup handler walks the map and removes every Practice session owned by that Learner. User Memory persists in H2 regardless."
+> **Domain expert:** "Yes — the cleanup handler walks the map and removes every Practice session owned by that Learner. UserLearningProfile persists in H2 regardless."

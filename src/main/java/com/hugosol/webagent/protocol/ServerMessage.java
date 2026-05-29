@@ -44,7 +44,7 @@ public sealed interface ServerMessage
     record TokenWarning(double usage, String message) implements ServerMessage {
     }
 
-    record ReportData(String summary, String topicSummary, int fluencyScore, String errorSummary,
+    record ReportData(String summary, int fluencyScore, String errorSummary,
                       String keyTakeaway) {
     }
 

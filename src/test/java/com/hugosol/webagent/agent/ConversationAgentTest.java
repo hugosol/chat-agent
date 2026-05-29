@@ -1,6 +1,7 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
+import com.hugosol.webagent.dto.CueMatch;
 import com.hugosol.webagent.dto.MemoryContent;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
@@ -218,17 +219,17 @@ class ConversationAgentTest {
     }
 
     @Test
-    void userMemoryInjection_containsTopicAndProfile() {
+    void lastConversationAndProfile_injectedIndependently() {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent("Talked about travel plans", "Past tense needs work", null),
+                new MemoryContent("earlier today", "Past tense needs work", null),
                 0,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).contains("Conversation Memory");
-        assertThat(systemContent).contains("Talked about travel plans");
+        assertThat(systemContent).contains("The last conversation was earlier today");
+        assertThat(systemContent).contains("Pick up conversation naturally");
         assertThat(systemContent).contains("Your Learning Profile");
         assertThat(systemContent).contains("Past tense needs work");
         assertThat(systemContent).contains("Active Engagement");
@@ -236,19 +237,22 @@ class ConversationAgentTest {
 
     @Test
     void ragMemoryInjection_containsMemoryCues() {
+        var cue = new CueMatch("cue-1", "Work Standup", "Discussed login module", 0.85,
+                java.time.LocalDateTime.of(2026, 5, 27, 10, 0));
+
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, "Work Standup: discussed login module, as well as, Sprint Planning: sprint review notes"),
+                new MemoryContent(null, null, List.of(cue)),
                 0,
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).doesNotContain("Conversation Memory");
+        assertThat(systemContent).doesNotContain("The last conversation was");
         assertThat(systemContent).doesNotContain("Your Learning Profile");
-        assertThat(systemContent).contains("Memory Cues");
-        assertThat(systemContent).contains("login module");
-        assertThat(systemContent).contains("sprint review");
+        assertThat(systemContent).contains("[Memory Cues]");
+        assertThat(systemContent).contains("1. [from ");
+        assertThat(systemContent).contains("Work Standup: Discussed login module");
         assertThat(systemContent).contains("Active Engagement");
     }
 
@@ -262,7 +266,7 @@ class ConversationAgentTest {
                 new NoopHandler());
 
         String systemContent = getSystemContent();
-        assertThat(systemContent).doesNotContain("Conversation Memory");
+        assertThat(systemContent).doesNotContain("The last conversation was");
         assertThat(systemContent).doesNotContain("Memory Cues");
         assertThat(systemContent).doesNotContain("Active Engagement");
     }
@@ -283,45 +287,55 @@ class ConversationAgentTest {
     }
 
     @Test
-    void applyTimeLabelsToCues_addsTimePrefixToEachCue() {
+    void formatMemoryCuesForPrompt_producesNumberedListWithTimeLabels() {
         var now = java.time.LocalDateTime.now();
-        var yesterday = now.minusDays(1);
+        var yesterday9am = now.minusDays(1).withHour(9).withMinute(0).withSecond(0);
         var lastWeek = now.minusDays(5);
 
-        String result = ConversationAgent.applyTimeLabelsToCues(
-                "Work Standup: discussed login, as well as, Travel: Japan trip",
-                List.of(yesterday, lastWeek));
+        var cue1 = new CueMatch("c1", "Work Standup", "Discussed login", 0.85, yesterday9am);
+        var cue2 = new CueMatch("c2", "Travel", "Japan trip plan", 0.75, lastWeek);
 
-        assertThat(result).isEqualTo(
-                "[from yesterday] Work Standup: discussed login, as well as, [from a few days ago] Travel: Japan trip");
+        agent.generateStream(
+                List.of(new MessageData(MessageRole.USER, "Hi", 0)),
+                AgentMode.WORKPLACE_STANDUP,
+                new MemoryContent(null, null, List.of(cue2, cue1)),
+                0,
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("[Memory Cues]");
+        assertThat(systemContent).contains("1. [from ");
+        assertThat(systemContent).contains("Travel: Japan trip plan");
+        assertThat(systemContent).contains("2. [from ");
+        assertThat(systemContent).contains("Work Standup: Discussed login");
     }
 
     @Test
-    void applyTimeLabelsToCues_skipsNullCreatedAt() {
-        var yesterday = java.time.LocalDateTime.now().minusDays(1);
+    void emptyCueMatches_noMemoryCuesInjection() {
+        agent.generateStream(
+                List.of(new MessageData(MessageRole.USER, "Hi", 0)),
+                AgentMode.WORKPLACE_STANDUP,
+                new MemoryContent(null, null, List.of()),
+                0,
+                new NoopHandler());
 
-        String result = ConversationAgent.applyTimeLabelsToCues(
-                "Topic A: details, as well as, Topic B: details",
-                java.util.Arrays.asList(yesterday, null));
-
-        assertThat(result).isEqualTo(
-                "[from yesterday] Topic A: details, as well as, Topic B: details");
+        String systemContent = getSystemContent();
+        assertThat(systemContent).doesNotContain("Memory Cues");
+        assertThat(systemContent).doesNotContain("Active Engagement");
     }
 
     @Test
-    void applyTimeLabelsToCues_emptyCueListReturnsOriginal() {
-        String result = ConversationAgent.applyTimeLabelsToCues(
-                "Topic: details", List.of());
+    void nullCueMatches_noMemoryCuesInjection() {
+        agent.generateStream(
+                List.of(new MessageData(MessageRole.USER, "Hi", 0)),
+                AgentMode.WORKPLACE_STANDUP,
+                new MemoryContent(null, null, (List<CueMatch>) null),
+                0,
+                new NoopHandler());
 
-        assertThat(result).isEqualTo("Topic: details");
-    }
-
-    @Test
-    void applyTimeLabelsToCues_nullCueListReturnsOriginal() {
-        String result = ConversationAgent.applyTimeLabelsToCues(
-                "Topic: details", null);
-
-        assertThat(result).isEqualTo("Topic: details");
+        String systemContent = getSystemContent();
+        assertThat(systemContent).doesNotContain("Memory Cues");
+        assertThat(systemContent).doesNotContain("Active Engagement");
     }
 
     private String getSystemContent() {

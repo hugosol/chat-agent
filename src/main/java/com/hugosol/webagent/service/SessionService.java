@@ -1,5 +1,7 @@
 package com.hugosol.webagent.service;
 
+import com.hugosol.webagent.config.AppProperties;
+import com.hugosol.webagent.dto.MemoryCueQueue;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
@@ -27,18 +29,20 @@ public class SessionService {
     private final Map<String, String> sessionToWs = new ConcurrentHashMap<>();
     private final Map<String, List<CompletableFuture<Void>>> pendingCorrections = new ConcurrentHashMap<>();
     private final TokenTracker tokenTracker;
-    private final MemoryService memoryService;
+    private final LearningProfileService learningProfileService;
+    private final AppProperties appProperties;
 
-    public SessionService(TokenTracker tokenTracker, MemoryService memoryService) {
+    public SessionService(TokenTracker tokenTracker, LearningProfileService learningProfileService, AppProperties appProperties) {
         this.tokenTracker = tokenTracker;
-        this.memoryService = memoryService;
+        this.learningProfileService = learningProfileService;
+        this.appProperties = appProperties;
     }
 
     public void init(String sessionId, String mode, String userId, String wsId) {
-        AgentMode agentMode = AgentMode.valueOf(mode);
-        String topicMemory = memoryService.loadLatestContent(userId, "TOPIC_SUMMARY", agentMode);
-        String learningProfile = memoryService.loadLatestContent(userId, "LEARNING_PROFILE", null);
-        Map<String, Object> initData = CoachState.initialState(sessionId, mode, userId, topicMemory, learningProfile);
+        String learningProfile = learningProfileService.loadLatestContent(userId, "LEARNING_PROFILE", null);
+        int queueCapacity = appProperties.getMemory().getRetrieval().getTopK() + 1;
+        var memoryCueQueue = new MemoryCueQueue(queueCapacity);
+        Map<String, Object> initData = CoachState.initialState(sessionId, mode, userId, learningProfile, memoryCueQueue);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
         tokenTracker.initSession(sessionId);
@@ -142,14 +146,14 @@ public class SessionService {
         return state != null ? state.corrections().size() : 0;
     }
 
-    public String getTopicMemory(String sessionId) {
-        CoachState state = activeStates.get(sessionId);
-        return state != null ? state.topicMemory() : "";
-    }
-
     public String getLearningProfile(String sessionId) {
         CoachState state = activeStates.get(sessionId);
         return state != null ? state.learningProfile() : "";
+    }
+
+    public MemoryCueQueue getMemoryCueQueue(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.memoryCueQueue() : null;
     }
 
     public double getUsageRatio(String sessionId) {

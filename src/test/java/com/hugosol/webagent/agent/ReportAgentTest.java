@@ -53,7 +53,7 @@ class ReportAgentTest {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
         LlmCallLogService logService = mock(LlmCallLogService.class);
-        TaskRunner runner = new TaskRunner(chatModel, logService);
+        TaskRunner runner = new TaskRunner(chatModel, chatModel, logService);
         agent = new ReportAgent(runner, promptLoader, new ObjectMapper());
     }
 
@@ -75,7 +75,6 @@ class ReportAgentTest {
         );
 
         assertThat(result.overallAssessment()).isEqualTo("Good progress");
-        assertThat(result.topicSummary()).isEqualTo("Talked about work and travel");
         assertThat(result.errorSummary()).isEqualTo("Grammar: 2, Chinglish: 1");
         assertThat(result.fluencyScore()).isEqualTo(7);
         assertThat(result.keyTakeaway()).isEqualTo("Practice past tense");
@@ -88,7 +87,6 @@ class ReportAgentTest {
                 new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
         assertThat(result.overallAssessment()).isEmpty();
-        assertThat(result.topicSummary()).isEmpty();
         assertThat(result.errorSummary()).isEmpty();
         assertThat(result.fluencyScore()).isZero();
         assertThat(result.keyTakeaway()).isEmpty();
@@ -163,7 +161,6 @@ class ReportAgentTest {
 
         assertThat(result.fluencyScore()).isEqualTo(5);
         assertThat(result.overallAssessment()).isEmpty();
-        assertThat(result.topicSummary()).isEmpty();
         assertThat(result.keyTakeaway()).isEmpty();
     }
 

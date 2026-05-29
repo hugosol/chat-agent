@@ -5,6 +5,7 @@ import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.CueMatch;
 import com.hugosol.webagent.dto.MemoryContent;
+import com.hugosol.webagent.dto.MemoryCueQueue;
 import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.graph.nodes.CorrectionNode;
@@ -12,6 +13,7 @@ import com.hugosol.webagent.model.AgentMode;
 import com.hugosol.webagent.model.AgentType;
 import com.hugosol.webagent.model.ErrorType;
 import com.hugosol.webagent.model.MessageRole;
+import com.hugosol.webagent.repository.MemoryCueRepository;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.TokenUsage;
@@ -20,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +39,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class TurnProcessorTest {
 
     @Mock
@@ -53,7 +58,10 @@ class TurnProcessorTest {
     private EmbeddingService embeddingService;
 
     @Mock
-    private MemoryService memoryService;
+    private LearningProfileService learningProfileService;
+
+    @Mock
+    private MemoryCueRepository memoryCueRepository;
 
     private AppProperties appProperties;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -65,8 +73,8 @@ class TurnProcessorTest {
         when(sessionService.getMode(anyString())).thenReturn("WORKPLACE_STANDUP");
         when(sessionService.getUserId(anyString())).thenReturn("user-1");
         when(sessionService.getCorrectionCount(anyString())).thenReturn(0);
-        when(sessionService.getTopicMemory(anyString())).thenReturn("");
         when(sessionService.getLearningProfile(anyString())).thenReturn("");
+        when(sessionService.getMemoryCueQueue(anyString())).thenReturn(new MemoryCueQueue(3));
         when(conversationAgent.buildPromptJson(any(), any(AgentMode.class), any(MemoryContent.class), anyInt()))
                 .thenReturn("[{\"role\":\"system\",\"content\":\"You are a coach\"},{\"role\":\"user\",\"content\":\"hi\"},{\"role\":\"assistant\",\"content\":\"Hello\"}]");
     }
@@ -161,7 +169,7 @@ class TurnProcessorTest {
     }
 
     @Test
-    void messageIdOne_doesNotCallRagSearch() throws Exception {
+    void messageIdOne_callsRagSearch() throws Exception {
         setupConversationAgent("ok", 0);
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -174,7 +182,7 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(embeddingService, never()).search(anyString(), any(), anyString(), anyInt(), anyDouble());
+        verify(embeddingService).search(eq("hi"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
     }
 
     @Test
@@ -288,9 +296,85 @@ class TurnProcessorTest {
         verify(sessionService).addPendingCorrection(eq("s1"), any(CompletableFuture.class));
     }
 
+    @Test
+    void messageIdTwo_firstRagLoad_searchesTopK() throws Exception {
+        setupConversationAgent("ok", 0);
+        var cueA = new CueMatch("a", "Topic A", "Summary A", 0.6,
+                java.time.LocalDateTime.of(2026, 5, 28, 10, 0));
+        var cueB = new CueMatch("b", "Topic B", "Summary B", 0.75,
+                java.time.LocalDateTime.of(2026, 5, 28, 10, 0));
+        var cueC = new CueMatch("c", "Topic C", "Summary C", 0.9,
+                java.time.LocalDateTime.of(2026, 5, 28, 10, 0));
+        when(embeddingService.search(eq("my input"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6)))
+                .thenReturn(List.of(cueA, cueB, cueC));
+
+        TurnProcessor processor = newProcessor();
+        CountDownLatch latch = new CountDownLatch(1);
+
+        processor.processTurn("s1", "my input", 2, new StubCallback() {
+            @Override
+            public void onConversationComplete(String text, int msgId, int tokens) {
+                latch.countDown();
+            }
+        });
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(embeddingService).search(eq("my input"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+    }
+
+    @Test
+    void messageIdTwo_firstRagLoad_emptyResults_stillCallsSearch() throws Exception {
+        setupConversationAgent("ok", 0);
+        when(embeddingService.search(eq("new topic"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6)))
+                .thenReturn(List.of());
+
+        TurnProcessor processor = newProcessor();
+        CountDownLatch latch = new CountDownLatch(1);
+
+        processor.processTurn("s1", "new topic", 2, new StubCallback() {
+            @Override
+            public void onConversationComplete(String text, int msgId, int tokens) {
+                latch.countDown();
+            }
+        });
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(embeddingService).search(eq("new topic"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+    }
+
+    @Test
+    void messageIdThree_subsequentRagLoad_searchesTopK() throws Exception {
+        setupConversationAgent("ok", 0);
+        var nonEmptyQueue = new MemoryCueQueue(3);
+        nonEmptyQueue.push(List.of(
+                new CueMatch("a", "A", "A", 0.6, java.time.LocalDateTime.of(2026, 5, 28, 10, 0)),
+                new CueMatch("b", "B", "B", 0.75, java.time.LocalDateTime.of(2026, 5, 28, 10, 0)),
+                new CueMatch("c", "C", "C", 0.9, java.time.LocalDateTime.of(2026, 5, 28, 10, 0))
+        ));
+        when(sessionService.getMemoryCueQueue("s1")).thenReturn(nonEmptyQueue);
+
+        var cueD = new CueMatch("d", "D", "D", 0.7, java.time.LocalDateTime.of(2026, 5, 29, 10, 0));
+        var cueE = new CueMatch("e", "E", "E", 0.85, java.time.LocalDateTime.of(2026, 5, 29, 10, 0));
+        when(embeddingService.search(eq("follow up"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6)))
+                .thenReturn(List.of(cueD, cueE));
+
+        TurnProcessor processor = newProcessor();
+        CountDownLatch latch = new CountDownLatch(1);
+
+        processor.processTurn("s1", "follow up", 3, new StubCallback() {
+            @Override
+            public void onConversationComplete(String text, int msgId, int tokens) {
+                latch.countDown();
+            }
+        });
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(embeddingService).search(eq("follow up"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+    }
+
     private TurnProcessor newProcessor() {
         CoachGraphBuilder builder = new CoachGraphBuilder(correctionNode);
-        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, memoryService, appProperties, executor);
+        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, learningProfileService, memoryCueRepository, appProperties, executor);
     }
 
     private void setupConversationAgent(String responseText, int totalTokens) {

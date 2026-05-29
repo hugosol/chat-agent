@@ -1,28 +1,15 @@
 package com.hugosol.webagent.dto;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public record MemoryContent(
-        String topicSummary,
+        String lastConversationTimeLabel,
         String learningProfile,
-        String memoryCuesText,
-        LocalDateTime topicCreatedAt,
-        List<LocalDateTime> cueCreatedAts) {
-
-    public MemoryContent {
-        if (cueCreatedAts == null) {
-            cueCreatedAts = List.of();
-        }
-    }
-
-    public MemoryContent(String topicSummary, String learningProfile, String memoryCuesText) {
-        this(topicSummary, learningProfile, memoryCuesText, null, List.of());
-    }
+        List<CueMatch> cueMatches) {
 
     public boolean isEmpty() {
-        return (topicSummary == null || topicSummary.isEmpty())
+        return (lastConversationTimeLabel == null || lastConversationTimeLabel.isEmpty())
                 && (learningProfile == null || learningProfile.isEmpty())
-                && (memoryCuesText == null || memoryCuesText.isEmpty());
+                && (cueMatches == null || cueMatches.isEmpty());
     }
 }

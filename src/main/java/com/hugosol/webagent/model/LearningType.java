@@ -1,6 +1,5 @@
 package com.hugosol.webagent.model;
 
-public enum MemoryType {
-    TOPIC_SUMMARY,
+public enum LearningType {
     LEARNING_PROFILE
 }

@@ -32,7 +32,7 @@ class SessionCompleteTest {
     private ReportAgent reportAgent;
 
     @Mock
-    private MemoryService memoryService;
+    private LearningProfileService learningProfileService;
 
     @Mock
     private MemoryCueService memoryCueService;
@@ -41,21 +41,21 @@ class SessionCompleteTest {
 
     @BeforeEach
     void setUp() {
-        sessionComplete = new SessionComplete(sessionStore, reportAgent, memoryService, memoryCueService);
+        sessionComplete = new SessionComplete(sessionStore, reportAgent, learningProfileService, memoryCueService);
     }
 
     @Test
     void complete_AllSuccess_ReturnsValidReport() {
         List<MessageData> messages = List.of(new MessageData(MessageRole.USER, "Hello", 1));
         List<CorrectionData> corrections = List.of();
-        ReportResult expectedReport = new ReportResult("Great job", "discussed work", "none", 7, "keep practicing");
+        ReportResult expectedReport = new ReportResult("Great job", "none", 7, "keep practicing");
         when(reportAgent.generate(any(), any(), any())).thenReturn(expectedReport);
 
         ReportResult result = sessionComplete.complete("s1", messages, corrections, "user1", AgentMode.WORKPLACE_STANDUP);
 
         assertThat(result).isEqualTo(expectedReport);
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
-        verify(memoryService).generateMemoryAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
+        verify(learningProfileService).generateLearningProfileAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
         verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
@@ -70,7 +70,7 @@ class SessionCompleteTest {
         assertThat(result.fluencyScore()).isEqualTo(-1);
         assertThat(result.overallAssessment()).contains("failed");
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), isNull());
-        verify(memoryService).generateMemoryAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
+        verify(learningProfileService).generateLearningProfileAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
         verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
@@ -78,14 +78,14 @@ class SessionCompleteTest {
     void complete_PersistFails_ReturnsReport_StillFiresMemory() {
         List<MessageData> messages = List.of(new MessageData(MessageRole.USER, "Hey", 1));
         List<CorrectionData> corrections = List.of();
-        ReportResult expectedReport = new ReportResult("Good", "topics", "minor", 6, "tip");
+        ReportResult expectedReport = new ReportResult("Good", "minor", 6, "tip");
         when(reportAgent.generate(any(), any(), any())).thenReturn(expectedReport);
         when(sessionStore.completeSession(any(), any(), any(), any())).thenThrow(new RuntimeException("DB down"));
 
         ReportResult result = sessionComplete.complete("s1", messages, corrections, "user1", AgentMode.WORKPLACE_STANDUP);
 
         assertThat(result).isEqualTo(expectedReport);
-        verify(memoryService).generateMemoryAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
+        verify(learningProfileService).generateLearningProfileAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
         verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
@@ -99,7 +99,7 @@ class SessionCompleteTest {
         ReportResult result = sessionComplete.complete("s1", messages, corrections, "user1", AgentMode.WORKPLACE_STANDUP);
 
         assertThat(result.fluencyScore()).isEqualTo(-1);
-        verify(memoryService).generateMemoryAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
+        verify(learningProfileService).generateLearningProfileAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
         verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
@@ -107,14 +107,14 @@ class SessionCompleteTest {
     void complete_NullUserId_SkipsMemory() {
         List<MessageData> messages = List.of(new MessageData(MessageRole.USER, "Hello", 1));
         List<CorrectionData> corrections = List.of();
-        ReportResult expectedReport = new ReportResult("OK", "stuff", "none", 5, "tip");
+        ReportResult expectedReport = new ReportResult("OK", "none", 5, "tip");
         when(reportAgent.generate(any(), any(), any())).thenReturn(expectedReport);
 
         ReportResult result = sessionComplete.complete("s1", messages, corrections, null, AgentMode.WORKPLACE_STANDUP);
 
         assertThat(result).isEqualTo(expectedReport);
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
-        verify(memoryService, never()).generateMemoryAsync(any(), any(), any(), any());
+        verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
         verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
     }
 }

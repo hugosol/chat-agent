@@ -44,7 +44,7 @@ public class ReportAgent {
         log.debug("ReportAgent generating...");
         ReportResult result = runner.requestModel(TaskName.REPORT,
                 new ReportParams(messages, allCorrections), ctx);
-        return result != null ? result : new ReportResult("", "", "", 0, "");
+        return result != null ? result : new ReportResult("", "", 0, "");
     }
 
     private ReportResult parseReport(String response) {
@@ -55,14 +55,13 @@ public class ReportAgent {
                     .readValue(response);
             return new ReportResult(
                     getString(sections, "overallAssessment"),
-                    getString(sections, "topicSummary"),
                     getString(sections, "errorSummary"),
                     getInt(sections, "fluencyScore"),
                     getString(sections, "keyTakeaway")
             );
         } catch (Exception e) {
             log.warn("ReportAgent: failed to parse JSON, raw response:\n{}", response, e);
-            return new ReportResult(response, "", "", 0, "");
+            return new ReportResult(response, "", 0, "");
         }
     }
 
@@ -105,7 +104,6 @@ public class ReportAgent {
 
     public record ReportResult(
             String overallAssessment,
-            String topicSummary,
             String errorSummary,
             int fluencyScore,
             String keyTakeaway

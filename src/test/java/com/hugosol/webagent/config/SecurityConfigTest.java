@@ -1,9 +1,9 @@
 package com.hugosol.webagent.config;
 
 import com.hugosol.webagent.model.User;
-import com.hugosol.webagent.repository.UserMemoryRepository;
+import com.hugosol.webagent.repository.UserLearningProfileRepository;
 import com.hugosol.webagent.repository.UserRepository;
-import com.hugosol.webagent.service.MemoryService;
+import com.hugosol.webagent.service.LearningProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,10 +39,10 @@ class SecurityConfigTest {
     private UserRepository userRepository;
 
     @MockBean
-    private MemoryService memoryService;
+    private LearningProfileService learningProfileService;
 
     @MockBean
-    private UserMemoryRepository userMemoryRepository;
+    private UserLearningProfileRepository userLearningProfileRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;

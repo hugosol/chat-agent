@@ -19,18 +19,18 @@ public class SessionComplete {
 
     private static final ReportResult FALLBACK_REPORT = new ReportResult(
             "Sorry, the session report generation failed. Your conversation and corrections have been saved.",
-            "N/A", "N/A", -1, "N/A");
+            "N/A", -1, "N/A");
 
     private final SessionDbStore sessionStore;
     private final ReportAgent reportAgent;
-    private final MemoryService memoryService;
+    private final LearningProfileService learningProfileService;
     private final MemoryCueService memoryCueService;
 
     public SessionComplete(SessionDbStore sessionStore, ReportAgent reportAgent,
-                           MemoryService memoryService, MemoryCueService memoryCueService) {
+                           LearningProfileService learningProfileService, MemoryCueService memoryCueService) {
         this.sessionStore = sessionStore;
         this.reportAgent = reportAgent;
-        this.memoryService = memoryService;
+        this.learningProfileService = learningProfileService;
         this.memoryCueService = memoryCueService;
     }
 
@@ -46,7 +46,7 @@ public class SessionComplete {
         }
 
         if (userId != null) {
-            memoryService.generateMemoryAsync(userId, report, mode, sessionId);
+            learningProfileService.generateLearningProfileAsync(userId, report, mode, sessionId);
             memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
         }
 

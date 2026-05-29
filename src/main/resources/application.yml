@@ -39,10 +39,13 @@ app:
   prompt-directory: classpath:prompts
   memory:
     store-path: data/embedding-store.json
-    user-memory-rounds: 1
     retrieval:
       top-k: 2
-      similarity-threshold: 0.5
+      similarity-threshold: 0.6
   security:
     permit-all-paths:
       - /login/**
+  llm:
+    max-output-tokens:
+      default: 2048
+      report: 4096

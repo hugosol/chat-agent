@@ -180,7 +180,7 @@ class ProtocolDispatcherTest {
                 new ServerMessage.TokenWarning(0.8, "warning text"),
                 new ServerMessage.CorrectionResult(List.of(), 1),
                 new ServerMessage.SessionReportMessage(
-                        new ServerMessage.ReportData("a", "topics", 5, "b", "d")),
+                        new ServerMessage.ReportData("a", 5, "b", "d")),
                 new ServerMessage.SessionResumed("s1", "W", List.of(), List.of(), 0.0),
                 new ServerMessage.SessionHistory(List.of()),
                 new ServerMessage.ErrorMessage("err")

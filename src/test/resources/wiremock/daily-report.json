@@ -7,7 +7,7 @@
     "index": 0,
     "message": {
       "role": "assistant",
-      "content": "{\"overallAssessment\":\"Great casual conversation! You communicated naturally and showed willingness to try new expressions. Your storytelling about the weekend was engaging. --- 很棒的闲聊对话！你交流得很自然，愿意尝试新表达。你对周末活动的讲述很有吸引力。\",\"topicSummary\":\"The user talked about their weekend activities including going to a party and eating at a Sichuan restaurant. They discussed food preferences and planned to meet friends next Friday. The conversation covered casual social topics like dining out and hanging out with friends.\",\"errorSummary\":\"GRAMMAR: 2 errors (past tense, articles)\nCHINGLISH: 1 error (missing be-verb)\nWORD_CHOICE: 1 error (vocabulary suggestion)\",\"fluencyScore\":6,\"keyTakeaway\":\"Focus on using past tense consistently when talking about past events. Practice using articles (a/an/the) naturally. --- 重点练习过去时态的一致性，以及冠词的自然使用。\"}"
+      "content": "{\"overallAssessment\":\"Great casual conversation! You communicated naturally and showed willingness to try new expressions. Your storytelling about the weekend was engaging. --- 很棒的闲聊对话！你交流得很自然，愿意尝试新表达。你对周末活动的讲述很有吸引力。\",\"errorSummary\":\"GRAMMAR: 2 errors (past tense, articles)\nCHINGLISH: 1 error (missing be-verb)\nWORD_CHOICE: 1 error (vocabulary suggestion)\",\"fluencyScore\":6,\"keyTakeaway\":\"Focus on using past tense consistently when talking about past events. Practice using articles (a/an/the) naturally. --- 重点练习过去时态的一致性，以及冠词的自然使用。\"}"
     },
     "finish_reason": "stop"
   }],

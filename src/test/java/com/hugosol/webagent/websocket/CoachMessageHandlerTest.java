@@ -226,7 +226,7 @@ class CoachMessageHandlerTest {
         when(sessionService.getUserId("s1")).thenReturn("user1");
         when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
 
-        ReportResult reportResult = new ReportResult("Great", "topics discussed", "none", 8, "practice");
+        ReportResult reportResult = new ReportResult("Great", "none", 8, "practice");
         when(sessionComplete.complete(eq("s1"), any(), any(), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP)))
                 .thenReturn(reportResult);
 
@@ -244,7 +244,7 @@ class CoachMessageHandlerTest {
         ServerMessage last = captor.getValue();
         assertThat(last).isInstanceOf(ServerMessage.SessionReportMessage.class);
         var reportMsg = (ServerMessage.SessionReportMessage) last;
-        assertThat(reportMsg.report().topicSummary()).isEqualTo("topics discussed");
+        assertThat(reportMsg.report().summary()).isEqualTo("Great");
     }
 
     @Test
@@ -266,7 +266,7 @@ class CoachMessageHandlerTest {
         when(sessionService.getUserId("s1")).thenReturn("user1");
         when(sessionService.getMode("s1")).thenReturn("WORKPLACE_STANDUP");
 
-        ReportResult fallbackReport = new ReportResult("failed message", "N/A", "N/A", -1, "N/A");
+        ReportResult fallbackReport = new ReportResult("failed message", "N/A", -1, "N/A");
         when(sessionComplete.complete(eq("s1"), any(), any(), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP)))
                 .thenReturn(fallbackReport);
 
@@ -280,7 +280,6 @@ class CoachMessageHandlerTest {
         assertThat(last).isInstanceOf(ServerMessage.SessionReportMessage.class);
         var reportMsg = (ServerMessage.SessionReportMessage) last;
         assertThat(reportMsg.report().fluencyScore()).isEqualTo(-1);
-        assertThat(reportMsg.report().topicSummary()).isEqualTo("N/A");
     }
 
     @Test
