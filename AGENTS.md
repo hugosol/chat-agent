@@ -84,7 +84,8 @@ com.hugosol.webagent/
 ├── websocket/       # CoachWebSocketHandler (WS entry), CoachMessageHandler (protocol logic)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
-│                    # SessionStore (entity persistence), MemoryService, MemoryCueService,
+│                    # SessionComplete (session-ending pipeline), SessionStore (entity persistence),
+│                    # MemoryService, MemoryCueService,
 │                    # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
 ├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport,
 │                    # UserProgress, UserMemory, MemoryCue, AgentMode, MemoryCueStatus, TimeLabel, ...
@@ -155,7 +156,7 @@ Server → Client:
 - **Memory injection**: Round 1: User Memory (topicSummary + learningProfile) via System Prompt injection. Round 2+: RAG-based MemoryCue retrieval via `EmbeddingService` semantic search (ONNX all-MiniLM-L6-v2, cosine similarity ≥ 0.6, top-2 results). `ConversationAgent` accepts `MemoryContent` DTO to encapsulate all memory data.
 - **MemoryCue module**: `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `llmRequestExecutor`, parallel with Report and Profile Merge. Completed cues are vectorized asynchronously by `EmbeddingService.indexAsync()`. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
 - **RAG retrieval**: `EmbeddingService` with `InMemoryEmbeddingStore` + ONNX embeddings. Store persists to `./data/embedding-store.json` on disk, with corrupted-file fallback to H2 rebuild. Data isolated by `userId × AgentMode` at both H2 and vector store layers. Dedicated `embeddingExecutor` thread pool (core=2, max=2). Configurable via `app.memory.retrieval.*`.
-- **Thread pool**: `llmRequestExecutor` (core=4, max=8) handles correction LLM calls (during turns) and memory processing (MemoryCue split + parallel segment generation + Report + Profile Merge, at session end). Turn-time correction and end-session memory tasks do not overlap chronologically. Topic Memory is a direct write (no LLM merge).
+- **Thread pool**: `llmRequestExecutor` (core=4, max=8) handles correction LLM calls (during turns) and memory processing (MemoryCue split + parallel segment generation + Report + Profile Merge, at session end, orchestrated via `SessionComplete`). Turn-time correction and end-session memory tasks do not overlap chronologically. Topic Memory is a direct write (no LLM merge).
 
 ## Logging
 

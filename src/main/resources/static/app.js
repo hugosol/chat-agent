@@ -400,12 +400,16 @@
     }
 
     function showReport(report) {
-        els.reportContent.innerHTML =
-            '<div class="report-section"><strong>Overall Assessment:</strong><p>' + escapeHtml(report.summary) + '</p></div>' +
-            '<div class="report-section"><strong>Topic Summary:</strong><p>' + escapeHtml(report.topicSummary || '') + '</p></div>' +
-            '<div class="report-section"><strong>Fluency Score:</strong> ' + report.fluencyScore + '/10</div>' +
-            '<div class="report-section"><strong>Error Summary:</strong><p>' + escapeHtml(report.errorSummary || '') + '</p></div>' +
+        var html = '<div class="report-section"><strong>Overall Assessment:</strong><p>' + escapeHtml(report.summary) + '</p></div>' +
+            '<div class="report-section"><strong>Topic Summary:</strong><p>' + escapeHtml(report.topicSummary || '') + '</p></div>';
+
+        if (report.fluencyScore >= 0) {
+            html += '<div class="report-section"><strong>Fluency Score:</strong> ' + report.fluencyScore + '/10</div>';
+        }
+
+        html += '<div class="report-section"><strong>Error Summary:</strong><p>' + escapeHtml(report.errorSummary || '') + '</p></div>' +
             '<div class="report-section"><strong>Key Takeaway:</strong><p>' + escapeHtml(report.keyTakeaway || '') + '</p></div>';
+        els.reportContent.innerHTML = html;
         els.reportModal.classList.remove('hidden');
     }
 

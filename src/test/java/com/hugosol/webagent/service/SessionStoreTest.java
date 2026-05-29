@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -146,5 +147,27 @@ class SessionStoreTest {
         List<Session> result = store.getHistory("user1");
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void completeSession_NullReport_MarksSessionFailed() {
+        Session session = new Session(AgentMode.WORKPLACE_STANDUP);
+        session.setUserId("user1");
+        when(sessionRepository.findById("s1")).thenReturn(Optional.of(session));
+        when(sessionRepository.save(session)).thenReturn(session);
+        when(mapper.buildMessages(any(), anyList())).thenReturn(List.of());
+        when(mapper.buildErrorRecords(any(), anyList(), anyList())).thenReturn(List.of());
+        when(userProgressRepository.findByUserId("user1")).thenReturn(Optional.empty());
+
+        store.completeSession("s1",
+                List.of(new MessageData(MessageRole.USER, "Hi", 1)),
+                List.of(),
+                null);
+
+        assertThat(session.getStatus()).isEqualTo(SessionStatus.FAILED);
+        assertThat(session.getEndTime()).isNotNull();
+        verify(sessionReportRepository, never()).save(any());
+        verify(messageRepository).saveAll(any());
+        verify(errorRecordRepository).saveAll(any());
     }
 }

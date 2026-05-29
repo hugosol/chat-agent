@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -56,7 +57,12 @@ public class SessionStore {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
 
-        session.complete();
+        if (report != null) {
+            session.complete();
+        } else {
+            session.setStatus(SessionStatus.FAILED);
+            session.setEndTime(LocalDateTime.now());
+        }
         sessionRepository.save(session);
 
         List<Message> savedMessages = mapper.buildMessages(sessionId, messages);
@@ -65,13 +71,17 @@ public class SessionStore {
         List<ErrorRecord> errorRecords = mapper.buildErrorRecords(sessionId, corrections, savedMessages);
         errorRecordRepository.saveAll(errorRecords);
 
-        SessionReport sessionReport = mapper.buildReport(sessionId, report);
-        sessionReportRepository.save(sessionReport);
-
-        updateUserProgress(session);
-
-        log.info("SessionStore: completed session {}", sessionId);
-        return sessionReport;
+        if (report != null) {
+            SessionReport sessionReport = mapper.buildReport(sessionId, report);
+            sessionReportRepository.save(sessionReport);
+            updateUserProgress(session);
+            log.info("SessionStore: completed session {}", sessionId);
+            return sessionReport;
+        } else {
+            updateUserProgress(session);
+            log.info("SessionStore: failed session {}", sessionId);
+            return null;
+        }
     }
 
     public List<Session> getHistory(String userId) {
