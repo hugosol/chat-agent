@@ -1,12 +1,14 @@
 package com.hugosol.webagent.graph;
 
 import com.hugosol.webagent.dto.CorrectionData;
+import com.hugosol.webagent.dto.MemoryCueQueue;
 import com.hugosol.webagent.dto.MessageData;
 import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
 import org.bsc.langgraph4j.state.Channels;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ public class CoachState extends AgentState {
     public static final String CORRECTIONS  = "corrections";
     public static final String TOPIC_MEMORY = "topicMemory";
     public static final String LEARNING_PROFILE = "learningProfile";
+    public static final String MEMORY_CUE_QUEUE = "memoryCueQueue";
 
     static final Map<String, Channel<?>> SCHEMA = Map.of(
             SESSION_ID,   Channels.base(() -> ""),
@@ -31,7 +34,8 @@ public class CoachState extends AgentState {
             USER_INPUT,   Channels.base(() -> ""),
             CORRECTIONS,  Channels.appender(ArrayList::new),
             TOPIC_MEMORY,     Channels.base(() -> ""),
-            LEARNING_PROFILE, Channels.base(() -> "")
+            LEARNING_PROFILE, Channels.base(() -> ""),
+            MEMORY_CUE_QUEUE, Channels.base(MemoryCueQueue::new)
     );
 
     public CoachState(Map<String, Object> initData) {
@@ -39,18 +43,20 @@ public class CoachState extends AgentState {
     }
 
     public static Map<String, Object> initialState(String sessionId, String mode, String userId,
-                                                      String topicMemory, String learningProfile) {
-        return Map.of(
-                SESSION_ID, sessionId,
-                MODE, mode,
-                USER_ID, userId,
-                STATE_STATUS, "IDLE",
-                MESSAGES, new ArrayList<>(),
-                USER_INPUT, "",
-                CORRECTIONS, new ArrayList<>(),
-                TOPIC_MEMORY, topicMemory != null ? topicMemory : "",
-                LEARNING_PROFILE, learningProfile != null ? learningProfile : ""
-        );
+                                                      String topicMemory, String learningProfile,
+                                                      MemoryCueQueue memoryCueQueue) {
+        Map<String, Object> data = new HashMap<>();
+        data.put(SESSION_ID, sessionId);
+        data.put(MODE, mode);
+        data.put(USER_ID, userId);
+        data.put(STATE_STATUS, "IDLE");
+        data.put(MESSAGES, new ArrayList<>());
+        data.put(USER_INPUT, "");
+        data.put(CORRECTIONS, new ArrayList<>());
+        data.put(TOPIC_MEMORY, topicMemory != null ? topicMemory : "");
+        data.put(LEARNING_PROFILE, learningProfile != null ? learningProfile : "");
+        data.put(MEMORY_CUE_QUEUE, memoryCueQueue);
+        return data;
     }
 
     public String sessionId() {
@@ -103,5 +109,9 @@ public class CoachState extends AgentState {
 
     public String learningProfile() {
         return this.<String>value(LEARNING_PROFILE).orElse("");
+    }
+
+    public MemoryCueQueue memoryCueQueue() {
+        return this.<MemoryCueQueue>value(MEMORY_CUE_QUEUE).orElse(null);
     }
 }

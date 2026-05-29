@@ -47,12 +47,12 @@
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserMemory` 新增可空 `mode` 字段：`TOPIC_SUMMARY` 记当前 AgentMode（隔离），`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 MemoryType |
-| 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 RAG 语义检索注入 MemoryCue |
+| 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 MemoryCueQueue（LRU 队列，capacity topK+1，跨 Turn 存活于 CoachState，去重刷新驱逐）管理 RAG 语义检索结果，编号列表注入 System Prompt |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `TaskRunner` 统一管理 LLM 调用生命周期与日志，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
 | 40 | TaskRunner 同步 Agent 模式 | 抽取 `TaskRunner` 深模块统一管理同步 Agent 的 LLM 调用生命周期。Agent 构造时通过 `runner.register(name, task)` 注册 `TaskDefinition`（模板 + paramBuilder + parser + errorStrategy），运行时通过 `runner.requestModel(name, params, ctx)` 触发 LLM 调用。`TaskName` 枚举管理 5 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）。删除 `LoggableChatModel` 包装层，日志能力由 TaskRunner 内生提供，含完整 sessionId/userId/agentType/mode 上下文字段。`MemoryAgent` 重命名为 `LearningAgent`（职责退化，仅保留 learningProfile 合并）。
 | 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `CoachMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/MemoryService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
-| 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，top-2 结果 (cosine ≥ 0.6) 注入 System Prompt `{memoryCues}` 占位符。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
+| 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载（队列为空）search topK+1 条，后续 search topK 条，去重时同 cueId 刷新到队头，满容时驱逐队尾（最久未访问）。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
 | 42 | TimeLabel 时间感知增强 | `TimeLabel` 计算逻辑从 Duration 桶遍历改为日期+时段判断。≤5分钟 "just now"，≤1小时 "a few minutes ago"，其余按日期分段：今天按时段（last night / this morning / this afternoon / this evening / tonight），昨天同样按时段（last night / yesterday morning / yesterday afternoon / yesterday evening / last night），2天以上保持 "a few days ago" 等模糊标签。`computeLabel(LocalDateTime, LocalDateTime)` API 签名不变。 |
 | 43 | LLM max output tokens 按 Agent 配置 | 新增 `app.llm.max-output-tokens` 配置，支持按 Agent 类型独立设置最大输出 token 数。默认 2048，ReportAgent 使用 4096（报告需更长输出）。`LangChain4jConfig` 创建独立的 `ChatLanguageModel` bean（default / report），`TaskRunner` 按 `TaskName.REPORT` 路由到对应模型。`MaxOutputTokens` 通过 `@ConfigurationProperties` 绑定，未配置的 Agent 自动回退到 default。 |
 
@@ -168,7 +168,7 @@ START → correction → END
   → WebSocket 收到 USER_INPUT
   → TurnProcessor.processTurn(sessionId, userInput, messageId, callback)
     → messageId ≤ 1: 注入 User Memory (topicSummary + learningProfile)
-    → messageId ≥ 2: EmbeddingService.search(userInput, mode, userId, topK, threshold) → MemoryContent(memoryCues)
+    → messageId ≥ 2: MemoryCueQueue.isEmpty() ? search(topK+1) : search(topK) → push results → MemoryContent(cueMatches)
     → 两路 CompletableFuture 并行:
       A) ConversationAgent.generateStream(history, mode, MemoryContent, messageId, handler) → 流式推送到前端
       B) graph.stream(input, config) → CorrectionNode → 纠错结果异步推送
@@ -409,14 +409,14 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AF
 | **日志写入** | LLM 调用时即时异步写入 | `TaskRunner.requestModel()`（同步 Agent）在调用点内生写入完整上下文字段；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
 | **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
 | **记忆写入** | MemoryService + MemoryCueService 异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Topic 直接写入 + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
-| **RAG 检索** | TurnProcessor Round 4+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，top-K=2，userId×AgentMode 隔离，结果注入 System Prompt `{memoryCues}` |
+| **RAG 检索** | TurnProcessor Round 2+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，userId×AgentMode 隔离。结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载 search topK+1 条，后续 search topK 条，去重刷新驱逐，按 tail→head 编号列表注入 System Prompt `{memoryCues}` |
 
 ### 会话生命周期
 
 ```
 [对话中]
   AgentState.messages (MemorySaver checkpoint)  ← 只在内存
-  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 1 注入 User Memory, messageId ≥ 2 触发 RAG MemoryCue 检索)
+  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 1 注入 User Memory, messageId ≥ 2 触发 MemoryCueQueue 管理的 RAG 检索)
   UI token bar 实时更新
 
 [用户点击 End Session]
@@ -528,10 +528,11 @@ web-agent/
 │   │   └── MemoryCueAgent.java             // 两步 LLM：话题切换检测 + 分段结构化摘要生成（委托 TaskRunner）
 │   │
 │   ├── dto/                              // 数据传输
-│   │   ├── MessageData.java              // 消息数据 (role, content, messageId)
-│   │   ├── CorrectionData.java           // 纠错数据 (ErrorType, original, corrected, explanation)
-│   │   ├── MemoryContent.java            // 记忆注入负载 (topicSummary, learningProfile, memoryCuesText)
-│   │   └── CueMatch.java                 // RAG 检索结果 (cueId, topic, summary, score)
+│   │   ├── MemoryContent.java            // 记忆注入负载 (topicSummary, learningProfile, cueMatches)
+│   │   ├── CueMatch.java                 // RAG 检索结果 (cueId, topic, summary, score, createdAt)
+│   │   ├── MemoryCueQueue.java           // LRU 有序集合 (capacity topK+1)，跨 Turn 存活于 CoachState
+│   │   ├── MessageData.java              // 前端消息序列化
+│   │   └── CorrectionData.java           // 纠错结果序列化
 │   │
 │   ├── websocket/
 │   │   ├── CoachWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)

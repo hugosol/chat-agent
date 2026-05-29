@@ -6,23 +6,16 @@ import java.util.List;
 public record MemoryContent(
         String topicSummary,
         String learningProfile,
-        String memoryCuesText,
-        LocalDateTime topicCreatedAt,
-        List<LocalDateTime> cueCreatedAts) {
+        List<CueMatch> cueMatches,
+        LocalDateTime topicCreatedAt) {
 
-    public MemoryContent {
-        if (cueCreatedAts == null) {
-            cueCreatedAts = List.of();
-        }
-    }
-
-    public MemoryContent(String topicSummary, String learningProfile, String memoryCuesText) {
-        this(topicSummary, learningProfile, memoryCuesText, null, List.of());
+    public MemoryContent(String topicSummary, String learningProfile, List<CueMatch> cueMatches) {
+        this(topicSummary, learningProfile, cueMatches, null);
     }
 
     public boolean isEmpty() {
         return (topicSummary == null || topicSummary.isEmpty())
                 && (learningProfile == null || learningProfile.isEmpty())
-                && (memoryCuesText == null || memoryCuesText.isEmpty());
+                && (cueMatches == null || cueMatches.isEmpty());
     }
 }

@@ -1,5 +1,6 @@
 package com.hugosol.webagent.service;
 
+import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
@@ -29,7 +30,8 @@ class SessionServiceTest {
         TokenTracker tokenTracker = new TokenTracker(128000, 0.8);
         MemoryService memoryService = mock(MemoryService.class);
         when(memoryService.loadLatestContent(anyString(), anyString(), any())).thenReturn("");
-        service = new SessionService(tokenTracker, memoryService);
+        AppProperties appProperties = new AppProperties();
+        service = new SessionService(tokenTracker, memoryService, appProperties);
     }
 
     @Test

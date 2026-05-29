@@ -4,6 +4,7 @@ import com.hugosol.webagent.agent.ConversationAgent;
 import com.hugosol.webagent.config.AppProperties;
 import com.hugosol.webagent.dto.CueMatch;
 import com.hugosol.webagent.dto.MemoryContent;
+import com.hugosol.webagent.dto.MemoryCueQueue;
 import com.hugosol.webagent.graph.CoachGraphBuilder;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
@@ -25,7 +26,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -104,24 +104,25 @@ public class TurnProcessor {
 
         if (messageId <= userMemoryRounds) {
             LocalDateTime topicCreatedAt = memoryService.loadTopicCreatedAt(userId, mode);
-            return new MemoryContent(topicSummary, learningProfile, null, topicCreatedAt, null);
+            return new MemoryContent(topicSummary, learningProfile, null, topicCreatedAt);
         }
 
         int topK = appProperties.getMemory().getRetrieval().getTopK();
         double threshold = appProperties.getMemory().getRetrieval().getSimilarityThreshold();
-        List<CueMatch> ragResults = embeddingService.search(userInput, mode, userId, topK, threshold);
-        if (!ragResults.isEmpty()) {
-            String memoryCuesText = ragResults.stream()
-                    .map(m -> m.topic() + ": " + m.summary())
-                    .collect(Collectors.joining(", as well as, "));
-            List<LocalDateTime> cueCreatedAts = ragResults.stream()
-                    .map(CueMatch::createdAt)
-                    .collect(Collectors.toList());
-            log.info("TurnProcessor: RAG retrieved {} cues for session {} messageId {}",
-                    ragResults.size(), sessionId, messageId);
-            return new MemoryContent(null, null, memoryCuesText, null, cueCreatedAts);
+
+        MemoryCueQueue queue = sessionService.getMemoryCueQueue(sessionId);
+        int searchTopK = queue.isEmpty() ? topK + 1 : topK;
+
+        List<CueMatch> results = embeddingService.search(userInput, mode, userId, searchTopK, threshold);
+        queue.push(results);
+
+        List<CueMatch> entries = queue.getEntries();
+        if (!entries.isEmpty()) {
+            log.info("TurnProcessor: RAG retrieved {} new cues, queue now has {} entries for session {} messageId {}",
+                    results.size(), entries.size(), sessionId, messageId);
+            return new MemoryContent(null, null, entries);
         }
-        return new MemoryContent(null, null, null, null, null);
+        return new MemoryContent(null, null, null);
     }
 
     private void startConversation(String sessionId, List<MessageData> history, AgentMode mode,

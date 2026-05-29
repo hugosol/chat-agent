@@ -1,6 +1,7 @@
 package com.hugosol.webagent.agent;
 
 import com.hugosol.webagent.config.PromptLoader;
+import com.hugosol.webagent.dto.CueMatch;
 import com.hugosol.webagent.dto.MemoryContent;
 import com.hugosol.webagent.dto.MessageData;
 import com.hugosol.webagent.model.AgentMode;
@@ -131,7 +132,7 @@ public class ConversationAgent {
 
         boolean hasUserMemory = memoryContent.topicSummary() != null && !memoryContent.topicSummary().isBlank()
                 || memoryContent.learningProfile() != null && !memoryContent.learningProfile().isBlank();
-        boolean hasRagMemory = memoryContent.memoryCuesText() != null && !memoryContent.memoryCuesText().isBlank();
+        boolean hasRagMemory = memoryContent.cueMatches() != null && !memoryContent.cueMatches().isEmpty();
 
         if (hasUserMemory) {
             String ts = memoryContent.topicSummary();
@@ -148,13 +149,10 @@ public class ConversationAgent {
                             ? "[Your Learning Profile]\n" + lp : "")
                     .replace("{activeEngagement}", ACTIVE_ENGAGEMENT_TEXT);
         } else if (hasRagMemory) {
-            String cuesText = memoryContent.memoryCuesText();
-            if (memoryContent.cueCreatedAts() != null && !memoryContent.cueCreatedAts().isEmpty()) {
-                cuesText = applyTimeLabelsToCues(cuesText, memoryContent.cueCreatedAts());
-            }
+            String cuesText = formatMemoryCuesForPrompt(memoryContent.cueMatches());
             content = content
                     .replace("{topicSummary}", "")
-                    .replace("{memoryCues}", "[Memory Cues]\n" + cuesText)
+                    .replace("{memoryCues}", cuesText)
                     .replace("{learningProfile}", "")
                     .replace("{activeEngagement}", ACTIVE_ENGAGEMENT_TEXT);
         } else {
@@ -173,20 +171,14 @@ public class ConversationAgent {
         return "[from " + label + "] ";
     }
 
-    static String applyTimeLabelsToCues(String cuesText, List<LocalDateTime> cueCreatedAts) {
-        if (cueCreatedAts == null || cueCreatedAts.isEmpty()) return cuesText;
-        String[] parts = cuesText.split(", as well as, ");
-        StringBuilder sb = new StringBuilder();
+    private static String formatMemoryCuesForPrompt(List<CueMatch> cues) {
+        StringBuilder sb = new StringBuilder("[Memory Cues]\n");
         LocalDateTime now = LocalDateTime.now();
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) sb.append(", as well as, ");
-            if (i < cueCreatedAts.size() && cueCreatedAts.get(i) != null) {
-                String label = TimeLabel.computeLabel(cueCreatedAts.get(i), now);
-                sb.append("[from ").append(label).append("] ");
-            } else if (i < cueCreatedAts.size()) {
-                log.debug("ConversationAgent: cue {} has null createdAt, time label omitted", i);
-            }
-            sb.append(parts[i]);
+        for (int i = 0; i < cues.size(); i++) {
+            CueMatch cue = cues.get(i);
+            String timeLabel = TimeLabel.computeLabel(cue.createdAt(), now);
+            sb.append(i + 1).append(". [from ").append(timeLabel).append("] ")
+                    .append(cue.topic()).append(": ").append(cue.summary()).append("\n");
         }
         return sb.toString();
     }

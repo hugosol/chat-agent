@@ -1,5 +1,7 @@
 package com.hugosol.webagent.service;
 
+import com.hugosol.webagent.config.AppProperties;
+import com.hugosol.webagent.dto.MemoryCueQueue;
 import com.hugosol.webagent.graph.CoachState;
 import com.hugosol.webagent.dto.CorrectionData;
 import com.hugosol.webagent.dto.MessageData;
@@ -28,17 +30,21 @@ public class SessionService {
     private final Map<String, List<CompletableFuture<Void>>> pendingCorrections = new ConcurrentHashMap<>();
     private final TokenTracker tokenTracker;
     private final MemoryService memoryService;
+    private final AppProperties appProperties;
 
-    public SessionService(TokenTracker tokenTracker, MemoryService memoryService) {
+    public SessionService(TokenTracker tokenTracker, MemoryService memoryService, AppProperties appProperties) {
         this.tokenTracker = tokenTracker;
         this.memoryService = memoryService;
+        this.appProperties = appProperties;
     }
 
     public void init(String sessionId, String mode, String userId, String wsId) {
         AgentMode agentMode = AgentMode.valueOf(mode);
         String topicMemory = memoryService.loadLatestContent(userId, "TOPIC_SUMMARY", agentMode);
         String learningProfile = memoryService.loadLatestContent(userId, "LEARNING_PROFILE", null);
-        Map<String, Object> initData = CoachState.initialState(sessionId, mode, userId, topicMemory, learningProfile);
+        int queueCapacity = appProperties.getMemory().getRetrieval().getTopK() + 1;
+        var memoryCueQueue = new MemoryCueQueue(queueCapacity);
+        Map<String, Object> initData = CoachState.initialState(sessionId, mode, userId, topicMemory, learningProfile, memoryCueQueue);
         var state = new CoachState(initData);
         activeStates.put(sessionId, state);
         tokenTracker.initSession(sessionId);
@@ -150,6 +156,11 @@ public class SessionService {
     public String getLearningProfile(String sessionId) {
         CoachState state = activeStates.get(sessionId);
         return state != null ? state.learningProfile() : "";
+    }
+
+    public MemoryCueQueue getMemoryCueQueue(String sessionId) {
+        CoachState state = activeStates.get(sessionId);
+        return state != null ? state.memoryCueQueue() : null;
     }
 
     public double getUsageRatio(String sessionId) {
