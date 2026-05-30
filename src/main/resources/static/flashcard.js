@@ -26,12 +26,14 @@
             els.debugLog.classList.add('hidden');
         }
         window.activePanel = 'flashcard';
+        els.toggle.style.visibility = 'hidden';
         els.panel.classList.remove('collapsed');
         showStage1();
     }
 
     function closePanel() {
         els.panel.classList.add('collapsed');
+        els.toggle.style.visibility = '';
         window.activePanel = null;
         resetForm();
     }

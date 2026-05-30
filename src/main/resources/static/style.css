@@ -145,7 +145,7 @@ main {
     padding: 8px 12px;
     margin-bottom: 8px;
     border-radius: 8px;
-    font-size: 0.9em;
+    font-size: 16px;
     line-height: 1.5;
     max-width: 85%;
     white-space: pre-wrap;
@@ -189,7 +189,7 @@ main {
     right: 8px;
     background: transparent;
     border: none;
-    font-size: 0.9em;
+    font-size: 16px;
     cursor: pointer;
     opacity: 0.6;
     padding: 2px 4px;
@@ -403,7 +403,7 @@ footer {
 
 .report-section {
     margin-bottom: 14px;
-    font-size: 0.9em;
+    font-size: 16px;
     line-height: 1.6;
 }
 
@@ -598,29 +598,33 @@ footer {
     }
 }
 
-/* Flashcard Panel */
+/* Flashcard Toggle (in debug bar) */
 
 #flashcardToggle {
-    padding: 4px 10px;
-    background: #0f3460;
-    border: 1px solid #1a5276;
-    border-radius: 4px;
+    margin-left: auto;
+    background: #333;
     color: #aaa;
-    font-size: 0.75em;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 10px;
+    font-size: 10px;
     cursor: pointer;
-    white-space: nowrap;
 }
 
 #flashcardToggle:hover {
-    color: #27ae60;
-    border-color: #27ae60;
+    background: #555;
+    color: #fff;
 }
+
+/* Flashcard Panel */
 
 .flashcard-panel {
     position: fixed;
     bottom: 0;
-    left: 0;
-    right: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 1000px;
     z-index: 201;
     background: rgba(0, 0, 0, 0.92);
     border-top: 1px solid #333;
@@ -675,7 +679,10 @@ footer {
 }
 
 #flashcardStage1 {
-    height: 52px;
+    flex-direction: column;   /* 原默认 row：输入+按钮水平排列 */
+    align-items: stretch;     /* 子元素撑满宽度 */
+    gap: 6px;
+    height: auto;             /* 移除固定 52px */
 }
 
 #flashcardStage2 {
@@ -692,7 +699,7 @@ footer {
     border: 1px solid #1a5276;
     border-radius: 4px;
     color: #e0e0e0;
-    font-size: 0.9em;
+    font-size: 16px;
     outline: none;
 }
 
@@ -710,7 +717,7 @@ footer {
     border: 1px solid #1a5276;
     border-radius: 4px;
     color: #e0e0e0;
-    font-size: 0.9em;
+    font-size: 16px;
     outline: none;
     resize: vertical;
     font-family: inherit;
@@ -743,7 +750,7 @@ footer {
 .flashcard-chip .chip-remove {
     cursor: pointer;
     color: #888;
-    font-size: 0.9em;
+    font-size: 16px;
     line-height: 1;
 }
 
@@ -824,7 +831,6 @@ footer {
 }
 
 #flashcardSave {
-    align-self: flex-end;
     margin-top: 4px;
 }
 

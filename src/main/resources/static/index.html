@@ -22,7 +22,6 @@
             <button id="correctionShowBtn" class="correction-show-btn hidden">
                 Corrections <span id="correctionBadge">0</span>
             </button>
-            <button id="flashcardToggle" class="header-btn">闪卡</button>
         </header>
 
         <main>
@@ -79,12 +78,12 @@
 
     <div id="flashcardPanel" class="flashcard-panel collapsed">
         <div class="flashcard-header">
-            <span class="flashcard-title">闪卡</span>
+            <span class="flashcard-title">anki</span>
             <button id="flashcardClose" class="flashcard-close">&times;</button>
         </div>
         <div id="flashcardStage1" class="flashcard-stage">
             <input id="flashcardFront" type="text" placeholder="单词或表达..." autocomplete="off">
-            <button id="flashcardContinue" class="flashcard-btn">继续</button>
+            <button id="flashcardContinue" class="flashcard-btn primary">继续</button>
         </div>
         <div id="flashcardStage2" class="flashcard-stage hidden">
             <textarea id="flashcardBack" placeholder="释义或校正文..." rows="2"></textarea>
@@ -103,6 +102,7 @@
         <div class="debug-header">
             <button id="debugToggle">Log</button>
             <button id="debugClear">Clear</button>
+            <button id="flashcardToggle">anki</button>
         </div>
         <div id="debugLog" class="debug-log hidden"></div>
     </div>
