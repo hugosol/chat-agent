@@ -1,6 +1,6 @@
 # Chat Agent
 
-AI-powered English speaking practice tool for Chinese Java developers.  
+AI-powered English speaking practice tool for Chinese developers.  
 Uses **LangChain4j** + **langgraph4j** + **DeepSeek** to run 5 AI agents that role-play conversations, correct English errors in real-time, generate session reports, and maintain cross-session memory with structured topic cues.
 
 ## Quick Start

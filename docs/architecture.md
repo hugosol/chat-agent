@@ -445,7 +445,7 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AF
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Chat Agent    [Token: ████░]              [Corrections 3]        │ ← 顶部栏 (场景+tokens+correction按钮)
+│  [Logout]    [Token: █████████░]   90%        [Corrections 3]        │ ← 顶部栏 (场景+tokens+correction按钮)
 │──────────────────────────────────────────────────────────────────────│
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │                                                                │  │
