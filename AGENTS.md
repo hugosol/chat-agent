@@ -30,7 +30,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 
 - **Java 17** / **Spring Boot 3.4.7** / **Maven** — `mvn compile` for build verification, `mvn test` for unit tests, `mvn verify` for E2E tests.
 - **Spring Security**: form login + remember-me + BCrypt. SecurityConfig is always loaded — no conditional annotations. Auth behavior is driven entirely by `app.security.permit-all-paths` in YAML config. Default user: `admin/admin123` (from `application.yml` → `DataInitializer`).
-- **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/chatagent/e2e/`. Five IT test classes: `ChatAgentSessionIT`, `ChatAgentResumeIT`, `ChatAgentMemoryIT`, `DailyTalkIT`, `ChatAgentMemoryCueIT`. WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`. Uses `@ActiveProfiles("e2e")` + `application-e2e.yml` with `permit-all-paths: [/**]` to bypass authentication.
+- **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/chatagent/e2e/`. Six IT test classes: `ChatAgentSessionIT`, `ChatAgentResumeIT`, `ChatAgentMemoryIT`, `DailyTalkIT`, `ChatAgentMemoryCueIT`, `FlashcardIT`. WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`. Uses `@ActiveProfiles("e2e")` + `application-e2e.yml` with `permit-all-paths: [/**]` to bypass authentication.
 - **Package**: `com.hugosol.chatagent`
 - **DeepSeek via LangChain4j**: uses OpenAI-compatible adapter (`dev.langchain4j:langchain4j-open-ai`). Default model is `deepseek-v4-flash` (see `application.yml`, not README which says `deepseek-chat`).
 - **Two LLM beans**: `ChatLanguageModel` (sync, used by `TaskRunner` for all sync agents) + `StreamingChatLanguageModel` (`OpenAiStreamingChatModel`, for ConversationAgent). Both in `LangChain4jConfig`. `ChatLanguageModel` is returned directly without `LoggableChatModel` wrapper — logging is handled by `TaskRunner.requestModel()`.
@@ -40,7 +40,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 - **MemorySaver checkpoints**: survive page refresh, **lost on server restart**. No persistence until session ends.
 - **Session resume**: WS disconnect no longer destroys `activeStates`. Frontend stores `sessionId` in `localStorage` and sends `RESUME_SESSION` on reconnect.
 - **Multi-tab**: `sessionToWs` map is one-to-one (sessionId → wsId, flipped from old `wsToSession`). Page Visibility API triggers auto-resume on tab activation. Stale delta protection skips streaming tokens for already-rendered messageIds.
-- **Frontend**: vanilla HTML/JS/CSS in `src/main/resources/static/`. No npm, no webpack, no build tools. Correction sidebar toggled via `×` button. Login page at `/login/main.html` with dark theme, served from `static/login/`.
+- **Frontend**: vanilla HTML/JS/CSS in `src/main/resources/static/`. No npm, no webpack, no build tools. Correction sidebar toggled via `×` button. Flashcard panel (`flashcard.js`) independent of `app.js`, shared via `window.activePanel`. Login page at `/login/main.html` with dark theme, served from `static/login/`.
 - **Correction display**: numbered summary bubble (`1. original → corrected` / `2. ...`) inserted after user message in chat flow; detailed items in sidebar (type + explanation). Sidebar is an absolute overlay (no longer squeezes chat) and starts collapsed. Header "Corrections N" button toggles visibility.
 - **WebSocket endpoint**: `/ws/chat` — JSON protocol. Handshake authenticated via Spring Security (JSESSIONID cookie). If Principal is null (E2E profile), falls back to `"anonymous"`.
 - **Architecture document**: `docs/architecture.md` is the design blueprint + decision log. Read before structural changes; **do not edit casually**.
@@ -81,17 +81,20 @@ com.hugosol.chatagent/
 │   └── nodes/       # CorrectionNode (only remaining node)
 ├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent
 │   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName, TaskContext, ErrorStrategy
+├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
+├── controller/      # FlashcardController — first @RestController in codebase (POST /api/cards/add, GET /api/tags)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 │                    # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
+│                    # FlashcardService (createCard with FSRS init + Tag upsert),
 │                    # LearningProfileService, MemoryCueService,
 │                    # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
-├── model/           # JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport,
+├── model/           # JPA entities + enums: User, Session, Message, Card, Tag, ErrorRecord, SessionReport,
 │                    # UserProgress, UserLearningProfile, MemoryCue, AgentMode, MemoryCueStatus, TimeLabel, ...
-├── repository/      # Spring Data JPA repos (8: User, Session, Message, ErrorRecord, SessionReport,
+├── repository/      # Spring Data JPA repos (10: User, Session, Message, Card, Tag, ErrorRecord, SessionReport,
 │                    # UserProgress, UserLearningProfile, MemoryCue, LlmCallLog)
-├── dto/             # Data transfer records: MessageData, CorrectionData, MemoryContent, CueMatch
+├── dto/             # Data transfer records: MessageData, CorrectionData, MemoryContent, CueMatch, AddCardRequest/Response, TagResponse
 ├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AsyncConfig,
 │                    # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
 └── speech/          # (vacant — V2 will add STT/TTS adapters when needed)
@@ -100,8 +103,9 @@ src/test/java/com/hugosol/chatagent/e2e/
 ├── ChatAgentSessionIT.java    # Full session: 3 turns + sidebar + H2 assertions
 ├── ChatAgentResumeIT.java     # Page reload → session resume verification
 ├── ChatAgentMemoryIT.java     # Two sessions back-to-back → memory merge verification
-├── DailyTalkIT.java              # DAILY_TALK mode → teaching-style corrections
+├── DailyTalkIT.java           # DAILY_TALK mode → teaching-style corrections
 ├── ChatAgentMemoryCueIT.java  # Session end → MemoryCue structured generation verification
+├── FlashcardIT.java           # 闪卡录入：两阶段面板 → 标签创建 → 保存 → H2 数据验证（不依赖 WireMock，闪卡不调 LLM）
 └── helper/
     ├── E2ETestBase.java          # @SpringBootTest base: WireMock (19090), Playwright, DOM waits, @ActiveProfiles("e2e")
     └── WireMockStubs.java        # Scenario state machine stubs (memory cue stubs included, JSON Path body matching)
@@ -157,6 +161,16 @@ Server → Client:
 - **MemoryCue module**: `memory_cues` table + `MemoryCueAgent` (two-step LLM: topic switch detection → per-segment `{topic, summary}` JSON). `MemoryCueService` dispatches post-session generation asynchronously on `llmRequestExecutor`, parallel with Report and Profile Merge. Completed cues are vectorized asynchronously by `EmbeddingService.indexAsync()`. `MemoryCueStatus` tracks completion state per segment (COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED). AgentMode isolation via `mode` column.
 - **RAG retrieval**: `EmbeddingService` with `InMemoryEmbeddingStore` + ONNX embeddings. Store persists to `./data/embedding-store.json` on disk, with corrupted-file fallback to H2 rebuild. Data isolated by `userId × AgentMode` at both H2 and vector store layers. Dedicated `embeddingExecutor` thread pool (core=2, max=2). Configurable via `app.memory.retrieval.*`.
 - **Thread pool**: `llmRequestExecutor` (core=4, max=8) handles correction LLM calls (during turns) and memory processing (MemoryCue split + parallel segment generation + Report + Profile Merge, at session end, orchestrated via `SessionComplete`). Turn-time correction and end-session memory tasks do not overlap chronologically.
+
+## Flashcard Module
+
+- **REST API**: `FlashcardController` is the codebase's first `@RestController` (`POST /api/cards/add`, `GET /api/tags`). Authentication via JSESSIONID cookie (same as WebSocket). `/api/**` is NOT in `permit-all-paths` (requires login), but CSRF is disabled for `/api/**` in `SecurityConfig`.
+- **Card entity**: `Card` (id, userId, front, back, stability, difficulty, cardState, due, reps, lapses, lastReview). `@ManyToMany` with `Tag` via join table `card_tags`. FSRS state initialized via `FsrsScheduler.createInitState()` (stability=2.5, difficulty=0.0, state=0).
+- **Tag entity**: `Tag` (id, name, type=null, userId). `type` field reserved for future Deck concept. `TagRepository.findByNameAndUserId()` for upsert; `TagRepository.findByUserId()` for autocomplete.
+- **FSRS-6**: `FsrsScheduler` (stateless pure functions) — `initNewCard()` (py-fsrs compatible Learning state for tests), `createInitState()` (PRD-compatible New state for Card entity), `repeat()` (full 4-state machine: Learning→Review→Relearning→Review with learning steps), `retrievability()`. 21 default parameters hardcoded as constants. 12 unit tests covering 8 PRD-specified test vectors + 4 additional from ts-fsrs.
+- **AleaPrng**: Custom Alea PRNG (Johannes Baagøe's algorithm) replacing `java.util.Random` for deterministic cross-implementation fuzz. Used via `DoubleSupplier` in `repeat()`.
+- **Two-stage UI**: Stage 1 — minimal panel (~60px) with front input + "继续" button. Stage 2 — expanded (~70vh max) with back textarea + chip tag input (autocomplete from `GET /api/tags`) + "保存" button. Panel and Debug panel mutually exclusive via `window.activePanel`.
+- **E2E**: `FlashcardIT` extends `E2ETestBase`. No WireMock stubs needed (flashcard doesn't call LLM). `E2ETestBase` autowires `CardRepository` + `TagRepository`.
 
 ## Logging
 

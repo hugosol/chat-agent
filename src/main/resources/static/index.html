@@ -22,6 +22,7 @@
             <button id="correctionShowBtn" class="correction-show-btn hidden">
                 Corrections <span id="correctionBadge">0</span>
             </button>
+            <button id="flashcardToggle" class="header-btn">闪卡</button>
         </header>
 
         <main>
@@ -76,6 +77,28 @@
         </div>
     </div>
 
+    <div id="flashcardPanel" class="flashcard-panel collapsed">
+        <div class="flashcard-header">
+            <span class="flashcard-title">闪卡</span>
+            <button id="flashcardClose" class="flashcard-close">&times;</button>
+        </div>
+        <div id="flashcardStage1" class="flashcard-stage">
+            <input id="flashcardFront" type="text" placeholder="单词或表达..." autocomplete="off">
+            <button id="flashcardContinue" class="flashcard-btn">继续</button>
+        </div>
+        <div id="flashcardStage2" class="flashcard-stage hidden">
+            <textarea id="flashcardBack" placeholder="释义或校正文..." rows="2"></textarea>
+            <div id="flashcardTagArea">
+                <div id="flashcardTagChips"></div>
+                <input id="flashcardTagInput" type="text" placeholder="添加标签..." autocomplete="off">
+                <div id="flashcardTagSuggestions" class="tag-suggestions hidden"></div>
+            </div>
+            <button id="flashcardSave" class="flashcard-btn primary">保存</button>
+        </div>
+    </div>
+
+    <div id="flashcardToast" class="flashcard-toast hidden">已保存</div>
+
     <div id="debugPanel" class="debug-panel">
         <div class="debug-header">
             <button id="debugToggle">Log</button>
@@ -111,5 +134,6 @@
     </template>
 
     <script src="app.js"></script>
+    <script src="flashcard.js"></script>
 </body>
 </html>

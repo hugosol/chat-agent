@@ -79,6 +79,7 @@ E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari view
 | `ChatAgentMemoryIT` | Two sessions back-to-back → Topic Memory v1→v2 direct write → Learning Profile v1→v2 merge → topic memory mode-scoped isolation → learning profile cross-mode sharing |
 | `DailyTalkIT` | DAILY_TALK mode → 3-turn casual conversation → teaching-style corrections → mode-scoped memory |
 | `ChatAgentMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
+| `FlashcardIT` | 闪卡录入：两阶段面板 → chip 标签创建 → 保存 → H2 数据验证（不依赖 WireMock，闪卡不调 LLM） |
 
 Test resources: `src/test/resources/wiremock/` (mock response files for conversation, correction, report, memory merge, and memory cue), `src/test/resources/application-e2e.yml` (in-memory H2, permit all paths).
 
@@ -307,6 +308,8 @@ App-level configuration in `application.yml`:
 - [x] Cross-session memory (Topic Memory + Learning Profile dual memory system)
 - [x] Structured MemoryCue (topic segmentation + tagged memory entries, write-only in v1)
 - [x] RAG-based MemoryCue retrieval (ONNX vector embeddings, semantic similarity search)
+- [x] 闪卡录入模块（FSRS-6 初始化 + 两阶段面板 + chip 标签 + REST API）
+- [ ] 闪卡复习功能（FSRS-6 repeat + 评分按钮 Again/Hard/Good/Easy + 每日复习队列）
 - [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)

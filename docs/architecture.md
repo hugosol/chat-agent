@@ -56,6 +56,9 @@
 | 42 | TimeLabel 时间感知增强 | `TimeLabel` 计算逻辑从 Duration 桶遍历改为日期+时段判断。≤5分钟 "just now"，≤1小时 "a few minutes ago"，其余按日期分段：今天按时段（last night / this morning / this afternoon / this evening / tonight），昨天同样按时段（last night / yesterday morning / yesterday afternoon / yesterday evening / last night），2天以上保持 "a few days ago" 等模糊标签。`computeLabel(LocalDateTime, LocalDateTime)` API 签名不变。 |
 | 43 | LLM max output tokens 按 Agent 配置 | 新增 `app.llm.max-output-tokens` 配置，支持按 Agent 类型独立设置最大输出 token 数。默认 2048，ReportAgent 使用 4096（报告需更长输出）。`LangChain4jConfig` 创建独立的 `ChatLanguageModel` bean（default / report），`TaskRunner` 按 `TaskName.REPORT` 路由到对应模型。`MaxOutputTokens` 通过 `@ConfigurationProperties` 绑定，未配置的 Agent 自动回退到 default。 |
 | 44 | MemoryCueQueue LRU 淘汰设计 | `MemoryCueQueue` 为有容量上限的 LRU 有序集合（capacity = topK+1），跨 Turn 存活于 ChatState。首次加载（队列空）search topK+1 条，后续 search topK 条。push 时去重：同 cueId 刷新到队头；满容时淘汰队尾（最久未访问）。fallback anchor（最新 completed session 的 last cue）生命周期约 1 轮——下一轮被 RAG 结果替代。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。 |
+| 45 | 闪卡模块解耦 | 独立 JPA 实体 (Card, Tag) + REST API (`FlashcardController`) + 前端 `flashcard.js`。闪卡模块与现有聊天功能完全解耦——不依赖 WebSocket，不依赖 Practice session。Tag 有可空 `type` 字段，为未来 Deck 概念预留。 |
+| 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~300 行），无 JNI 依赖。`FsrsScheduler` 为无状态纯函数——`initNewCard()` 返回 py-fsrs 兼容初始态（用于测试验证），`createInitState()` 返回 PRD 默认值（用于 Card 实体初始化）。12 个单元测试：8 个来自 PRD 测试向量 + 4 个来自 ts-fsrs（首次复习值、retrievability）。Fuzz 使用自研 `AleaPrng`（Johannes Baagøe 算法 Java 端口）替代 `java.util.Random`——seed(42)→12 天、seed(12345)→11 天，精准匹配 PRD 预期值。 |
+| 47 | REST API 模式引入 | `FlashcardController` 为代码库首个 `@RestController`（`POST /api/cards/add` + `GET /api/tags`）。认证走 JSESSIONID cookie（与 WebSocket 一致），`/api/**` 不走 `permit-all-paths`（需要认证），CSRF 对 `/api/**` 在 `SecurityConfig` 中禁用。 |
 
 ---
 
@@ -358,7 +361,31 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AFTERNOON, THIS_EVENING, TONIGHT, YESTERDAY_MORNING, YESTERDAY_AFTERNOON, YESTERDAY_EVENING, A_FEW_DAYS_AGO, ABOUT_A_WEEK_AGO, A_FEW_WEEKS_AGO, ABOUT_A_MONTH_AGO, A_WHILE_AGO }（计算方式为日期+时段判断，非 Duration 桶遍历）
 ```
 
-> **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。
+### Flashcard 模块数据模型
+
+闪卡模块独立于聊天会话，拥有自己的 JPA 实体和表：
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
+│    Card      │     │   card_tags      │     │     Tag     │
+│─────────────│     │──────────────────│     │─────────────│
+│ id (PK)     │────▶│ card_id (FK)     │◀────│ id (PK)     │
+│ userId      │     │ tag_id (FK)      │     │ name        │
+│ front       │     └──────────────────┘     │ type (null) │
+│ back        │                              │ userId      │
+│ stability   │                              └─────────────┘
+│ difficulty  │
+│ cardState   │
+│ due         │
+│ reps        │
+│ lapses      │
+│ lastReview  │
+└─────────────┘
+```
+
+Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Card-Tag 通过 `@ManyToMany` 关联，Card 侧为 owning side。FSRS 字段在创建卡片时由 `FsrsScheduler.createInitState()` 自动初始化（stability=2.5, difficulty=0.0, state=0, reps=0, lapses=0）。
+
+> **数据隔离**: 所有实体使用纯字符串 FK（无 JPA `@ManyToOne` 关系）。`Session.userId` 是唯一的多租户分界点——子实体通过 UUID sessionId 自然隔离，无需额外 `userId` 字段。闪卡模块的 Card 和 Tag 均携带 `userId` 实现独立的数据隔离。
 
 ---
 
@@ -515,6 +542,15 @@ chat-agent/
 │   │   └── nodes/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
+│   ├── flashcard/                          // 闪卡模块核心
+│   │   ├── FsrsScheduler.java             // FSRS-6 调度器（initNewCard + createInitState + repeat + retrievability）
+│   │   ├── CardState.java                 // 卡片状态记录（Learning/Review/Relearning 状态机 + step + hasStability）
+│   │   ├── Rating.java                    // AGAIN/HARD/GOOD/EASY（pyValue 1-4 映射，匹配 py-fsrs 索引）
+│   │   └── AleaPrng.java                  // Alea PRNG（Johannes Baagøe 算法，替代 java.util.Random 用于确定性 fuzz）
+│   │
+│   ├── controller/                         // REST API（首次引入 @RestController）
+│   │   └── FlashcardController.java       // POST /api/cards/add + GET /api/tags
+│   │
 │   ├── agent/                              // Agent 调用封装
 │   │   ├── common/                         // 横切关注点：TaskRunner 公共模块
 │   │   │   ├── TaskRunner.java
@@ -533,7 +569,10 @@ chat-agent/
 │   │   ├── CueMatch.java                 // RAG 检索结果 (cueId, topic, summary, score, createdAt)
 │   │   ├── MemoryCueQueue.java           // LRU 有序集合 (capacity topK+1)，跨 Turn 存活于 ChatState
 │   │   ├── MessageData.java              // 前端消息序列化
-│   │   └── CorrectionData.java           // 纠错结果序列化
+│   │   ├── CorrectionData.java           // 纠错结果序列化
+│   │   ├── AddCardRequest.java           // 闪卡创建请求 (front, back, tags)
+│   │   ├── AddCardResponse.java          // 闪卡创建响应 (id, front, back, tags, due)
+│   │   └── TagResponse.java              // 标签响应 (name, type)
 │   │
 │   ├── websocket/
 │   │   ├── ChatWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)
@@ -551,6 +590,8 @@ chat-agent/
 │   │   ├── User.java                       // 用户（username + BCrypt password）
 │   │   ├── Session.java                    // 会话（含 userId）
 │   │   ├── Message.java
+│   │   ├── Card.java                       // 闪卡（front/back + FSRS 状态字段, @ManyToMany Tag）
+│   │   ├── Tag.java                        // 标签（name + 可空 type, userId 隔离）
 │   │   ├── ErrorRecord.java
 │   │   ├── SessionReport.java
 │   │   ├── UserProgress.java               // 学习进度（含 userId unique，每用户一行）
@@ -563,10 +604,12 @@ chat-agent/
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED / FAILED
 │   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP (含 displayName + templatePath)
 │   │
-│   ├── repository/                         // Spring Data JPA（9 个）
+│   ├── repository/                         // Spring Data JPA（11 个）
 │   │   ├── UserRepository.java             // findByUsername
 │   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
+│   │   ├── CardRepository.java             // 闪卡 CRUD
+│   │   ├── TagRepository.java              // findByNameAndUserId + findByUserId
 │   │   ├── ErrorRecordRepository.java
 │   │   ├── SessionReportRepository.java
 │   │   ├── UserProgressRepository.java     // findByUserId
@@ -577,6 +620,7 @@ chat-agent/
 │   ├── service/                            // 业务服务
 │   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
 │   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图 + RAG 检索)
+│   │   ├── FlashcardService.java           // 闪卡创建（FSRS 初始化 + Tag upsert）+ 标签查询
 │   │   ├── SessionComplete.java            // 会话结束管线 (report+persist+async memory)
 │   │   ├── SessionDbStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
 │   │   ├── LearningProfileService.java              // 异步保存 Topic 摘要 + Learning Profile 合并（含 sessionId 追溯）
@@ -622,9 +666,10 @@ chat-agent/
     │   ├── main.html                       // 登录表单 + 暗色主题
     │   ├── main.js                         // ?error 参数检测
     │   └── main.css                        // 暗色主题卡片样式
-    ├── index.html                          // 聊天页（认证后访问，header 含 Logout 按钮）
-    ├── app.js                              // WebSocket 客户端 + Visibility API 自动 resume
-    └── style.css                           // 深色主题 + Logout 按钮样式
+    ├── index.html                          // 聊天页（认证后访问，header 含 Logout + 闪卡按钮）
+    ├── app.js                              // WebSocket 客户端 + Visibility API 自动 resume + window.activePanel
+    ├── flashcard.js                        // 闪卡面板（两阶段录入 + chip 标签 + 保存 + debug 面板互斥）
+    └── style.css                           // 深色主题 + 闪卡面板样式 + toast 动画
 ```
 
 > **图结构简化**: `ConversationNode` 和 `MergeResponseNode` 已移除。对话流式生成由 `TurnProcessor` 直接调用 `ConversationAgent`，token 计数由 `TokenTracker` 封装在 `SessionStateStore` 中管理。
@@ -693,3 +738,6 @@ chat-agent/
 | **14. User 模块** | Spring Security form login + remember-me + BCrypt。User entity + UserRepository。AppProperties 配置 `permit-all-paths` 驱动权限。ChatState 加 `USER_ID` channel。`Session.userId` 数据隔离。`sessionToWs` 一对一翻转。SessionCleanupLogoutHandler 登出清理。E2E 用 `application-e2e.yml` + `permit-all-paths: [/**]` 绕过认证。`requireUserId` fallback `"anonymous"`。前端登录页 `login/main.html` + Visibility API 多标签自动 resume。 | 多用户认证 + 数据隔离 + 配置驱动权限 |
 | **15. AgentMode 合并** | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举（`displayName` + `templatePath`）；前端两个下拉框合并为一个；提示词拆分为 per-Mode `description.txt` + `rules.txt`，`conversation-system.txt` 退化为骨架模板；ChatState `SCENARIO` + `PERSONA` → `MODE`；协议 `scenario` + `persona` → `mode`；删除旧枚举类 | 消除不合理组合、降低选择成本、提示词按 Mode 独立定制、新增 Mode 只需加文件夹和模板 |
 | **16. 会话结束管线抽取** | `SessionComplete` 深模块：报告生成+持久化+异步记忆管线统一；`SessionDbStore.completeSession(null report)` → FAILED；`SessionStatus.FAILED` 枚举值；降级报告（fluencyScore=-1）+ 前端条件渲染；Handler 依赖 7→4 | 会话结束逻辑局部化，降级路径明确，前端不再展示 "0/10" |
+| **17. REST API 模式引入** | 全 WebSocket 通信 | `FlashcardController` 为 `@RestController`，POST /api/cards/add + GET /api/tags | 闪卡录入为独立 CRUD 操作，天然适配 REST 语义而非 WS 长连接；SecurityConfig 中 `/api/**` CSRF 豁免 |
+| **18. Fuzz PRNG 替换** | `java.util.Random` | `AleaPrng`（Johannes Baagøe 算法 Java 端口），通过 `DoubleSupplier` 接口注入 `repeat()` | 需跨实现 fuzz 确定性；Alea seed(42)→12 天、seed(12345)→11 天 精准匹配 PRD 预期值 |
+| **19. FSRS 代码量** | ~150 行预估 | ~300 行实际 | 算法复杂度被低估：含学习步进逻辑（Learning→Review→Relearning 4 状态机）、同日复习修正（short-term stability）、Fuzz 区间计算、retrievability 公式 |

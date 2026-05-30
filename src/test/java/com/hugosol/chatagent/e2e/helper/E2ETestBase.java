@@ -59,6 +59,12 @@ public abstract class E2ETestBase {
     @Autowired
     protected MemoryCueRepository memoryCueRepository;
 
+    @Autowired
+    protected CardRepository cardRepository;
+
+    @Autowired
+    protected TagRepository tagRepository;
+
     private int turnNumber = 0;
 
     static {

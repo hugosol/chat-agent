@@ -1,8 +1,10 @@
-(function () {
+    (function () {
     'use strict';
 
     var MAX_VISIBLE_MSGS = 10;
     var WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/chat';
+
+    window.activePanel = null;
 
     var ws = null;
     var sessionId = null;
@@ -506,6 +508,14 @@
 
     els.debugToggle.addEventListener('click', function () {
         els.debugLog.classList.toggle('hidden');
+        if (els.debugLog.classList.contains('hidden')) {
+            window.activePanel = null;
+        } else {
+            if (window.activePanel === 'flashcard') {
+                document.getElementById('flashcardPanel').classList.add('collapsed');
+            }
+            window.activePanel = 'debug';
+        }
     });
 
     els.debugClear.addEventListener('click', function () {
