@@ -1,0 +1,229 @@
+package com.hugosol.chatagent.e2e.helper;
+
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.hugosol.chatagent.model.*;
+import com.hugosol.chatagent.repository.*;
+import com.microsoft.playwright.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("e2e")
+public abstract class E2ETestBase {
+
+    protected static final String DEFAULT_USER_ID = "anonymous";
+
+    protected static final int WIREMOCK_PORT = 19090;
+    protected static WireMockServer wireMockServer;
+    protected static Browser browser;
+    private static final String runTimestamp;
+
+    protected BrowserContext context;
+    protected Page page;
+
+    @LocalServerPort
+    protected int serverPort;
+
+    @Autowired
+    protected SessionRepository sessionRepository;
+
+    @Autowired
+    protected MessageRepository messageRepository;
+
+    @Autowired
+    protected ErrorRecordRepository errorRecordRepository;
+
+    @Autowired
+    protected SessionReportRepository sessionReportRepository;
+
+    @Autowired
+    protected UserLearningProfileRepository userLearningProfileRepository;
+
+    @Autowired
+    protected MemoryCueRepository memoryCueRepository;
+
+    private int turnNumber = 0;
+
+    static {
+        wireMockServer = new WireMockServer(WireMockConfiguration.options().port(WIREMOCK_PORT));
+        wireMockServer.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(wireMockServer::stop));
+
+        var now = LocalDateTime.now();
+        String prefix = now.format(DateTimeFormatter.ofPattern("MM-dd-HHmm"));
+        String suffix;
+        Path dir;
+        do {
+            suffix = ThreadLocalRandom.current().ints(4, 'a', 'z' + 1)
+                    .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                    .toString();
+            dir = Paths.get("target/e2e-screenshots", prefix + "-" + suffix);
+        } while (Files.exists(dir));
+        runTimestamp = prefix + "-" + suffix;
+        housekeepScreenshots();
+    }
+
+    @BeforeAll
+    static void launchBrowser() {
+        browser = Playwright.create().chromium().launch(
+                new BrowserType.LaunchOptions().setHeadless(true));
+    }
+
+    @AfterAll
+    static void closeBrowser() {
+        if (browser != null) browser.close();
+    }
+
+    @BeforeEach
+    void setUp() {
+        turnNumber = 0;
+        context = browser.newContext(new Browser.NewContextOptions()
+                .setViewportSize(390, 844)
+                .setUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) " +
+                        "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+                        "Version/17.0 Mobile/15E148 Safari/604.1")
+                .setIsMobile(true)
+                .setDeviceScaleFactor(3));
+        page = context.newPage();
+        page.navigate("http://localhost:" + serverPort);
+
+        WireMockStubs.registerAllStubs(wireMockServer);
+    }
+
+    @AfterEach
+    void tearDown() {
+        takeScreenshot("final");
+        if (context != null) context.close();
+    }
+
+    protected void takeScreenshot(String name) {
+        if (page == null) return;
+        try {
+            Path dir = Paths.get("target/e2e-screenshots", runTimestamp);
+            Files.createDirectories(dir);
+            page.screenshot(new Page.ScreenshotOptions()
+                    .setPath(dir.resolve(name + ".png")));
+        } catch (Exception ignored) {
+        }
+    }
+
+    protected String sessionId() {
+        return (String) page.evaluate("localStorage.getItem('sessionId')");
+    }
+
+    protected void startSession(String mode) {
+        page.locator("#modeSelect").selectOption(mode);
+        page.locator("#startBtn").click();
+        page.waitForFunction(
+                "() => !document.getElementById('textInputBar').classList.contains('hidden')");
+    }
+
+    protected void sendMessage(String text) {
+        turnNumber++;
+        page.locator("#textInput").fill(text);
+        page.locator("#sendTextBtn").click();
+    }
+
+    protected void waitForAgentResponse() {
+        page.waitForFunction("() => !document.getElementById('textInput').disabled");
+        page.waitForFunction(
+                "expected => document.querySelectorAll('.correction-bubble').length >= expected",
+                turnNumber);
+    }
+
+    protected void endSession() {
+        page.locator("#endBtn").click();
+        page.waitForFunction(
+                "() => !document.getElementById('reportModal').classList.contains('hidden')");
+    }
+
+    protected void reloadPage() {
+        page.reload();
+        page.waitForSelector(".message.user");
+    }
+
+    protected int countUserMessages() {
+        return page.locator(".message.user").count();
+    }
+
+    protected int countAgentMessages() {
+        return page.locator(".message.agent").count();
+    }
+
+    protected int countCorrectionBubbles() {
+        return page.locator(".message.correction-bubble").count();
+    }
+
+    protected boolean hasCorrectionBubbleWith(String containedText) {
+        return page.locator(".correction-bubble .content-text")
+                .filter(new Locator.FilterOptions().setHasText(containedText))
+                .count() > 0;
+    }
+
+    protected int countCorrectionSidebarItems() {
+        return page.locator(".correction-item").count();
+    }
+
+    protected boolean isReportModalVisible() {
+        return page.locator("#reportModal").isVisible();
+    }
+
+    protected String getReportModalText() {
+        return page.locator("#reportContent").innerText();
+    }
+
+    private static void housekeepScreenshots() {
+        Path screenshotsDir = Paths.get("target/e2e-screenshots");
+        if (!Files.exists(screenshotsDir)) return;
+
+        Pattern pattern = Pattern.compile("^(\\d{2})-(\\d{2})-(\\d{4})-[a-z]{4}$");
+        var cutoff = LocalDateTime.now().minusHours(24);
+        var today = LocalDate.now();
+
+        try (var dirs = Files.list(screenshotsDir)) {
+            dirs.filter(Files::isDirectory).forEach(dir -> {
+                var matcher = pattern.matcher(dir.getFileName().toString());
+                if (!matcher.matches()) return;
+
+                int month = Integer.parseInt(matcher.group(1));
+                int day = Integer.parseInt(matcher.group(2));
+                String time = matcher.group(3);
+                int hour = Integer.parseInt(time.substring(0, 2));
+                int minute = Integer.parseInt(time.substring(2));
+
+                int year = today.getYear();
+                if (month > today.getMonthValue()
+                        || (month == today.getMonthValue() && day > today.getDayOfMonth())) {
+                    year--;
+                }
+                var ts = LocalDateTime.of(year, month, day, hour, minute);
+
+                if (ts.isBefore(cutoff)) {
+                    try (var walk = Files.walk(dir)) {
+                        walk.sorted(Comparator.reverseOrder())
+                                .forEach(p -> {
+                                    try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+                                });
+                    } catch (Exception ignored) {}
+                }
+            });
+        } catch (Exception ignored) {}
+    }
+}

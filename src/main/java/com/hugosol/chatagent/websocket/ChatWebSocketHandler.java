@@ -1,0 +1,49 @@
+package com.hugosol.chatagent.websocket;
+
+import com.hugosol.chatagent.protocol.ClientMessage;
+import com.hugosol.chatagent.protocol.ProtocolDispatcher;
+import com.hugosol.chatagent.service.SessionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+@Component
+public class ChatWebSocketHandler extends TextWebSocketHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
+
+    private final ProtocolDispatcher protocol;
+    private final ChatMessageHandler messageHandler;
+    private final SessionService sessionService;
+
+    public ChatWebSocketHandler(ProtocolDispatcher protocol, ChatMessageHandler messageHandler,
+                                  SessionService sessionService) {
+        this.protocol = protocol;
+        this.messageHandler = messageHandler;
+        this.sessionService = sessionService;
+    }
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession wsSession) {
+        log.info("WebSocket connected: {}", wsSession.getId());
+    }
+
+    @Override
+    protected void handleTextMessage(WebSocketSession wsSession, TextMessage message) {
+        try {
+            ClientMessage msg = protocol.parse(message.getPayload());
+            protocol.dispatch(wsSession, msg, messageHandler);
+        } catch (Exception e) {
+            log.error("Error handling message", e);
+        }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        sessionService.unbind(session.getId());
+    }
+}

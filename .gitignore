@@ -19,5 +19,5 @@ Thumbs.db
 # Environment
 .env
 *.env
-/.run/WebAgentApplication.run.xml
+/.run/
 /logs/

@@ -2,7 +2,7 @@
     'use strict';
 
     var MAX_VISIBLE_MSGS = 10;
-    var WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/coach';
+    var WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/chat';
 
     var ws = null;
     var sessionId = null;
