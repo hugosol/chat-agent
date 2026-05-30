@@ -6,7 +6,10 @@ import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.TagRepository;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -24,7 +27,12 @@ public class FlashcardService {
         this.tagRepository = tagRepository;
     }
 
+    @Transactional
     public Card createCard(String front, String back, List<String> tagNames, String userId) {
+        if (tagNames == null || tagNames.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "标签不能为空");
+        }
+
         Card card = new Card(userId, front, back);
 
         var state = FsrsScheduler.createInitState(Instant.now());

@@ -7,15 +7,20 @@ import com.hugosol.chatagent.repository.TagRepository;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -84,5 +89,19 @@ class FlashcardServiceTest {
         assertThat(tags).hasSize(2);
         assertThat(tags.get(0).getName()).isEqualTo("daily");
         assertThat(tags.get(1).getName()).isEqualTo("time");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void createCard_emptyTags_throwsBadRequest(List<String> tagNames) {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        assertThatThrownBy(() -> service.createCard("hello", "world", tagNames, "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        verify(cardRepository, never()).save(any());
+        verify(tagRepository, never()).save(any());
     }
 }
