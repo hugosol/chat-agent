@@ -104,4 +104,20 @@ class FlashcardServiceTest {
         verify(cardRepository, never()).save(any());
         verify(tagRepository, never()).save(any());
     }
+
+    @Test
+    void createCard_duplicate_throwsConflict() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+        Card existing = new Card("user-1", "hello", "old meaning");
+        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
+                .thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.createCard("hello", "world", List.of("greeting"), "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        verify(cardRepository, never()).save(any());
+        verify(tagRepository, never()).save(any());
+    }
 }

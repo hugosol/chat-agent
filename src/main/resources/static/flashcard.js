@@ -148,6 +148,11 @@
             credentials: 'same-origin'
         })
             .then(function (resp) {
+                if (resp.status === 409) {
+                    return resp.json().then(function (body) {
+                        throw { message: (body && body.message) || '卡片已存在', status: 409 };
+                    });
+                }
                 if (!resp.ok) throw new Error('Save failed');
                 return resp.json();
             })
@@ -156,7 +161,11 @@
                 closePanel();
             })
             .catch(function (err) {
-                alert('保存失败: ' + err.message);
+                if (err.status === 409) {
+                    alert(err.message);
+                } else {
+                    alert('保存失败: ' + err.message);
+                }
             })
             .finally(function () {
                 els.saveBtn.disabled = false;

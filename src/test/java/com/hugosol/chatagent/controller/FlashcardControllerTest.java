@@ -100,4 +100,20 @@ class FlashcardControllerTest {
                         .content(requestJson))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void addCard_duplicate_returnsConflict() throws Exception {
+        when(flashcardService.createCard(anyString(), anyString(), anyList(), anyString()))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "卡片'yesterday'已存在"));
+
+        String requestJson = """
+                {"front":"yesterday","back":"昨天","tags":["daily"]}""";
+
+        mockMvc.perform(post("/api/cards/add")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isConflict());
+    }
 }
