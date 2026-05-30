@@ -1,0 +1,341 @@
+package com.hugosol.chatagent.service;
+
+import com.hugosol.chatagent.config.AppProperties;
+import com.hugosol.chatagent.dto.CorrectionData;
+import com.hugosol.chatagent.dto.MessageData;
+import com.hugosol.chatagent.model.AgentMode;
+import com.hugosol.chatagent.model.AgentType;
+import com.hugosol.chatagent.model.ErrorType;
+import com.hugosol.chatagent.model.MessageRole;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class SessionServiceTest {
+
+    private SessionService service;
+
+    @BeforeEach
+    void setUp() {
+        TokenTracker tokenTracker = new TokenTracker(128000, 0.8);
+        LearningProfileService learningProfileService = mock(LearningProfileService.class);
+        when(learningProfileService.loadLatestContent(anyString(), anyString(), any())).thenReturn("");
+        AppProperties appProperties = new AppProperties();
+        service = new SessionService(tokenTracker, learningProfileService, appProperties);
+    }
+
+    @Test
+    void initCreatesSession() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        assertThat(service.exists("s1")).isTrue();
+    }
+
+    @Test
+    void initStoresUserId() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        assertThat(service.getUserId("s1")).isEqualTo("user1");
+    }
+
+    @Test
+    void getUserIdReturnsNullForNonexistentSession() {
+        assertThat(service.getUserId("unknown")).isNull();
+    }
+
+    @Test
+    void existsReturnsFalseForUnknownSession() {
+        assertThat(service.exists("unknown")).isFalse();
+    }
+
+    @Test
+    void existsReturnsFalseAfterRemove() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.remove("s1");
+        assertThat(service.exists("s1")).isFalse();
+    }
+
+    @Test
+    void initInitializesTokenTracker() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.recordTokens("s1", AgentType.CONVERSATION, 500);
+        assertThat(service.getUsageRatio("s1")).isGreaterThan(0);
+    }
+
+    @Test
+    void removeClearsTokenTracker() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.recordTokens("s1", AgentType.CONVERSATION, 500);
+        service.remove("s1");
+        assertThat(service.getUsageRatio("s1")).isZero();
+    }
+
+    @Test
+    void bindAndGetSessionId() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        assertThat(service.getSessionId("ws1")).isEqualTo("s1");
+    }
+
+    @Test
+    void unbindKeepsStateAlive() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.unbind("ws1");
+        assertThat(service.getSessionId("ws1")).isNull();
+        assertThat(service.exists("s1")).isTrue();
+    }
+
+    @Test
+    void rebindAfterUnbind() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.unbind("ws1");
+        service.bind("ws2", "s1");
+        assertThat(service.getSessionId("ws2")).isEqualTo("s1");
+        assertThat(service.getSessionId("ws1")).isNull();
+    }
+
+    @Test
+    void bindOverwritesPreviousBinding() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.bind("ws2", "s1");
+        assertThat(service.getSessionId("ws2")).isEqualTo("s1");
+        assertThat(service.getSessionId("ws1")).isNull();
+    }
+
+    @Test
+    void getSessionIdReturnsNullForUnknown() {
+        assertThat(service.getSessionId("unknown")).isNull();
+    }
+
+    @Test
+    void getWsForSessionReturnsBoundWsId() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        assertThat(service.getWsForSession("s1")).isEqualTo("ws1");
+    }
+
+    @Test
+    void getWsForSessionReturnsNullForNonexistent() {
+        assertThat(service.getWsForSession("unknown")).isNull();
+    }
+
+    @Test
+    void removeAllForUserClearsOnlyThatUser() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.init("s2", "WORKPLACE_STANDUP", "user2", "ws2");
+
+        service.removeAllForUser("user1");
+
+        assertThat(service.exists("s1")).isFalse();
+        assertThat(service.exists("s2")).isTrue();
+        assertThat(service.getSessionId("ws1")).isNull();
+        assertThat(service.getSessionId("ws2")).isEqualTo("s2");
+    }
+
+    @Test
+    void addMessageStoresCorrectly() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
+
+        List<MessageData> messages = service.getMessages("s1");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getRole()).isEqualTo(MessageRole.USER);
+        assertThat(messages.get(0).getContent()).isEqualTo("Hello");
+        assertThat(messages.get(0).getMessageId()).isEqualTo(1);
+    }
+
+    @Test
+    void addMessageStoresTokenCount() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.addMessage("s1", MessageRole.AGENT, "Reply", 1, 520);
+
+        List<MessageData> messages = service.getMessages("s1");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getTokenCount()).isEqualTo(520);
+    }
+
+    @Test
+    void addMessageAllowsNullTokenCount() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
+
+        List<MessageData> messages = service.getMessages("s1");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).getTokenCount()).isNull();
+    }
+
+    @Test
+    void addMessageDoesNotThrowForNonexistentSession() {
+        service.addMessage("unknown", MessageRole.USER, "test", 1, null);
+    }
+
+    @Test
+    void getMessagesReturnsDefensiveCopy() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.addMessage("s1", MessageRole.USER, "Hello", 1, null);
+
+        List<MessageData> messages = service.getMessages("s1");
+        messages.clear();
+
+        assertThat(service.getMessages("s1")).hasSize(1);
+    }
+
+    @Test
+    void getMessagesReturnsEmptyListForNonexistentSession() {
+        assertThat(service.getMessages("unknown")).isEmpty();
+    }
+
+    @Test
+    void addCorrectionsStoresCorrectly() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CorrectionData cd = new CorrectionData(ErrorType.GRAMMAR, "orig", "corr", "expl");
+        service.addCorrections("s1", List.of(cd));
+
+        List<CorrectionData> corrections = service.getCorrections("s1");
+        assertThat(corrections).hasSize(1);
+        assertThat(corrections.get(0).getType()).isEqualTo(ErrorType.GRAMMAR);
+    }
+
+    @Test
+    void addCorrectionsAccumulates() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.addCorrections("s1", List.of(
+                new CorrectionData(ErrorType.GRAMMAR, "a", "b", "c")
+        ));
+        service.addCorrections("s1", List.of(
+                new CorrectionData(ErrorType.CHINGLISH, "d", "e", "f")
+        ));
+
+        assertThat(service.getCorrections("s1")).hasSize(2);
+    }
+
+    @Test
+    void getCorrectionsReturnsDefensiveCopy() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.addCorrections("s1", List.of(
+                new CorrectionData(ErrorType.GRAMMAR, "a", "b", "c")
+        ));
+
+        List<CorrectionData> corrections = service.getCorrections("s1");
+        corrections.clear();
+
+        assertThat(service.getCorrections("s1")).hasSize(1);
+    }
+
+    @Test
+    void getCorrectionsReturnsEmptyListForNonexistentSession() {
+        assertThat(service.getCorrections("unknown")).isEmpty();
+    }
+
+    @Test
+    void getCorrectionCountReturnsSize() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        assertThat(service.getCorrectionCount("s1")).isZero();
+
+        service.addCorrections("s1", List.of(
+                new CorrectionData(ErrorType.GRAMMAR, "a", "b", "c"),
+                new CorrectionData(ErrorType.CHINGLISH, "d", "e", "f")
+        ));
+        assertThat(service.getCorrectionCount("s1")).isEqualTo(2);
+    }
+
+    @Test
+    void getCorrectionCountReturnsZeroForNonexistentSession() {
+        assertThat(service.getCorrectionCount("unknown")).isZero();
+    }
+
+    @Test
+    void getModeReturnsStoredValue() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        assertThat(service.getMode("s1")).isEqualTo("WORKPLACE_STANDUP");
+    }
+
+    @Test
+    void getModeReturnsEmptyForNonexistent() {
+        assertThat(service.getMode("unknown")).isEmpty();
+    }
+
+    @Test
+    void recordTokensDelegatesToTokenTracker() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        service.recordTokens("s1", AgentType.CONVERSATION, 1000);
+
+        double ratio = service.getUsageRatio("s1");
+        assertThat(ratio).isGreaterThan(0);
+    }
+
+    @Test
+    void isTokenWarningDelegatesToTokenTracker() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        assertThat(service.isTokenWarning("s1")).isFalse();
+
+        service.recordTokens("s1", AgentType.CONVERSATION, 120000);
+        assertThat(service.isTokenWarning("s1")).isTrue();
+    }
+
+    @Test
+    void addPendingCorrection_registersFutureForSession() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        service.addPendingCorrection("s1", future);
+    }
+
+    @Test
+    void waitForPendingCorrections_waitsForCompletedFuture() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        service.addPendingCorrection("s1", future);
+
+        service.waitForPendingCorrections("s1", 1000);
+    }
+
+    @Test
+    void waitForPendingCorrections_doesNothingForSessionWithNoPendingFutures() {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+
+        service.waitForPendingCorrections("s1", 1000);
+    }
+
+    @Test
+    void waitForPendingCorrections_doesNothingForUnknownSession() {
+        service.waitForPendingCorrections("unknown", 1000);
+    }
+
+    @Test
+    void waitForPendingCorrections_waitsForInProgressFuture() throws Exception {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CountDownLatch latch = new CountDownLatch(1);
+
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try {
+                latch.await(2, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
+        });
+        service.addPendingCorrection("s1", future);
+
+        service.waitForPendingCorrections("s1", 5000);
+    }
+
+    @Test
+    void waitForPendingCorrections_timedOutReturnsWithoutThrowing() throws Exception {
+        service.init("s1", "WORKPLACE_STANDUP", "user1", "ws1");
+        CountDownLatch latch = new CountDownLatch(1);
+
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try {
+                latch.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
+        });
+        service.addPendingCorrection("s1", future);
+
+        service.waitForPendingCorrections("s1", 100);
+    }
+}

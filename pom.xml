@@ -11,10 +11,10 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example</groupId>
-    <artifactId>web-agent</artifactId>
+    <groupId>com.hugosol</groupId>
+    <artifactId>chat-agent</artifactId>
     <version>0.1.0</version>
-    <name>Web Agent</name>
+    <name>Chat Agent</name>
     <description>AI-powered English speaking practice tool</description>
 
     <properties>

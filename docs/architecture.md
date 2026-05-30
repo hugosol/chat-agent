@@ -1,4 +1,4 @@
-# English Coach — 完整架构蓝图
+# Chat Agent — 完整架构蓝图
 
 ## 一、项目定位
 
@@ -47,15 +47,15 @@
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | Topic Memory 模式隔离 | `UserLearningProfile` 新增可空 `mode` 字段：`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 LearningType |
-| 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 MemoryCueQueue（LRU 队列，capacity topK+1，跨 Turn 存活于 CoachState，去重刷新驱逐）管理 RAG 语义检索结果，编号列表注入 System Prompt |
+| 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 MemoryCueQueue（LRU 队列，capacity topK+1，跨 Turn 存活于 ChatState，去重刷新驱逐）管理 RAG 语义检索结果，编号列表注入 System Prompt |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `TaskRunner` 统一管理 LLM 调用生命周期与日志，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
 | 40 | TaskRunner 同步 Agent 模式 | 抽取 `TaskRunner` 深模块统一管理同步 Agent 的 LLM 调用生命周期。Agent 构造时通过 `runner.register(name, task)` 注册 `TaskDefinition`（模板 + paramBuilder + parser + errorStrategy），运行时通过 `runner.requestModel(name, params, ctx)` 触发 LLM 调用。`TaskName` 枚举管理 5 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）。删除 `LoggableChatModel` 包装层，日志能力由 TaskRunner 内生提供，含完整 sessionId/userId/agentType/mode 上下文字段。`MemoryAgent` 重命名为 `LearningAgent`（职责退化，仅保留 learningProfile 合并）。
-| 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `CoachMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/LearningProfileService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
+| 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `ChatMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/LearningProfileService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
 | 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载（队列为空）search topK+1 条，后续 search topK 条，去重时同 cueId 刷新到队头，满容时驱逐队尾（最久未访问）。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
 | 42 | TimeLabel 时间感知增强 | `TimeLabel` 计算逻辑从 Duration 桶遍历改为日期+时段判断。≤5分钟 "just now"，≤1小时 "a few minutes ago"，其余按日期分段：今天按时段（last night / this morning / this afternoon / this evening / tonight），昨天同样按时段（last night / yesterday morning / yesterday afternoon / yesterday evening / last night），2天以上保持 "a few days ago" 等模糊标签。`computeLabel(LocalDateTime, LocalDateTime)` API 签名不变。 |
 | 43 | LLM max output tokens 按 Agent 配置 | 新增 `app.llm.max-output-tokens` 配置，支持按 Agent 类型独立设置最大输出 token 数。默认 2048，ReportAgent 使用 4096（报告需更长输出）。`LangChain4jConfig` 创建独立的 `ChatLanguageModel` bean（default / report），`TaskRunner` 按 `TaskName.REPORT` 路由到对应模型。`MaxOutputTokens` 通过 `@ConfigurationProperties` 绑定，未配置的 Agent 自动回退到 default。 |
-| 44 | MemoryCueQueue LRU 淘汰设计 | `MemoryCueQueue` 为有容量上限的 LRU 有序集合（capacity = topK+1），跨 Turn 存活于 CoachState。首次加载（队列空）search topK+1 条，后续 search topK 条。push 时去重：同 cueId 刷新到队头；满容时淘汰队尾（最久未访问）。fallback anchor（最新 completed session 的 last cue）生命周期约 1 轮——下一轮被 RAG 结果替代。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。 |
+| 44 | MemoryCueQueue LRU 淘汰设计 | `MemoryCueQueue` 为有容量上限的 LRU 有序集合（capacity = topK+1），跨 Turn 存活于 ChatState。首次加载（队列空）search topK+1 条，后续 search topK 条。push 时去重：同 cueId 刷新到队头；满容时淘汰队尾（最久未访问）。fallback anchor（最新 completed session 的 last cue）生命周期约 1 轮——下一轮被 RAG 结果替代。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。 |
 
 ---
 
@@ -127,10 +127,10 @@
 
 **架构决策**: LangGraph 图处理**单轮纠错**（仅 `correction` 节点），对话流式生成由 Service 层 (`TurnProcessor`) 管理。
 
-### 状态定义 (CoachState extends AgentState)
+### 状态定义 (ChatState extends AgentState)
 
 ```java
-public class CoachState extends AgentState {
+public class ChatState extends AgentState {
     static final String SESSION_ID        = "sessionId";
     static final String MODE              = "mode";               // AgentMode 枚举名 (String)
     static final String USER_ID           = "userId";             // 当前用户标识
@@ -163,7 +163,7 @@ START → correction → END
 ```
 [用户 Start Session]
   → SessionDbStore.createSession(mode, userId) → H2 写入 Session + userId
-  → SessionService.init(sessionId, mode, userId, wsId) → 创建 CoachState (含 MODE) → activeStates Map + TokenTracker 初始化
+  → SessionService.init(sessionId, mode, userId, wsId) → 创建 ChatState (含 MODE) → activeStates Map + TokenTracker 初始化
 
 [每轮对话]
   → WebSocket 收到 USER_INPUT
@@ -173,7 +173,7 @@ START → correction → END
     → 两路 CompletableFuture 并行:
       A) ConversationAgent.generateStream(history, mode, MemoryContent, messageId, handler) → 流式推送到前端
       B) graph.stream(input, config) → CorrectionNode → 纠错结果异步推送
-  → 回调通过 TurnProcessor.TurnCallback 通知 CoachMessageHandler
+  → 回调通过 TurnProcessor.TurnCallback 通知 ChatMessageHandler
 
 [用户 End Session]
   → SessionService.waitForPendingCorrections(sessionId, 10s) → 等待所有 pending correction 完成（超时则 cancel）
@@ -187,7 +187,7 @@ START → correction → END
   → 发送 SESSION_REPORT 到前端（降级报告时 fluencyscore=-1，前端隐藏评分行）
 
 [会话恢复 RESUME_SESSION]
-  → CoachMessageHandler.onResumeSession() 校验 userId 匹配
+  → ChatMessageHandler.onResumeSession() 校验 userId 匹配
   → sessionToWs.put(sessionId, newWsId) 覆盖旧绑定
   → 返回 SESSION_RESUMED 包含完整 messages + corrections + tokenUsage
   → 前端 handleSessionResumed() 全量重建 DOM
@@ -364,7 +364,7 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AF
 
 ## 七、WebSocket 通信协议
 
-### 端点：`ws://localhost:8080/ws/coach`
+### 端点：`ws://localhost:8080/ws/chat`
 
 #### 前端 → 后端
 
@@ -445,7 +445,7 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AF
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  English Coach    [Token: ████░]              [Corrections 3]        │ ← 顶部栏 (场景+tokens+correction按钮)
+│  Chat Agent    [Token: ████░]              [Corrections 3]        │ ← 顶部栏 (场景+tokens+correction按钮)
 │──────────────────────────────────────────────────────────────────────│
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │                                                                │  │
@@ -504,14 +504,14 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AF
 ## 十、项目文件结构（实现版本）
 
 ```
-web-agent/
+chat-agent/
 ├── pom.xml
-├── src/main/java/com/hugosol/webagent/
-│   ├── WebAgentApplication.java
+├── src/main/java/com/hugosol/chatagent/
+│   ├── ChatAgentApplication.java
 │   │
 │   ├── graph/                              // LangGraph 核心
-│   │   ├── CoachState.java                 // AgentState 定义 + Schema (6 channels, 含 USER_ID + MODE)
-│   │   ├── CoachGraphBuilder.java          // StateGraph 构建 + compile (1节点线性图)
+│   │   ├── ChatState.java                 // AgentState 定义 + Schema (6 channels, 含 USER_ID + MODE)
+│   │   ├── ChatGraphBuilder.java          // StateGraph 构建 + compile (1节点线性图)
 │   │   └── nodes/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
@@ -531,13 +531,13 @@ web-agent/
 │   ├── dto/                              // 数据传输
 │   │   ├── MemoryContent.java            // 记忆注入负载 (learningProfile, cueMatches)
 │   │   ├── CueMatch.java                 // RAG 检索结果 (cueId, topic, summary, score, createdAt)
-│   │   ├── MemoryCueQueue.java           // LRU 有序集合 (capacity topK+1)，跨 Turn 存活于 CoachState
+│   │   ├── MemoryCueQueue.java           // LRU 有序集合 (capacity topK+1)，跨 Turn 存活于 ChatState
 │   │   ├── MessageData.java              // 前端消息序列化
 │   │   └── CorrectionData.java           // 纠错结果序列化
 │   │
 │   ├── websocket/
-│   │   ├── CoachWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)
-│   │   └── CoachMessageHandler.java        // 协议消息处理 + sessionToWs 映射 + requireUserId (实现 MessageHandler)
+│   │   ├── ChatWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)
+│   │   └── ChatMessageHandler.java        // 协议消息处理 + sessionToWs 映射 + requireUserId (实现 MessageHandler)
 │   │
 │   ├── protocol/                           // WS 消息协议
 │   │   ├── ClientMessage.java              // 密封接口 + 5 个子类型 (Jackson 多态反序列化)
@@ -677,19 +677,19 @@ web-agent/
 
 | 阶段 | 范围 | 产出 |
 |------|------|------|
-| **1. 骨架** | Spring Boot 项目 + Maven 依赖 + application.yml | pom.xml, WebAgentApplication, 目录结构 |
+| **1. 骨架** | Spring Boot 项目 + Maven 依赖 + application.yml | pom.xml, ChatAgentApplication, 目录结构 |
 | **2. 模型层** | 5 个 JPA Entity + 4 个枚举 + 5 个 Repository | 表结构 + 数据访问层 |
-| **3. LangGraph 核心** | CoachState (6 channels) + 1 Node + CoachGraphBuilder | 编译通过的单轮线性图 |
+| **3. LangGraph 核心** | ChatState (6 channels) + 1 Node + ChatGraphBuilder | 编译通过的单轮线性图 |
 | **4. Agent 接入** | 3 个 Agent + PromptLoader + 3 个 Prompt 文件 | LangChain4j DeepSeek 调用链路 |
 | **5. 服务层** | SessionStateStore + TurnProcessor + ReportGenerator + SessionService + TokenTracker | State 读写、并行编排、报告生成、H2 持久化 |
-| **6. WebSocket** | CoachWebSocketHandler + CoachMessageHandler + ProtocolDispatcher + 协议类型 + WebSocketConfig + LangChain4jConfig | JSON 消息路由、前后端通讯 |
+| **6. WebSocket** | ChatWebSocketHandler + ChatMessageHandler + ProtocolDispatcher + 协议类型 + WebSocketConfig + LangChain4jConfig | JSON 消息路由、前后端通讯 |
 | **7. 前端 V1** | 文本输入栏 + Send 按钮 + TTS 🔊 按钮 + Token 进度条 + Debug 面板 | 可用 UI |
 | **8. 移动端适配** | iOS Safari 兼容：🔊 按钮手势触发 TTS、输入框键盘原生听写、Debug 面板 | iPhone 13 可用 |
 | **9. 端到端验证** | `mvn compile` BUILD SUCCESS（40 个源文件） | 编译通过 |
 | **10. Correction UX 优化** | 侧边栏绝对定位浮层 + 默认隐藏 + header toggle；correction 气泡分行编号；Safe-area CSS；移除 LISTENING 状态 | 移动端体验提升 |
-| **11. Scenario/Persona 枚举重构** | `ScenarioType` + `PersonaType` 加描述字段；`ConversationAgent` 用 enum 访问器；`CoachWebSocketHandler` persona 入口校验；prompt 占位符修正 | 自然语言 prompt、可扩展、类型安全 |
+| **11. Scenario/Persona 枚举重构** | `ScenarioType` + `PersonaType` 加描述字段；`ConversationAgent` 用 enum 访问器；`ChatWebSocketHandler` persona 入口校验；prompt 占位符修正 | 自然语言 prompt、可扩展、类型安全 |
 | **12. 归档深化** | `MessageData` 加 `messageId` 字段；`SessionArchiver` 纯计算模块提取；删除 `speech/` 空壳接口 | 修复 ErrorRecord 重复绑定；实体转换可脱离 DB 测试；消除无 leverage 模块 |
-| **13. E2E 测试** | Playwright + WireMock：`EnglishCoachSessionIT`（完整会话+3轮+sidebar+H2断言）、`EnglishCoachResumeIT`（页面刷新→会话恢复）。WireMock Scenario 状态机轮转 mock 数据，`matchingJsonPath` 区分 conversation/correction/report 请求。DOM 级等待（input 状态、correction bubble 数量、report modal 可见性）。截图自动保存到 `target/e2e-screenshots/`。 | 零外部依赖的全链路回归测试；WireMock 固定端口 19090 + shutdown hook 支持全量并行跑 |
-| **14. User 模块** | Spring Security form login + remember-me + BCrypt。User entity + UserRepository。AppProperties 配置 `permit-all-paths` 驱动权限。CoachState 加 `USER_ID` channel。`Session.userId` 数据隔离。`sessionToWs` 一对一翻转。SessionCleanupLogoutHandler 登出清理。E2E 用 `application-e2e.yml` + `permit-all-paths: [/**]` 绕过认证。`requireUserId` fallback `"anonymous"`。前端登录页 `login/main.html` + Visibility API 多标签自动 resume。 | 多用户认证 + 数据隔离 + 配置驱动权限 |
-| **15. AgentMode 合并** | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举（`displayName` + `templatePath`）；前端两个下拉框合并为一个；提示词拆分为 per-Mode `description.txt` + `rules.txt`，`conversation-system.txt` 退化为骨架模板；CoachState `SCENARIO` + `PERSONA` → `MODE`；协议 `scenario` + `persona` → `mode`；删除旧枚举类 | 消除不合理组合、降低选择成本、提示词按 Mode 独立定制、新增 Mode 只需加文件夹和模板 |
+| **13. E2E 测试** | Playwright + WireMock：`ChatAgentSessionIT`（完整会话+3轮+sidebar+H2断言）、`ChatAgentResumeIT`（页面刷新→会话恢复）。WireMock Scenario 状态机轮转 mock 数据，`matchingJsonPath` 区分 conversation/correction/report 请求。DOM 级等待（input 状态、correction bubble 数量、report modal 可见性）。截图自动保存到 `target/e2e-screenshots/`。 | 零外部依赖的全链路回归测试；WireMock 固定端口 19090 + shutdown hook 支持全量并行跑 |
+| **14. User 模块** | Spring Security form login + remember-me + BCrypt。User entity + UserRepository。AppProperties 配置 `permit-all-paths` 驱动权限。ChatState 加 `USER_ID` channel。`Session.userId` 数据隔离。`sessionToWs` 一对一翻转。SessionCleanupLogoutHandler 登出清理。E2E 用 `application-e2e.yml` + `permit-all-paths: [/**]` 绕过认证。`requireUserId` fallback `"anonymous"`。前端登录页 `login/main.html` + Visibility API 多标签自动 resume。 | 多用户认证 + 数据隔离 + 配置驱动权限 |
+| **15. AgentMode 合并** | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举（`displayName` + `templatePath`）；前端两个下拉框合并为一个；提示词拆分为 per-Mode `description.txt` + `rules.txt`，`conversation-system.txt` 退化为骨架模板；ChatState `SCENARIO` + `PERSONA` → `MODE`；协议 `scenario` + `persona` → `mode`；删除旧枚举类 | 消除不合理组合、降低选择成本、提示词按 Mode 独立定制、新增 Mode 只需加文件夹和模板 |
 | **16. 会话结束管线抽取** | `SessionComplete` 深模块：报告生成+持久化+异步记忆管线统一；`SessionDbStore.completeSession(null report)` → FAILED；`SessionStatus.FAILED` 枚举值；降级报告（fluencyScore=-1）+ 前端条件渲染；Handler 依赖 7→4 | 会话结束逻辑局部化，降级路径明确，前端不再展示 "0/10" |

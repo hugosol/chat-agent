@@ -1,4 +1,4 @@
-# Web Agent
+# Chat Agent
 
 AI-powered English speaking practice tool for Chinese Java developers.  
 Uses **LangChain4j** + **langgraph4j** + **DeepSeek** to run 5 AI agents that role-play conversations, correct English errors in real-time, generate session reports, and maintain cross-session memory with structured topic cues.
@@ -8,7 +8,7 @@ Uses **LangChain4j** + **langgraph4j** + **DeepSeek** to run 5 AI agents that ro
 ```bash
 # 1. Clone
 git clone <repo-url>
-cd web-agent
+cd chat-agent
 
 # 2. Set DeepSeek API key (pick one):
 #    Option A: Create application-local.yml and set the key there, then run with local profile
@@ -74,11 +74,11 @@ E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari view
 
 | Test Class | What It Verifies |
 |-----------|-----------------|
-| `EnglishCoachSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
-| `EnglishCoachResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
-| `EnglishCoachMemoryIT` | Two sessions back-to-back → Topic Memory v1→v2 direct write → Learning Profile v1→v2 merge → topic memory mode-scoped isolation → learning profile cross-mode sharing |
+| `ChatAgentSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
+| `ChatAgentResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
+| `ChatAgentMemoryIT` | Two sessions back-to-back → Topic Memory v1→v2 direct write → Learning Profile v1→v2 merge → topic memory mode-scoped isolation → learning profile cross-mode sharing |
 | `DailyTalkIT` | DAILY_TALK mode → 3-turn casual conversation → teaching-style corrections → mode-scoped memory |
-| `EnglishCoachMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
+| `ChatAgentMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
 
 Test resources: `src/test/resources/wiremock/` (mock response files for conversation, correction, report, memory merge, and memory cue), `src/test/resources/application-e2e.yml` (in-memory H2, permit all paths).
 
@@ -103,7 +103,7 @@ Password: (leave empty)
 # Activate local profile to enable file logging
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 
-# Logs written to: ./logs/english-coach.YYYY-MM-DD.log
+# Logs written to: ./logs/chat-agent.YYYY-MM-DD.log
 # Console: INFO level — File: DEBUG level, 3-day rolling retention
 ```
 
@@ -136,10 +136,10 @@ Records older than 3 days are automatically cleaned up on startup.
 Browser (login page → chat page with 🔊 TTS)
     │  HTTP + WebSocket JSON
     ▼
-Spring Security  ──►  /login  ──►  /index.html  ──►  /ws/coach
+Spring Security  ──►  /login  ──►  /index.html  ──►  /ws/chat
     │
     ▼
-CoachWebSocketHandler  ──►  CoachMessageHandler  ──►  TurnProcessor  ──►  LangGraph (1 node: correction)
+ChatWebSocketHandler  ──►  ChatMessageHandler  ──►  TurnProcessor  ──►  LangGraph (1 node: correction)
     │                              │                        │
      │                              │                        ├── EmbeddingService.search() → RAG MemoryCue (every round)
      │                              │                        ├── LearningProfile + last MemoryCue fallback (round 1 only)
@@ -162,7 +162,7 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 
 - **Spring Security** form login with HTTP session cookie + remember-me (14 days).
 - **User data isolation**: `Session` entity has `userId` field. All per-session queries (find by sessionId UUID) are naturally isolated. Only cross-session queries (history, progress) filter by user.
-- **Runtime user context**: `CoachState` stores `userId` as a langgraph channel, accessible to all async processing threads.
+- **Runtime user context**: `ChatState` stores `userId` as a langgraph channel, accessible to all async processing threads.
 - **Logout**: Explicit logout clears all active sessions via `SessionCleanupLogoutHandler`. Tab close without logout preserves sessions for resume.
 - **Multi-tab**: `sessionToWs` map is one-to-one (sessionId → wsId). Page Visibility API triggers auto-resume on tab activation, keeping UI fresh across tabs.
 - **Config-driven auth**: `app.security.permit-all-paths` controls which URL patterns skip authentication. No conditional annotations on SecurityConfig.
@@ -190,13 +190,13 @@ Every round performs RAG semantic search via `EmbeddingService.search()` against
 ## Project Structure
 
 ```
-web-agent/
+chat-agent/
 ├── pom.xml
-├── src/main/java/com/hugosol/webagent/
-│   ├── WebAgentApplication.java
+├── src/main/java/com/hugosol/chatagent/
+│   ├── ChatAgentApplication.java
 │   ├── graph/
-│   │   ├── CoachState.java
-│   │   ├── CoachGraphBuilder.java
+│   │   ├── ChatState.java
+│   │   ├── ChatGraphBuilder.java
 │   │   └── nodes/
 │   │       └── CorrectionNode.java
 │   ├── dto/
@@ -211,8 +211,8 @@ web-agent/
 │   │   ├── MemoryAgent.java
 │   │   └── MemoryCueAgent.java
 │   ├── websocket/
-│   │   ├── CoachWebSocketHandler.java
-│   │   └── CoachMessageHandler.java
+│   │   ├── ChatWebSocketHandler.java
+│   │   └── ChatMessageHandler.java
 │   ├── protocol/
 │   │   ├── ClientMessage.java
 │   │   ├── ServerMessage.java
@@ -249,12 +249,12 @@ web-agent/
 │   ├── app.js
 │   └── style.css
 └── src/test/
-    ├── java/com/hugosol/webagent/e2e/    # E2E regression tests (Playwright + WireMock)
-    │   ├── EnglishCoachSessionIT.java
-    │   ├── EnglishCoachResumeIT.java
-    │   ├── EnglishCoachMemoryIT.java
+    ├── java/com/hugosol/chatagent/e2e/    # E2E regression tests (Playwright + WireMock)
+    │   ├── ChatAgentSessionIT.java
+    │   ├── ChatAgentResumeIT.java
+    │   ├── ChatAgentMemoryIT.java
     │   ├── DailyTalkIT.java
-    │   ├── EnglishCoachMemoryCueIT.java
+    │   ├── ChatAgentMemoryCueIT.java
     │   └── helper/
     │       ├── E2ETestBase.java
     │       └── WireMockStubs.java

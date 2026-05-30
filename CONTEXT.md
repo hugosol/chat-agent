@@ -1,12 +1,12 @@
-# CONTEXT — English Coach
+# CONTEXT — Chat Agent
 
-English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（UserLearningProfile）。
+Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（UserLearningProfile）。
 
 ## People and Identity
 
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
-| **Learner** | A person who uses the English Coach to practice spoken English | User, student, customer |
+| **Learner** | A person who uses Chat Agent to practice spoken English | User, student, customer |
 | **Principal** | Spring Security representation of the authenticated Learner within a request context | Current user, auth context |
 | **Login session** | The Spring Security HTTP session (JSESSIONID cookie) that proves the Learner is authenticated | Auth session, HTTP session |
 | **Remember-Me** | A persistent cookie that survives browser restart and automatically re-establishes a Login session within 14 days | Auto-login, persistent login |
@@ -48,10 +48,10 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
-| **CoachState** | The in-memory langgraph container holding a Practice session messages, corrections, mode, and userId | Session state, graph state |
-| **Active states map** | The ConcurrentHashMap holding all active CoachState instances, keyed by Practice session UUID | activeStates (code name), session store, state cache |
+| **ChatState** | The in-memory langgraph container holding a Practice session messages, corrections, mode, and userId | Session state, graph state |
+| **Active states map** | The ConcurrentHashMap holding all active ChatState instances, keyed by Practice session UUID | activeStates (code name), session store, state cache |
 | **Binding map** | The one-to-one ConcurrentHashMap mapping a Practice session UUID to its Active Tab WebSocket ID | sessionToWs (code name), WS binding, connection map |
-| **Checkpoint** | A langgraph snapshot of CoachState preserved in MemorySaver, enabling state restoration after a WebSocket disconnect | Snapshot, savepoint |
+| **Checkpoint** | A langgraph snapshot of ChatState preserved in MemorySaver, enabling state restoration after a WebSocket disconnect | Snapshot, savepoint |
 
 ## Memory and Long-Term Context
 
@@ -66,7 +66,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 | **MemoryCue** | A structured memory record in the `memory_cues` table — one row per conversation topic segment, containing topic and summary. Generated post-session by MemoryCueAgent via two-step LLM analysis (topic switch detection + per-segment summarization). Vectorized by EmbeddingService into an InMemoryEmbeddingStore for semantic RAG retrieval starting from Round 4. | Structured memory, topic cue |
 | **Memory Cue Split** | The first LLM step in MemoryCue generation: analyzes the full conversation transcript and detects topic switch points, returning a list of message index boundaries | Topic switch detection, split detection |
 | **Memory Cue Entry** | The second LLM step in MemoryCue generation: for each identified segment, produces a `(topic, summary)` pair in structured JSON | Segment summarization, cue generation |
-| **MemoryCueQueue** | An LRU ordered set (capacity = topK + 1) living in CoachState across Turns. The +1 extra slot is deliberate — it serves as an LRU buffer so newly-loaded matches don't immediately evict older entries. On first RAG load (queue empty), `topK + 1` results are pushed; on subsequent loads, `topK` results are pushed with dedup (same cueId refreshes to head). When full, the least-recently-accessed entry is evicted from the tail. Fallback anchor entries (inserted when RAG returns no matches) survive approximately one round before being evicted via FIFO — they help the Agent maintain continuity without polluting the long-term queue. The queue is sorted FIFO + dedup, not by relevance score. Injected into the System Prompt as a numbered list sorted tail→head (old→new) with time labels per entry. | LRU queue, memory queue, context queue |
+| **MemoryCueQueue** | An LRU ordered set (capacity = topK + 1) living in ChatState across Turns. The +1 extra slot is deliberate — it serves as an LRU buffer so newly-loaded matches don't immediately evict older entries. On first RAG load (queue empty), `topK + 1` results are pushed; on subsequent loads, `topK` results are pushed with dedup (same cueId refreshes to head). When full, the least-recently-accessed entry is evicted from the tail. Fallback anchor entries (inserted when RAG returns no matches) survive approximately one round before being evicted via FIFO — they help the Agent maintain continuity without polluting the long-term queue. The queue is sorted FIFO + dedup, not by relevance score. Injected into the System Prompt as a numbered list sorted tail→head (old→new) with time labels per entry. | LRU queue, memory queue, context queue |
 | **MemoryCue Retrieval** | Vector semantic retrieval of historical MemoryCue records using ONNX embeddings (all-MiniLM-L6-v2, 384 dimensions). Starting from Round 2 (after UserLearningProfile's 1-turn window), each user message triggers a cosine-similarity search against past cues filtered by userId × AgentMode. Results are managed through MemoryCueQueue — first load retrieves `topK + 1` entries, subsequent loads retrieve `topK` entries, with LRU dedup and eviction for cross-turn memory migration. | RAG retrieval, semantic search, vector recall |
 | **EmbeddingService** | The RAG vectorization module: manages InMemoryEmbeddingStore lifecycle (init from disk or H2, async indexing, search with metadata filtering, JSON disk serialization). Uses a dedicated `embeddingExecutor` thread pool for ONNX CPU-bound operations. | Vector service, embedding module |
 | **CueMatch** | A DTO record returned by `EmbeddingService.search()` containing `(cueId, topic, summary, score, createdAt)`, decoupled from JPA entities. `createdAt` carries the original MemoryCue creation time for time-aware labeling in the System Prompt. | Search result, match record |
@@ -110,11 +110,11 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 
 - **Session** was used to mean both the Spring Security HTTP session (Login session) and the English practice conversation (Practice session). These are wholly distinct concepts. A Login session authorizes access; a Practice session contains conversation data. **Resolution:** Always prefix -- "Login session" for auth, "Practice session" for English conversation. Never say "session" alone.
 
-- **State** was used to mean both the CoachState object (a single Practice session data container) and the Active states map (the collection of all active CoachState instances). **Resolution:** Use "CoachState" for the individual container; use "Active states map" for the collection.
+- **State** was used to mean both the ChatState object (a single Practice session data container) and the Active states map (the collection of all active ChatState instances). **Resolution:** Use "ChatState" for the individual container; use "Active states map" for the collection.
 
 - **Token** was used to mean both an LLM usage unit (counted by TokenTracker) and a CSRF token. **Resolution:** Use "LLM token" or "token usage" for the LLM context; use "CSRF token" for security context. Never say "token" alone.
 
-- **Memory** was used to mean both the in-memory runtime state (CoachState, Active states map) and the persistent cross-session UserLearningProfile entity. **Resolution:** Use "In-memory state" or "Active states map" for runtime; use "UserLearningProfile" for the persisted H2 record. Never say "memory" alone.
+- **Memory** was used to mean both the in-memory runtime state (ChatState, Active states map) and the persistent cross-session UserLearningProfile entity. **Resolution:** Use "In-memory state" or "Active states map" for runtime; use "UserLearningProfile" for the persisted H2 record. Never say "memory" alone.
 
 - **Resume** was used for both the WebSocket protocol message (RESUME_SESSION) and the Page Visibility API pattern (Visibility resume). **Resolution:** "Protocol resume" for the WebSocket message; "Visibility resume" for the tab-activation auto-refresh. Both restore UI state but through different triggers.
 
@@ -126,7 +126,7 @@ English Coach 是一个基于 AI 的英语口语练习 Web 应用。使用者（
 >
 > **Dev:** "So the old tab shows stale conversation data until the Learner types?"
 >
-> **Domain expert:** "No -- we added Visibility resume. When the Learner switches back, the tab detects it is visible again and does a protocol resume, which triggers a full State rebuild from the latest CoachState."
+> **Domain expert:** "No -- we added Visibility resume. When the Learner switches back, the tab detects it is visible again and does a protocol resume, which triggers a full State rebuild from the latest ChatState."
 >
 > **Dev:** "What about in-flight streaming? If a Turn was mid-reply when the takeover happened, the Stale delta goes to the old tab?"
 >
