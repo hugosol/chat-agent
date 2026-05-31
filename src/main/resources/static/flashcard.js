@@ -148,12 +148,16 @@
             credentials: 'same-origin'
         })
             .then(function (resp) {
-                if (resp.status === 409) {
+                if (resp.status === 422) {
                     return resp.json().then(function (body) {
-                        throw { message: (body && body.message) || '卡片已存在', status: 409 };
+                        throw { message: (body && body.message) || '校验不通过', status: 422 };
                     });
                 }
-                if (!resp.ok) throw new Error('Save failed');
+                if (!resp.ok) {
+                    return resp.json().then(function (body) {
+                        throw { message: (body && body.message) || 'Save failed', status: resp.status };
+                    });
+                }
                 return resp.json();
             })
             .then(function () {
@@ -161,7 +165,7 @@
                 closePanel();
             })
             .catch(function (err) {
-                if (err.status === 409) {
+                if (err.status === 422) {
                     alert(err.message);
                 } else {
                     alert('保存失败: ' + err.message);

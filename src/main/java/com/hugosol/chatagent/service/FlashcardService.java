@@ -30,11 +30,11 @@ public class FlashcardService {
     @Transactional
     public Card createCard(String front, String back, List<String> tagNames, String userId) {
         if (tagNames == null || tagNames.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "标签不能为空");
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不能为空");
         }
 
         if (cardRepository.findByFrontIgnoreCaseAndUserId(front, userId).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "卡片'" + front + "'已存在");
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片'" + front + "'已存在");
         }
 
         Card card = new Card(userId, front, back);

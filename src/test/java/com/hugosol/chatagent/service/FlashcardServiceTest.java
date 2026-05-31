@@ -99,7 +99,7 @@ class FlashcardServiceTest {
         assertThatThrownBy(() -> service.createCard("hello", "world", tagNames, "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 
         verify(cardRepository, never()).save(any());
         verify(tagRepository, never()).save(any());
@@ -115,7 +115,7 @@ class FlashcardServiceTest {
         assertThatThrownBy(() -> service.createCard("hello", "world", List.of("greeting"), "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.CONFLICT);
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 
         verify(cardRepository, never()).save(any());
         verify(tagRepository, never()).save(any());

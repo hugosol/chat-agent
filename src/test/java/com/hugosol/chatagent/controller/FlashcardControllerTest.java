@@ -89,7 +89,7 @@ class FlashcardControllerTest {
     @WithMockUser(username = "admin")
     void addCard_emptyTags_returnsBadRequest() throws Exception {
         when(flashcardService.createCard(anyString(), anyString(), anyList(), anyString()))
-                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "标签不能为空"));
+                .thenThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不能为空"));
 
         String requestJson = """
                 {"front":"yesterday","back":"昨天","tags":[]}""";
@@ -98,14 +98,14 @@ class FlashcardControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test
     @WithMockUser(username = "admin")
     void addCard_duplicate_returnsConflict() throws Exception {
         when(flashcardService.createCard(anyString(), anyString(), anyList(), anyString()))
-                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "卡片'yesterday'已存在"));
+                .thenThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片'yesterday'已存在"));
 
         String requestJson = """
                 {"front":"yesterday","back":"昨天","tags":["daily"]}""";
@@ -114,6 +114,6 @@ class FlashcardControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
-                .andExpect(status().isConflict());
+                .andExpect(status().isUnprocessableEntity());
     }
 }
