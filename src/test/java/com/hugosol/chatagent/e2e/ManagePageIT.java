@@ -226,7 +226,7 @@ class ManagePageIT extends E2ETestBase {
 
         page.waitForSelector("#cardsTab .pagination");
         var pageButtons = page.locator("#cardsTab .pagination .page-num");
-        assertThat(pageButtons.count()).isEqualTo(2);
+        assertThat(pageButtons.count()).isEqualTo(3);
         assertThat(page.locator("#cardsTab .pagination .page-num.active").textContent()).isEqualTo("1");
 
         page.locator("#cardsTab .pagination .page-num").nth(1).click();

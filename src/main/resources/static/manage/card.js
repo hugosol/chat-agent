@@ -39,7 +39,7 @@
     }
 
     function loadCards() {
-        var params = '?page=' + currentPage + '&size=20&sort=' + encodeURIComponent(currentSort);
+        var params = '?page=' + currentPage + '&size=10&sort=' + encodeURIComponent(currentSort);
         if (currentSearch) params += '&search=' + encodeURIComponent(currentSearch);
         if (currentDeckId) params += '&deckId=' + encodeURIComponent(currentDeckId);
 
