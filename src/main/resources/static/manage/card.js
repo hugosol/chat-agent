@@ -2,11 +2,20 @@
     'use strict';
 
     var container = document.getElementById('cardsTab');
+    var synth = window.speechSynthesis;
     var currentSearch = '';
     var currentDeckId = null;
     var currentSort = 'front,asc';
     var currentPage = 0;
     var totalPages = 0;
+
+    function speakText(text) {
+        synth.cancel();
+        var utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.95;
+        synth.speak(utterance);
+    }
 
     function init() {
         currentSearch = '';
@@ -106,8 +115,10 @@
             for (var i = 0; i < content.length; i++) {
                 var card = content[i];
                 html += '<div class="card-block" data-card=\'' + JSON.stringify(card).replace(/'/g, "\\'") + '\'>' +
-                    '<div class="card-front">' + escapeHtml(card.front) + '</div>' +
-                    '<div class="card-back">' + escapeHtml(truncate(card.back, 50)) + '</div>' +
+                    '<div class="card-front">' + escapeHtml(card.front) +
+                        ' <span class="card-tts-btn" data-tts-text="' + escapeHtml(card.front).replace(/"/g, '&quot;') + '">🔊</span>' +
+                    '</div>' +
+                    '<div class="card-back">' + escapeHtml(truncate(card.back, 100)).replace(/\n/g, '<br>') + '</div>' +
                     '<div class="card-tags">' + renderCardTags(card.tags || []) + '</div>' +
                     '<div class="card-actions">' +
                         '<button class="btn-edit-card">Edit</button>' +
@@ -224,6 +235,13 @@
         if (nextBtn) nextBtn.addEventListener('click', function () {
             if (currentPage < totalPages - 1) { currentPage++; loadCards(); }
         });
+
+        container.querySelectorAll('.card-tts-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                speakText(this.getAttribute('data-tts-text'));
+            });
+        });
     }
 
     function showCardDetail(card) {
@@ -235,7 +253,7 @@
 
         var bodyHtml =
             '<div class="detail-item"><div class="detail-label">Front</div><div class="detail-value">' + escapeHtml(card.front) + '</div></div>' +
-            '<div class="detail-item"><div class="detail-label">Back</div><div class="detail-value">' + escapeHtml(card.back) + '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">Back</div><div class="detail-value">' + escapeHtml(card.back).replace(/\n/g, '<br>') + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">Tags</div><div class="detail-value">' + (tagsHtml || 'None') + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">State</div><div class="detail-value">' + state + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">Due</div><div class="detail-value">' + (card.due ? formatDate(card.due) : '-') + '</div></div>' +

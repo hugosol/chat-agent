@@ -113,7 +113,7 @@ class ManagePageIT extends E2ETestBase {
                 "() => document.querySelector('.modal') === null");
 
         page.waitForSelector("#cardsTab .card-block");
-        assertThat(page.locator("#cardsTab .card-front").textContent()).isEqualTo("yesterday");
+        assertThat(page.locator("#cardsTab .card-front").textContent()).contains("yesterday");
         assertThat(page.locator("#cardsTab .card-back").textContent()).contains("昨天");
 
         var tagChips = page.locator("#cardsTab .card-tags .chip");
@@ -147,7 +147,7 @@ class ManagePageIT extends E2ETestBase {
                 "() => document.querySelector('.modal') === null");
 
         page.waitForSelector("#cardsTab .card-front");
-        assertThat(page.locator("#cardsTab .card-front").textContent()).isEqualTo("Yesterday");
+        assertThat(page.locator("#cardsTab .card-front").textContent()).contains("Yesterday");
 
         takeScreenshot("step4-card-edited");
 
@@ -156,7 +156,7 @@ class ManagePageIT extends E2ETestBase {
         page.waitForTimeout(400);
 
         assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(1);
-        assertThat(page.locator("#cardsTab .card-front").textContent()).isEqualTo("Yesterday");
+        assertThat(page.locator("#cardsTab .card-front").textContent()).contains("Yesterday");
 
         page.locator("#cardSearch").fill("");
         page.waitForTimeout(400);
@@ -205,7 +205,7 @@ class ManagePageIT extends E2ETestBase {
         page.locator(".deck-chip:has-text('Daily English')").click();
         page.waitForTimeout(400);
         assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(1);
-        assertThat(page.locator("#cardsTab .card-front").textContent()).isEqualTo("Yesterday");
+        assertThat(page.locator("#cardsTab .card-front").textContent()).contains("Yesterday");
 
         page.locator(".deck-chip:has-text('Daily English')").click();
         page.waitForTimeout(400);

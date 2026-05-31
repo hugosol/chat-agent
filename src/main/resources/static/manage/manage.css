@@ -176,10 +176,22 @@
     font-size: 0.85em;
     color: #888;
     margin-bottom: 6px;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     max-width: 100%;
+}
+
+.card-tts-btn {
+    margin-left: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+}
+.card-tts-btn:hover {
+    opacity: 1;
 }
 
 .card-block .card-tags {
@@ -319,4 +331,5 @@
 .detail-item .detail-value {
     color: #e0e0e0;
     font-size: 0.9em;
+    white-space: pre-line;
 }
