@@ -9,7 +9,9 @@ import com.hugosol.chatagent.repository.TagRepository;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -146,6 +148,9 @@ public class FlashcardService {
     }
 
     public Page<Card> listCards(String userId, String search, String deckId, Pageable pageable) {
+        Sort sort = pageable.getSort();
+        Pageable pageableWithoutSort = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+
         Specification<Card> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("userId"), userId));
@@ -159,9 +164,23 @@ public class FlashcardService {
                 predicates.add(cb.equal(tagsJoin.get("id"), deckId));
             }
 
+            if (query != null && sort.isSorted()) {
+                for (Sort.Order order : sort) {
+                    if ("front".equals(order.getProperty())) {
+                        query.orderBy(order.isAscending()
+                                ? cb.asc(cb.lower(root.get("front")))
+                                : cb.desc(cb.lower(root.get("front"))));
+                    } else if ("createTime".equals(order.getProperty())) {
+                        query.orderBy(order.isAscending()
+                                ? cb.asc(root.get("createTime"))
+                                : cb.desc(root.get("createTime")));
+                    }
+                }
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-        return cardRepository.findAll(spec, pageable);
+        return cardRepository.findAll(spec, pageableWithoutSort);
     }
 
     @Transactional

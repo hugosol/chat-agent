@@ -186,10 +186,70 @@ class ManagePageIT extends E2ETestBase {
 
         takeScreenshot("step6-sort");
 
+        // === Step 7: Deck chip filtering ===
+        Tag verbTag = tagRepository.findAll().stream()
+                .filter(t -> "verb".equals(t.getName()))
+                .findFirst().orElseThrow();
+        Card cardNoDeck = new Card(DEFAULT_USER_ID, "hello", "你好");
+        cardNoDeck.getTags().add(verbTag);
+        cardRepository.save(cardNoDeck);
+
+        page.locator(".manage-tab-btn[data-tab='tags']").click();
+        page.waitForSelector("#tagsTab:not(.hidden)");
+        page.locator(".manage-tab-btn[data-tab='cards']").click();
+        page.waitForSelector("#cardsTab:not(.hidden)");
+
+        page.waitForSelector(".deck-chip:has-text('Daily English')");
+        assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(2);
+
+        page.locator(".deck-chip:has-text('Daily English')").click();
+        page.waitForTimeout(400);
+        assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(1);
+        assertThat(page.locator("#cardsTab .card-front").textContent()).isEqualTo("Yesterday");
+
+        page.locator(".deck-chip:has-text('Daily English')").click();
+        page.waitForTimeout(400);
+        assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(2);
+
+        takeScreenshot("step7-deck-filter");
+
         // === Step 8: Pagination ===
-        assertThat(page.locator("#cardsTab .pagination").count()).isEqualTo(0);
+        for (int i = 0; i < 19; i++) {
+            Card c = new Card(DEFAULT_USER_ID, "card" + String.format("%02d", i), "卡片" + i);
+            cardRepository.save(c);
+        }
+
+        page.locator(".manage-tab-btn[data-tab='tags']").click();
+        page.waitForSelector("#tagsTab:not(.hidden)");
+        page.locator(".manage-tab-btn[data-tab='cards']").click();
+        page.waitForSelector("#cardsTab:not(.hidden)");
+
+        page.waitForSelector("#cardsTab .pagination");
+        var pageButtons = page.locator("#cardsTab .pagination .page-num");
+        assertThat(pageButtons.count()).isEqualTo(2);
+        assertThat(page.locator("#cardsTab .pagination .page-num.active").textContent()).isEqualTo("1");
+
+        page.locator("#cardsTab .pagination .page-num").nth(1).click();
+        page.waitForTimeout(500);
+        assertThat(page.locator("#cardsTab .pagination .page-num.active").textContent()).isEqualTo("2");
+        assertThat(page.locator("#cardsTab .card-block").count()).isGreaterThan(0);
 
         takeScreenshot("step8-pagination");
+
+        var allCards = cardRepository.findAll();
+        for (Card c : allCards) {
+            if (!"Yesterday".equals(c.getFront())) {
+                cardRepository.delete(c);
+            }
+        }
+
+        page.locator(".manage-tab-btn[data-tab='tags']").click();
+        page.waitForSelector("#tagsTab:not(.hidden)");
+        page.locator(".manage-tab-btn[data-tab='cards']").click();
+        page.waitForSelector("#cardsTab:not(.hidden)");
+
+        page.waitForSelector("#cardsTab .card-block");
+        assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(1);
 
         // === Step 9: Card detail modal ===
         page.locator("#cardsTab .card-block").click();

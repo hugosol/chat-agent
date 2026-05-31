@@ -48,13 +48,15 @@
     function renderToolbar() {
         var sortNameActive = currentSort.indexOf('front') === 0 ? ' active' : '';
         var sortTimeActive = currentSort.indexOf('createTime') === 0 ? ' active' : '';
+        var nameArrow = sortNameActive ? (currentSort.endsWith(',asc') ? ' ↑' : ' ↓') : '';
+        var timeArrow = sortTimeActive ? (currentSort.endsWith(',asc') ? ' ↑' : ' ↓') : '';
 
         return '<div class="manage-toolbar">' +
             '<div class="search-row">' +
                 '<input type="text" id="cardSearch" class="card-search" placeholder="搜索卡片..." value="' + escapeHtml(currentSearch) + '">' +
                 '<div class="sort-btns">' +
-                    '<button class="sort-btn' + sortNameActive + '" data-sort="front,asc">A&rarr;Z</button>' +
-                    '<button class="sort-btn' + sortTimeActive + '" data-sort="createTime,desc">Time</button>' +
+                    '<button class="sort-btn' + sortNameActive + '" data-sort="front,asc">A&rarr;Z' + nameArrow + '</button>' +
+                    '<button class="sort-btn' + sortTimeActive + '" data-sort="createTime,desc">Time' + timeArrow + '</button>' +
                 '</div>' +
             '</div>' +
             '<div class="deck-chips" id="deckChips"></div>' +
