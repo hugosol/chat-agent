@@ -2,13 +2,25 @@ package com.hugosol.chatagent.e2e;
 
 import com.hugosol.chatagent.e2e.helper.E2ETestBase;
 import com.hugosol.chatagent.model.Card;
+import com.hugosol.chatagent.model.Tag;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FlashcardIT extends E2ETestBase {
+
+    @BeforeEach
+    void setupTags() {
+        Tag deckTag = new Tag("daily", DEFAULT_USER_ID);
+        deckTag.setType("deck");
+        tagRepository.save(deckTag);
+
+        Tag normalTag = new Tag("time", DEFAULT_USER_ID);
+        tagRepository.save(normalTag);
+    }
 
     @Test
     @Transactional
@@ -22,12 +34,14 @@ class FlashcardIT extends E2ETestBase {
 
         page.locator("#flashcardBack").fill("昨天");
 
-        page.locator("#flashcardTagInput").fill("daily");
-        page.locator("#flashcardTagInput").press("Enter");
+        page.locator("#flashcardTagInput").click();
+        page.waitForSelector("#flashcardTagSuggestions:not(.hidden)");
+        page.locator(".tag-suggestion-item").first().click();
         page.waitForSelector(".flashcard-chip");
 
-        page.locator("#flashcardTagInput").fill("time");
-        page.locator("#flashcardTagInput").press("Enter");
+        page.locator("#flashcardTagInput").click();
+        page.waitForSelector("#flashcardTagSuggestions:not(.hidden)");
+        page.locator(".tag-suggestion-item").last().click();
 
         var chips = page.locator(".flashcard-chip");
         assertThat(chips.count()).isEqualTo(2);
@@ -56,12 +70,5 @@ class FlashcardIT extends E2ETestBase {
         assertThat(card.getTags()).hasSize(2);
         assertThat(card.getTags()).extracting(t -> t.getName())
                 .containsExactlyInAnyOrder("daily", "time");
-
-        var tags = tagRepository.findAll();
-        assertThat(tags).hasSize(2);
-        for (var tag : tags) {
-            assertThat(tag.getUserId()).isEqualTo(DEFAULT_USER_ID);
-            assertThat(tag.getType()).isNull();
-        }
     }
 }

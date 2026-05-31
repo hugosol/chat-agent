@@ -48,6 +48,8 @@ public class ProtocolDispatcher {
             synchronized (wsSession) {
                 wsSession.sendMessage(new TextMessage(json));
             }
+        } else {
+            log.warn("WS session closed, dropping message: {}", message.getClass().getSimpleName());
         }
     }
 

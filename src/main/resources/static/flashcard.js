@@ -67,18 +67,21 @@
         for (var i = 0; i < chips.length; i++) {
             var chip = document.createElement('span');
             chip.className = 'flashcard-chip';
-            chip.innerHTML = escapeHtml(chips[i]) + '<span class="chip-remove" data-index="' + i + '">&times;</span>';
+            var label = chips[i].name;
+            if (chips[i].type === 'deck') {
+                label += ' [D]';
+            }
+            chip.innerHTML = escapeHtml(label) + '<span class="chip-remove" data-index="' + i + '">&times;</span>';
             els.tagChips.appendChild(chip);
         }
     }
 
-    function addChip(name) {
-        name = name.trim();
-        if (!name) return;
+    function addChip(tag) {
+        if (!tag) return;
         for (var i = 0; i < chips.length; i++) {
-            if (chips[i] === name) return;
+            if (chips[i].id === tag.id) return;
         }
-        chips.push(name);
+        chips.push(tag);
         renderChips();
         els.tagInput.value = '';
         els.tagSuggestions.classList.add('hidden');
@@ -89,25 +92,30 @@
         renderChips();
     }
 
-    function fetchTags(query) {
+    function fetchAllTags() {
         fetch('/api/tags', { credentials: 'same-origin' })
             .then(function (resp) {
                 if (!resp.ok) throw new Error('Failed to load tags');
                 return resp.json();
             })
             .then(function (tags) {
-                showSuggestions(tags, query);
+                showSuggestions(tags, els.tagInput.value.trim());
             })
             .catch(function () {
                 els.tagSuggestions.classList.add('hidden');
             });
     }
 
-    function showSuggestions(tags, query) {
+    function showSuggestions(allTags, query) {
         var lowerQuery = query.toLowerCase();
-        var matches = tags.filter(function (t) {
-            return t.name.toLowerCase().indexOf(lowerQuery) !== -1
-                && chips.indexOf(t.name) === -1;
+        var alreadyAdded = {};
+        for (var i = 0; i < chips.length; i++) {
+            alreadyAdded[chips[i].id] = true;
+        }
+        var matches = allTags.filter(function (t) {
+            if (alreadyAdded[t.id]) return false;
+            if (lowerQuery.length > 0 && t.name.toLowerCase().indexOf(lowerQuery) === -1) return false;
+            return true;
         });
 
         if (matches.length === 0) {
@@ -116,14 +124,20 @@
         }
 
         els.tagSuggestions.innerHTML = '';
-        for (var i = 0; i < Math.min(matches.length, 5); i++) {
-            var item = document.createElement('div');
-            item.className = 'tag-suggestion-item';
-            item.textContent = matches[i].name;
-            item.addEventListener('click', function () {
-                addChip(this.textContent);
-            });
-            els.tagSuggestions.appendChild(item);
+        for (var i = 0; i < Math.min(matches.length, 8); i++) {
+            (function (tag) {
+                var item = document.createElement('div');
+                item.className = 'tag-suggestion-item';
+                var label = tag.name;
+                if (tag.type === 'deck') {
+                    label += ' \uD83D\uDCC1';
+                }
+                item.textContent = label;
+                item.addEventListener('click', function () {
+                    addChip(tag);
+                });
+                els.tagSuggestions.appendChild(item);
+            })(matches[i]);
         }
         els.tagSuggestions.classList.remove('hidden');
     }
@@ -133,10 +147,23 @@
         var back = els.backInput.value.trim();
         if (!front || !back) return;
 
+        var hasDeck = false;
+        for (var i = 0; i < chips.length; i++) {
+            if (chips[i].type === 'deck') {
+                hasDeck = true;
+                break;
+            }
+        }
+        if (!hasDeck) {
+            alert('至少需要一个牌组标签');
+            return;
+        }
+
+        var tagIds = chips.map(function (c) { return c.id; });
         var payload = {
             front: front,
             back: back,
-            tags: chips.slice()
+            tagIds: tagIds
         };
 
         els.saveBtn.disabled = true;
@@ -218,22 +245,17 @@
         saveCard();
     });
 
+    els.tagInput.addEventListener('focus', function () {
+        fetchAllTags();
+    });
+
     els.tagInput.addEventListener('input', function () {
-        var query = els.tagInput.value.trim();
-        if (query.length > 0) {
-            fetchTags(query);
-        } else {
-            els.tagSuggestions.classList.add('hidden');
-        }
+        fetchAllTags();
     });
 
     els.tagInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            var query = els.tagInput.value.trim();
-            if (query) {
-                addChip(query);
-            }
         } else if (e.key === 'Backspace') {
             if (els.tagInput.value === '' && chips.length > 0) {
                 removeChip(chips.length - 1);

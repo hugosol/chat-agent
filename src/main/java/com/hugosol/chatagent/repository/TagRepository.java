@@ -10,5 +10,11 @@ public interface TagRepository extends JpaRepository<Tag, String> {
 
     Optional<Tag> findByNameAndUserId(String name, String userId);
 
+    Optional<Tag> findByNameIgnoreCaseAndUserId(String name, String userId);
+
+    Optional<Tag> findByNameIgnoreCaseAndUserIdAndIdNot(String name, String userId, String id);
+
     List<Tag> findByUserId(String userId);
+
+    List<Tag> findByUserIdAndType(String userId, String type);
 }

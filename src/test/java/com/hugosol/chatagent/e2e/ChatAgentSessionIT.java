@@ -37,12 +37,13 @@ class ChatAgentSessionIT extends E2ETestBase {
 
         assertEquals(6, countCorrectionSidebarItems(), "sidebar should have 6 correction items (3 from round 1, 2 from round 2, 1 from round 3)");
 
-        page.locator("#correctionShowBtn").click();
-        assertFalse(page.locator("#correctionSidebar").evaluate("el => el.classList.contains('collapsed')").equals(true),
-                "sidebar should be open after clicking correction button");
+        page.waitForSelector("#correctionSidebarToggle:not(.hidden)");
         page.locator("#correctionSidebarToggle").click();
-        assertTrue(page.locator("#correctionSidebar").evaluate("el => el.classList.contains('collapsed')").equals(true),
-                "sidebar should collapse after clicking close button");
+        page.waitForFunction(
+                "() => !document.getElementById('correctionSidebar').classList.contains('collapsed')");
+        page.locator("#correctionSidebarClose").click();
+        page.waitForFunction(
+                "() => document.getElementById('correctionSidebar').classList.contains('collapsed')");
 
         endSession();
         takeScreenshot("report");

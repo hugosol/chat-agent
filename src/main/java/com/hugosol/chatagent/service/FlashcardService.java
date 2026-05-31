@@ -6,12 +6,18 @@ import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.TagRepository;
 
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -28,8 +34,8 @@ public class FlashcardService {
     }
 
     @Transactional
-    public Card createCard(String front, String back, List<String> tagNames, String userId) {
-        if (tagNames == null || tagNames.isEmpty()) {
+    public Card createCard(String front, String back, List<String> tagIds, String userId) {
+        if (tagIds == null || tagIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不能为空");
         }
 
@@ -48,11 +54,23 @@ public class FlashcardService {
         card.setLapses(state.lapses());
 
         Set<Tag> tags = new HashSet<>();
-        for (String name : tagNames) {
-            Tag tag = tagRepository.findByNameAndUserId(name, userId)
-                    .orElseGet(() -> tagRepository.save(new Tag(name, userId)));
+        boolean hasDeck = false;
+        for (String tagId : tagIds) {
+            Tag tag = tagRepository.findById(tagId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不存在"));
+            if (!tag.getUserId().equals(userId)) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不存在");
+            }
+            if ("deck".equals(tag.getType())) {
+                hasDeck = true;
+            }
             tags.add(tag);
         }
+
+        if (!hasDeck) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "至少需要一个牌组标签");
+        }
+
         card.setTags(tags);
 
         return cardRepository.save(card);
@@ -60,5 +78,141 @@ public class FlashcardService {
 
     public List<Tag> getTags(String userId) {
         return tagRepository.findByUserId(userId);
+    }
+
+    public List<Tag> getTagsByType(String userId, String type) {
+        return tagRepository.findByUserIdAndType(userId, type);
+    }
+
+    @Transactional
+    public Tag createTag(String userId, String name, String type) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签名不能为空");
+        }
+        if (tagRepository.findByNameIgnoreCaseAndUserId(name, userId).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签'" + name + "'已存在");
+        }
+        Tag tag = new Tag(name.trim(), userId);
+        tag.setType(type);
+        return tagRepository.save(tag);
+    }
+
+    @Transactional
+    public Tag updateTag(String userId, String tagId, String name, String type) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签名不能为空");
+        }
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!tag.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        if (tagRepository.findByNameIgnoreCaseAndUserIdAndIdNot(name, userId, tagId).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签'" + name + "'已存在");
+        }
+        tag.setName(name.trim());
+        tag.setType(type);
+        return tagRepository.save(tag);
+    }
+
+    @Transactional
+    public void deleteTag(String userId, String tagId) {
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!tag.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        var cardsWithTag = cardRepository.findAllByTagsContaining(tag);
+        int orphanCount = 0;
+        for (Card card : cardsWithTag) {
+            boolean hasOtherDeck = card.getTags().stream()
+                    .anyMatch(t -> !t.getId().equals(tagId) && "deck".equals(t.getType()));
+            if (!hasOtherDeck) {
+                orphanCount++;
+            }
+        }
+
+        if (orphanCount > 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "{\"orphanCount\":" + orphanCount + "}");
+        }
+
+        for (Card card : cardsWithTag) {
+            card.getTags().remove(tag);
+            cardRepository.save(card);
+        }
+        tagRepository.delete(tag);
+    }
+
+    public Page<Card> listCards(String userId, String search, String deckId, Pageable pageable) {
+        Specification<Card> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("userId"), userId));
+
+            if (search != null && !search.isBlank()) {
+                predicates.add(cb.like(cb.lower(root.get("front")), "%" + search.toLowerCase() + "%"));
+            }
+
+            if (deckId != null && !deckId.isBlank()) {
+                Join<Card, Tag> tagsJoin = root.join("tags");
+                predicates.add(cb.equal(tagsJoin.get("id"), deckId));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return cardRepository.findAll(spec, pageable);
+    }
+
+    @Transactional
+    public Card updateCard(String userId, String cardId, String front, String back, List<String> tagIds) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!card.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        if (tagIds == null || tagIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不能为空");
+        }
+
+        if (cardRepository.findByFrontIgnoreCaseAndUserIdAndIdNot(front, userId, cardId).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片'" + front + "'已存在");
+        }
+
+        card.setFront(front);
+        card.setBack(back);
+
+        Set<Tag> tags = new HashSet<>();
+        boolean hasDeck = false;
+        for (String tagId : tagIds) {
+            Tag tag = tagRepository.findById(tagId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不存在"));
+            if (!tag.getUserId().equals(userId)) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不存在");
+            }
+            if ("deck".equals(tag.getType())) {
+                hasDeck = true;
+            }
+            tags.add(tag);
+        }
+
+        if (!hasDeck) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "至少需要一个牌组标签");
+        }
+
+        card.setTags(tags);
+        return cardRepository.save(card);
+    }
+
+    @Transactional
+    public void deleteCard(String userId, String cardId) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!card.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        card.getTags().clear();
+        cardRepository.delete(card);
     }
 }

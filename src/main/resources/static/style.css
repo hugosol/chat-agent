@@ -438,8 +438,12 @@ footer {
     transition: transform 0.25s ease;
 }
 
+.correction-sidebar.collapsed .correction-sidebar-content {
+    display: none;
+}
+
 .correction-sidebar.collapsed {
-    transform: translateX(100%);
+    width: auto;
 }
 
 .correction-sidebar-header {
@@ -466,8 +470,7 @@ footer {
     color: #e94560;
 }
 
-.correction-show-btn {
-    margin-left: auto;
+.correction-sidebar-toggle-btn {
     padding: 4px 10px;
     background: #0f3460;
     border: 1px solid #1a5276;
@@ -478,9 +481,13 @@ footer {
     white-space: nowrap;
 }
 
-.correction-show-btn:hover {
+.correction-sidebar-toggle-btn:hover {
     color: #e94560;
     border-color: #e94560;
+}
+
+.correction-sidebar-toggle-btn.hidden {
+    display: none;
 }
 
 .correction-sidebar-content {
@@ -592,9 +599,6 @@ footer {
 @media (max-width: 700px) {
     .correction-sidebar {
         width: 200px;
-    }
-    .correction-sidebar.collapsed {
-        width: 0;
     }
 }
 

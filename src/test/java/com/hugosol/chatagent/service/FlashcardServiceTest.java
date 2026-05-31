@@ -34,17 +34,21 @@ class FlashcardServiceTest {
     private TagRepository tagRepository;
 
     @Test
-    void createCard_savesCardWithFsrsInitAndUpsertsTags() {
+    void createCard_savesCardWithFsrsInitAndDeckTag() {
         var service = new FlashcardService(cardRepository, tagRepository);
 
-        when(tagRepository.findByNameAndUserId("greeting", "user-1"))
+        Tag deckTag = new Tag("daily", "user-1");
+        deckTag.setId("deck-tag-id");
+        deckTag.setType("deck");
+
+        when(tagRepository.findById("deck-tag-id"))
+                .thenReturn(Optional.of(deckTag));
+        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
                 .thenReturn(Optional.empty());
-        when(tagRepository.save(any(Tag.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
         when(cardRepository.save(any(Card.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        Card result = service.createCard("hello", "world", List.of("greeting"), "user-1");
+        Card result = service.createCard("hello", "world", List.of("deck-tag-id"), "user-1");
 
         assertThat(result.getFront()).isEqualTo("hello");
         assertThat(result.getBack()).isEqualTo("world");
@@ -57,25 +61,89 @@ class FlashcardServiceTest {
         assertThat(result.getDue()).isNotNull();
         assertThat(result.getLastReview()).isNull();
         assertThat(result.getTags()).hasSize(1);
-        assertThat(result.getTags().iterator().next().getName()).isEqualTo("greeting");
+        assertThat(result.getTags().iterator().next().getName()).isEqualTo("daily");
 
         verify(cardRepository).save(any(Card.class));
     }
 
     @Test
-    void createCard_reusesExistingTag() {
+    void createCard_acceptsBothDeckAndNormalTags() {
         var service = new FlashcardService(cardRepository, tagRepository);
-        Tag existingTag = new Tag("greeting", "user-1");
 
-        when(tagRepository.findByNameAndUserId("greeting", "user-1"))
-                .thenReturn(Optional.of(existingTag));
+        Tag deckTag = new Tag("daily", "user-1");
+        deckTag.setId("deck-id");
+        deckTag.setType("deck");
+        Tag normalTag = new Tag("verb", "user-1");
+        normalTag.setId("tag-id");
+        normalTag.setType(null);
+
+        when(tagRepository.findById("deck-id"))
+                .thenReturn(Optional.of(deckTag));
+        when(tagRepository.findById("tag-id"))
+                .thenReturn(Optional.of(normalTag));
+        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
+                .thenReturn(Optional.empty());
         when(cardRepository.save(any(Card.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        Card result = service.createCard("hello", "world", List.of("greeting"), "user-1");
+        Card result = service.createCard("hello", "world", List.of("deck-id", "tag-id"), "user-1");
 
-        assertThat(result.getTags()).hasSize(1);
-        assertThat(result.getTags().iterator().next()).isSameAs(existingTag);
+        assertThat(result.getTags()).hasSize(2);
+        verify(cardRepository).save(any(Card.class));
+    }
+
+    @Test
+    void createCard_missingDeckTag_throws422() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        Tag normalTag = new Tag("verb", "user-1");
+        normalTag.setId("tag-id");
+
+        when(tagRepository.findById("tag-id"))
+                .thenReturn(Optional.of(normalTag));
+        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createCard("hello", "world", List.of("tag-id"), "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        verify(cardRepository, never()).save(any());
+    }
+
+    @Test
+    void createCard_tagIdNotFound_throws422() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        when(tagRepository.findById("nonexistent"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createCard("hello", "world", List.of("nonexistent"), "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        verify(cardRepository, never()).save(any());
+    }
+
+    @Test
+    void createCard_tagNotOwnedByUser_throws422() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        Tag otherUsersTag = new Tag("deck", "other-user");
+        otherUsersTag.setId("deck-id");
+        otherUsersTag.setType("deck");
+
+        when(tagRepository.findById("deck-id"))
+                .thenReturn(Optional.of(otherUsersTag));
+
+        assertThatThrownBy(() -> service.createCard("hello", "world", List.of("deck-id"), "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        verify(cardRepository, never()).save(any());
     }
 
     @Test
@@ -93,16 +161,16 @@ class FlashcardServiceTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    void createCard_emptyTags_throwsBadRequest(List<String> tagNames) {
+    void createCard_emptyTags_throws422(List<String> tagIds) {
         var service = new FlashcardService(cardRepository, tagRepository);
 
-        assertThatThrownBy(() -> service.createCard("hello", "world", tagNames, "user-1"))
+        assertThatThrownBy(() -> service.createCard("hello", "world", tagIds, "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 
         verify(cardRepository, never()).save(any());
-        verify(tagRepository, never()).save(any());
+        verify(tagRepository, never()).findById(any());
     }
 
     @Test
@@ -112,12 +180,11 @@ class FlashcardServiceTest {
         when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
                 .thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> service.createCard("hello", "world", List.of("greeting"), "user-1"))
+        assertThatThrownBy(() -> service.createCard("hello", "world", List.of("deck-id"), "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 
         verify(cardRepository, never()).save(any());
-        verify(tagRepository, never()).save(any());
     }
 }
