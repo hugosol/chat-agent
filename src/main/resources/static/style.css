@@ -438,18 +438,14 @@ footer {
     transition: transform 0.25s ease;
 }
 
-.correction-sidebar.collapsed .correction-sidebar-content {
-    display: none;
-}
-
 .correction-sidebar.collapsed {
-    width: auto;
+    display: none;
 }
 
 .correction-sidebar-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     padding: 8px 10px;
     font-size: 0.75em;
     color: #aaa;
@@ -471,6 +467,11 @@ footer {
 }
 
 .correction-sidebar-toggle-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 11;
     padding: 4px 10px;
     background: #0f3460;
     border: 1px solid #1a5276;
@@ -488,6 +489,11 @@ footer {
 
 .correction-sidebar-toggle-btn.hidden {
     display: none;
+}
+
+#correctionBadge,
+#correctionBadgeHeader {
+    color: #e94560;
 }
 
 .correction-sidebar-content {

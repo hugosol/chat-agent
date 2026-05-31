@@ -73,13 +73,13 @@
         var chatLink = document.createElement('a');
         chatLink.className = 'nav-link' + (isChatPage ? ' active' : '');
         chatLink.href = '/';
-        chatLink.textContent = 'Chat';
+        chatLink.textContent = '💬 Chat';
         linksDiv.appendChild(chatLink);
 
         var cardsLink = document.createElement('a');
         cardsLink.className = 'nav-link' + (isManagePage ? ' active' : '');
         cardsLink.href = '/manage/index.html';
-        cardsLink.textContent = 'Cards';
+        cardsLink.textContent = '📋 Manage';
         linksDiv.appendChild(cardsLink);
 
         sidebar.appendChild(linksDiv);

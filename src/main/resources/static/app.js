@@ -41,6 +41,7 @@
         correctionSidebarToggle:  document.getElementById('correctionSidebarToggle'),
         correctionSidebarClose:   document.getElementById('correctionSidebarClose'),
         correctionBadge:     document.getElementById('correctionBadge'),
+        correctionBadgeHeader: document.getElementById('correctionBadgeHeader'),
     };
 
     function debugLog(msg) {
@@ -338,11 +339,10 @@
 
     function updateCorrectionBadge() {
         els.correctionBadge.textContent = correctionCount;
+        els.correctionBadgeHeader.textContent = correctionCount;
         if (correctionCount > 0) {
-            els.correctionBadge.style.color = '#e94560';
             els.correctionSidebarToggle.classList.remove('hidden');
         } else {
-            els.correctionBadge.style.color = '';
             els.correctionSidebarToggle.classList.add('hidden');
         }
     }
@@ -533,13 +533,20 @@
         els.debugLog.innerHTML = '';
     });
 
-    els.correctionSidebarClose.addEventListener('click', function () {
+    function toggleCorrectionSidebar() {
         els.correctionSidebar.classList.toggle('collapsed');
-    });
+        if (correctionCount > 0) {
+            if (els.correctionSidebar.classList.contains('collapsed')) {
+                els.correctionSidebarToggle.classList.remove('hidden');
+            } else {
+                els.correctionSidebarToggle.classList.add('hidden');
+            }
+        }
+    }
 
-    els.correctionSidebarToggle.addEventListener('click', function () {
-        els.correctionSidebar.classList.toggle('collapsed');
-    });
+    els.correctionSidebarClose.addEventListener('click', toggleCorrectionSidebar);
+
+    els.correctionSidebarToggle.addEventListener('click', toggleCorrectionSidebar);
 
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden && sessionId && ws && ws.readyState === WebSocket.OPEN) {

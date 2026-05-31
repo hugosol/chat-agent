@@ -38,7 +38,7 @@ class ManagePageIT extends E2ETestBase {
         page.waitForSelector("#navSidebar.open");
 
         assertThat(page.locator(".nav-sidebar-links .nav-link").count()).isEqualTo(2);
-        assertThat(page.locator(".nav-link.active").textContent()).isEqualTo("Chat");
+        assertThat(page.locator(".nav-link.active").textContent()).isEqualTo("💬 Chat");
 
         takeScreenshot("step1b-nav-open");
 
@@ -293,7 +293,7 @@ class ManagePageIT extends E2ETestBase {
         page.locator(".nav-menu-btn").click();
         page.waitForSelector("#navSidebar.open");
 
-        assertThat(page.locator(".nav-link.active").textContent()).isEqualTo("Cards");
+        assertThat(page.locator(".nav-link.active").textContent()).isEqualTo("📋 Manage");
         assertThat(page.locator(".nav-sidebar-links .nav-link").count()).isEqualTo(2);
 
         takeScreenshot("step14-nav-manage");
