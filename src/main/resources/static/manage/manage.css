@@ -234,7 +234,10 @@
 }
 
 .manage-toolbar .search-row input {
-    flex: 1;
+    width: 200px;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    min-width: 0;
 }
 
 .manage-toolbar .sort-btns {
@@ -285,7 +288,7 @@
 /* Pagination */
 .pagination {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     justify-content: center;
     align-items: center;
     margin-top: 16px;
@@ -295,10 +298,10 @@
     background: #0f3460;
     border: 1px solid #1a5276;
     color: #888;
-    padding: 4px 10px;
+    padding: 8px 16px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.8em;
+    font-size: 0.95em;
 }
 
 .pagination button:hover:not(:disabled) {
