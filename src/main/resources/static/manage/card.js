@@ -59,6 +59,7 @@
                 '</div>' +
             '</div>' +
             '<div class="deck-chips" id="deckChips"></div>' +
+            '<button class="btn btn-primary" onclick="window.manageCards.showCreate()">+ 创建卡片</button>' +
             '</div>';
     }
 
