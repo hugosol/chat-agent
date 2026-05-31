@@ -6,7 +6,6 @@ import com.hugosol.chatagent.model.Tag;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -14,6 +13,9 @@ class FlashcardIT extends E2ETestBase {
 
     @BeforeEach
     void setupTags() {
+        cardRepository.deleteAll(cardRepository.findAll());
+        tagRepository.deleteAll(tagRepository.findAll());
+
         Tag deckTag = new Tag("daily", DEFAULT_USER_ID);
         deckTag.setType("deck");
         tagRepository.save(deckTag);
@@ -23,7 +25,6 @@ class FlashcardIT extends E2ETestBase {
     }
 
     @Test
-    @Transactional
     void fullFlashcardCreateFlow_persistsCardAndTags() {
         page.locator("#flashcardToggle").click();
         page.waitForSelector("#flashcardPanel:not(.collapsed)");
