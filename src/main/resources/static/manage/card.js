@@ -251,9 +251,16 @@
             return '<span class="chip">' + escapeHtml(t.name) + (t.type === 'deck' ? ' [D]' : '') + '</span>';
         }).join(' ');
 
+        var frontEng = englishOnly(card.front);
+        var backEng = englishOnly(card.back);
+
         var bodyHtml =
-            '<div class="detail-item"><div class="detail-label">Front</div><div class="detail-value">' + escapeHtml(card.front) + '</div></div>' +
-            '<div class="detail-item"><div class="detail-label">Back</div><div class="detail-value">' + escapeHtml(card.back).replace(/\n/g, '<br>') + '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">Front</div><div class="detail-value">' + escapeHtml(card.front) +
+                (frontEng ? ' <span class="card-tts-btn" onclick="event.stopPropagation();window.manageCards.speak(\'' + frontEng + '\')">🔊</span>' : '') +
+            '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">Back</div><div class="detail-value">' + escapeHtml(card.back).replace(/\n/g, '<br>') +
+                (backEng ? ' <span class="card-tts-btn" onclick="event.stopPropagation();window.manageCards.speak(\'' + backEng + '\')">🔊</span>' : '') +
+            '</div></div>' +
             '<div class="detail-item"><div class="detail-label">Tags</div><div class="detail-value">' + (tagsHtml || 'None') + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">State</div><div class="detail-value">' + state + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">Due</div><div class="detail-value">' + (card.due ? formatDate(card.due) : '-') + '</div></div>' +
@@ -379,9 +386,15 @@
         return div.innerHTML;
     }
 
+    function englishOnly(text) {
+        if (!text) return '';
+        return text.replace(/[^A-Za-z\s]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
     window.manageCards = {
         init: init,
         destroy: destroy,
-        showCreate: showCreate
+        showCreate: showCreate,
+        speak: speakText
     };
 })();

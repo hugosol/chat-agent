@@ -259,7 +259,7 @@ class ManagePageIT extends E2ETestBase {
         assertThat(detailItems.count()).isGreaterThanOrEqualTo(5);
 
         assertThat(page.locator(".modal .detail-item .detail-label:has-text('Front') + .detail-value").textContent())
-                .isEqualTo("Yesterday");
+                .contains("Yesterday");
         assertThat(page.locator(".modal .detail-item .detail-label:has-text('Back') + .detail-value").textContent())
                 .isEqualTo("昨天");
         assertThat(page.locator(".modal .detail-item .detail-label:has-text('State') + .detail-value").textContent())
