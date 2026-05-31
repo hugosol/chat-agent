@@ -13,7 +13,6 @@
         currentDeckId = null;
         currentSort = 'front,asc';
         currentPage = 0;
-        loadDecks();
         loadCards();
     }
 
@@ -89,7 +88,6 @@
                     currentDeckId = deckId;
                 }
                 currentPage = 0;
-                loadDecks();
                 loadCards();
             });
         });
@@ -120,6 +118,7 @@
 
         container.innerHTML = html;
         bindCardEvents();
+        loadDecks();
     }
 
     function renderCardTags(tags) {
