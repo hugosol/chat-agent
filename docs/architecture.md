@@ -472,19 +472,19 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  [Logout]    [Token: █████████░]   90%        [Corrections 3]        │ ← 顶部栏 (场景+tokens+correction按钮)
+│  [Logout]    [Token: █████████░]   90%          ☰                    │ ← 顶部栏
 │──────────────────────────────────────────────────────────────────────│
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │                                                                │  │
-│  │   [Conversation scroll area]                         ┌───────┐ │  │ ← correction sidebar
-│  │   Agent: Good morning! How was your weekend?🔊       │ Corre-│ │ │    绝对定位浮层
-│  │   You: I went to park with my family.                │ ctions│ │ │    不挤压对话区
-│  │   Correction: 1. went to park → went to the park     │ ───── │ │ │
-│  │                2. ...                                │ 1.GRAM│ │ │
-│  │   Agent: Sounds lovely! ...               🔊        │  ...  │ │ │
-│  │   ─── [Show earlier messages] ───                    │ 2.CHIN│ │ │
-│  │                                                      │  ...  │ │ │
-│  └──────────────────────────────────────────────────────└───────┘ │ │
+│  │   [Conversation scroll area]                                   │  │
+│  │   Agent: Good morning! How was your weekend?🔊                 │  │ ← ⚠️ 浮动按钮
+│  │   You: I went to park with my family.                          │  │    居中右侧
+│  │   Correction: 1. went to park → went to the park               │  │
+│  │                2. ...                                   ⚠️ 3 ◂ │  │
+│  │   Agent: Sounds lovely! ...               🔊                   │  │
+│  │   ─── [Show earlier messages] ───                              │  │
+│  │                                                                │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │────────────────────────────────────────────────────────────────────│
 │  Status: Type your message                                         │
 │────────────────────────────────────────────────────────────────────│
@@ -492,8 +492,20 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 │────────────────────────────────────────────────────────────────────│
 │  [Standup Meeting ▼]                    [Start] [End & Report]    │
 ├────────────────────────────────────────────────────────────────────┤
-│  [Log] [Clear]                                                     │
+│  [Log] [Clear]                                         [anki]     │
 └────────────────────────────────────────────────────────────────────┘
+
+  展开 correction sidebar 后：
+
+┌─────────────────────────────────────────────────┬──────────────────┐
+│   [Conversation scroll area]                     │ ▸ Correction 3   │
+│   ...                                           │ ──────────────── │
+│                                                 │ 1.GRAMMAR        │
+│                                                 │   I go → I went  │
+│                                                 │   ...            │
+│                                                 │ 2.CHINGLISH      │
+│                                                 │   ...            │
+└─────────────────────────────────────────────────┴──────────────────┘
 ```
 
 ### 关键交互细节
@@ -504,7 +516,7 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 | TTS 播放 | 每条 Agent 消息右上角 🔊 按钮。**用户点击手势触发**（规避 iOS Safari 禁止无需用户手势的音频播放） |
 | Token 用量 | 顶部进度条，≥80% 红色警告 |
 | 旧消息 | 前 10 条可见，更早的折叠在 "Show earlier" 后 |
-| Correction 侧边栏 | 绝对定位浮层（不挤压对话区），默认隐藏。Header "Corrections N" 按钮/侧边栏 × 按钮双向 toggle |
+| Correction 侧边栏 | 绝对定位浮层（不挤压对话区），默认隐藏（`display: none`）。Correction 到达时右上角出现浮动 ⚠️ N ◂ badge（垂直居中），点击展开 260px 面板，header ▸ 按钮收起。打开 ☰ 菜单自动收起 sidebar。 |
 | Correction 聊天气泡 | 插入用户消息下方，多条时分行编号展示（`1. original → corrected`），`white-space: pre-line` |
 | Debug | 页面底部半透明面板，实时打印所有 WebSocket/状态/错误事件，可折叠/清空 |
 | Safe Area | `padding-top: env(safe-area-inset-top)` — iOS 刘海/状态栏留白 |
@@ -666,6 +678,15 @@ chat-agent/
     │   ├── main.html                       // 登录表单 + 暗色主题
     │   ├── main.js                         // ?error 参数检测
     │   └── main.css                        // 暗色主题卡片样式
+    ├── manage/                             // Manage 页面 (Cards + Tags 管理)
+    │   ├── index.html                      // 双 tab 布局（Cards / Tags) + tab 切换逻辑
+    │   ├── card.js                         // Card 列表、CRUD modal、搜索、排序、deck 筛选、分页、TTS
+    │   ├── tag.js                          // Tag 表格、CRUD modal、deck checkbox、内联编辑
+    │   ├── modal.js                        // 通用 Modal 组件（open/close/save）
+    │   └── manage.css                      // Manage 页面专用样式
+    ├── shared/                             // 跨页面共享资源
+    │   ├── nav.js                          // 顶部导航栏 + ☰ 侧边栏（Chat / Cards 链接）
+    │   └── base.css                        // 共享基础样式（btn-primary, scrollbar, toast 等）
     ├── index.html                          // 聊天页（认证后访问，header 含 Logout + 闪卡按钮）
     ├── app.js                              // WebSocket 客户端 + Visibility API 自动 resume + window.activePanel
     ├── flashcard.js                        // 闪卡面板（两阶段录入 + chip 标签 + 保存 + debug 面板互斥）

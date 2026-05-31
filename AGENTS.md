@@ -30,7 +30,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 
 - **Java 17** / **Spring Boot 3.4.7** / **Maven** — `mvn compile` for build verification, `mvn test` for unit tests, `mvn verify` for E2E tests.
 - **Spring Security**: form login + remember-me + BCrypt. SecurityConfig is always loaded — no conditional annotations. Auth behavior is driven entirely by `app.security.permit-all-paths` in YAML config. Default user: `admin/admin123` (from `application.yml` → `DataInitializer`).
-- **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/chatagent/e2e/`. Six IT test classes: `ChatAgentSessionIT`, `ChatAgentResumeIT`, `ChatAgentMemoryIT`, `DailyTalkIT`, `ChatAgentMemoryCueIT`, `FlashcardIT`. WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`. Uses `@ActiveProfiles("e2e")` + `application-e2e.yml` with `permit-all-paths: [/**]` to bypass authentication.
+- **E2E tests**: Playwright (Java) + WireMock 3.x — `src/test/java/com/hugosol/chatagent/e2e/`. Seven IT test classes: `ChatAgentSessionIT`, `ChatAgentResumeIT`, `ChatAgentMemoryIT`, `DailyTalkIT`, `ChatAgentMemoryCueIT`, `ManagePageIT`, `FlashcardIT`. WireMock runs on fixed port `19090`, mocks DeepSeek at HTTP layer. DOM-based waits (no WebSocket frame interception). Screenshots auto-saved to `target/e2e-screenshots/` via `@AfterEach`. Uses `@ActiveProfiles("e2e")` + `application-e2e.yml` with `permit-all-paths: [/**]` to bypass authentication.
 - **Package**: `com.hugosol.chatagent`
 - **DeepSeek via LangChain4j**: uses OpenAI-compatible adapter (`dev.langchain4j:langchain4j-open-ai`). Default model is `deepseek-v4-flash` (see `application.yml`, not README which says `deepseek-chat`).
 - **Two LLM beans**: `ChatLanguageModel` (sync, used by `TaskRunner` for all sync agents) + `StreamingChatLanguageModel` (`OpenAiStreamingChatModel`, for ConversationAgent). Both in `LangChain4jConfig`. `ChatLanguageModel` is returned directly without `LoggableChatModel` wrapper — logging is handled by `TaskRunner.requestModel()`.
@@ -40,8 +40,8 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 - **MemorySaver checkpoints**: survive page refresh, **lost on server restart**. No persistence until session ends.
 - **Session resume**: WS disconnect no longer destroys `activeStates`. Frontend stores `sessionId` in `localStorage` and sends `RESUME_SESSION` on reconnect.
 - **Multi-tab**: `sessionToWs` map is one-to-one (sessionId → wsId, flipped from old `wsToSession`). Page Visibility API triggers auto-resume on tab activation. Stale delta protection skips streaming tokens for already-rendered messageIds.
-- **Frontend**: vanilla HTML/JS/CSS in `src/main/resources/static/`. No npm, no webpack, no build tools. Correction sidebar toggled via `×` button. Flashcard panel (`flashcard.js`) independent of `app.js`, shared via `window.activePanel`. Login page at `/login/main.html` with dark theme, served from `static/login/`.
-- **Correction display**: numbered summary bubble (`1. original → corrected` / `2. ...`) inserted after user message in chat flow; detailed items in sidebar (type + explanation). Sidebar is an absolute overlay (no longer squeezes chat) and starts collapsed. Header "Corrections N" button toggles visibility.
+- **Frontend**: vanilla HTML/JS/CSS in `src/main/resources/static/`. No npm, no webpack, no build tools. Correction sidebar hidden when collapsed (`display: none`); floating ⚠️ N ◂ badge appears at center-right when corrections arrive. Click badge to expand 260px sidebar, click ▸ in header to collapse. Flashcard panel (`flashcard.js`) independent of `app.js`, shared via `window.activePanel`. Login page at `/login/main.html` with dark theme, served from `static/login/`. Manage page at `/manage/index.html` — card/tag CRUD, search, sort, deck chip filtering, pagination, TTS.
+- **Correction display**: numbered summary bubble (`1. original → corrected` / `2. ...`) inserted after user message in chat flow; detailed items in sidebar (type + explanation). Sidebar is an absolute overlay (no longer squeezes chat) and starts collapsed. Floating ⚠️ N ◂ badge toggles visibility.
 - **WebSocket endpoint**: `/ws/chat` — JSON protocol. Handshake authenticated via Spring Security (JSESSIONID cookie). If Principal is null (E2E profile), falls back to `"anonymous"`.
 - **Architecture document**: `docs/architecture.md` is the design blueprint + decision log. Read before structural changes; **do not edit casually**.
 
@@ -83,7 +83,7 @@ com.hugosol.chatagent/
 │   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName, TaskContext, ErrorStrategy
 ├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
-├── controller/      # FlashcardController — first @RestController in codebase (POST /api/cards/add, GET /api/tags)
+├── controller/      # FlashcardController — REST API (Cards CRUD + Tags CRUD, 8 endpoints)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 │                    # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
@@ -105,6 +105,7 @@ src/test/java/com/hugosol/chatagent/e2e/
 ├── ChatAgentMemoryIT.java     # Two sessions back-to-back → memory merge verification
 ├── DailyTalkIT.java           # DAILY_TALK mode → teaching-style corrections
 ├── ChatAgentMemoryCueIT.java  # Session end → MemoryCue structured generation verification
+├── ManagePageIT.java          # Manage page: tag/card CRUD, search, sort, deck chip filtering, pagination, detail modal, TTS
 ├── FlashcardIT.java           # 闪卡录入：两阶段面板 → 标签创建 → 保存 → H2 数据验证（不依赖 WireMock，闪卡不调 LLM）
 └── helper/
     ├── E2ETestBase.java          # @SpringBootTest base: WireMock (19090), Playwright, DOM waits, @ActiveProfiles("e2e")
