@@ -534,7 +534,7 @@
     });
 
     els.correctionSidebarClose.addEventListener('click', function () {
-        els.correctionSidebar.classList.add('collapsed');
+        els.correctionSidebar.classList.toggle('collapsed');
     });
 
     els.correctionSidebarToggle.addEventListener('click', function () {
