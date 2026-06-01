@@ -108,6 +108,7 @@ public abstract class E2ETestBase {
                 .setIsMobile(true)
                 .setDeviceScaleFactor(3));
         page = context.newPage();
+        page.setDefaultTimeout(20_000);
         page.navigate("http://localhost:" + serverPort);
 
         WireMockStubs.registerAllStubs(wireMockServer);
