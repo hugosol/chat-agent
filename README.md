@@ -32,7 +32,7 @@ mvn spring-boot:run
 #    (credentials configurable via app.initial-users in application.yml)
 ```
 
-> **Note**: `node_modules` / `npm` / `webpack` are not used. The frontend is vanilla HTML + JS served directly by Spring Boot from `src/main/resources/static/`.
+> **Note**: Frontend is **migrating** to React + TypeScript (built with Vite). `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (plain JS/CSS) is placed in `src/main/resources/static/`. Node.js is required for local development.
 
 ## How to Use
 
@@ -128,7 +128,7 @@ Records older than 3 days are automatically cleaned up on startup.
 | Agent orchestration | langgraph4j 1.8.16 (`org.bsc.langgraph4j`) |
 | Database | H2 (file mode) + Spring Data JPA |
 | Communication | WebSocket (JSON protocol) |
-| Frontend | Native HTML + Vanilla JS (no build tools) |
+| Frontend | React 18 + TypeScript (Vite build) + Vanilla HTML/JS (incremental migration) |
 | TTS | Browser SpeechSynthesis (user-gesture triggered for iOS support) |
 | Embedding & RAG | ONNX all-MiniLM-L6-v2 (384-dim, ~200MB heap) + InMemoryEmbeddingStore (JSON disk persistence) |
 

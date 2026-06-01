@@ -22,7 +22,7 @@
 | 8 | 纠错机制 | Agent 口头自然纠正（融入对话不打断） |
 | 9 | LangGraph 深度 | 深度：HITL + Checkpoint + 持久化 |
 | 10 | Agent 架构 | 五 Agent 协作：Conversation + Correction + Report + Learning + MemoryCue，同步 Agent 统一委托 TaskRunner |
-| 11 | 前端技术 | 原生 HTML + Vanilla JS |
+| 11 | 前端技术 | 原生 HTML + Vanilla JS → React + TypeScript 渐进迁移中（ADR: frontend-react-migration） |
 | 12 | 通信协议 | WebSocket |
 | 13 | 数据库 | H2 文件模式 |
 | 14 | 构建工具 | Maven + Java 17 |
@@ -59,6 +59,7 @@
 | 45 | 闪卡模块解耦 | 独立 JPA 实体 (Card, Tag) + REST API (`FlashcardController`) + 前端 `flashcard.js`。闪卡模块与现有聊天功能完全解耦——不依赖 WebSocket，不依赖 Practice session。Tag 有可空 `type` 字段，为未来 Deck 概念预留。 |
 | 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~300 行），无 JNI 依赖。`FsrsScheduler` 为无状态纯函数——`initNewCard()` 返回 py-fsrs 兼容初始态（用于测试验证），`createInitState()` 返回 PRD 默认值（用于 Card 实体初始化）。12 个单元测试：8 个来自 PRD 测试向量 + 4 个来自 ts-fsrs（首次复习值、retrievability）。Fuzz 使用自研 `AleaPrng`（Johannes Baagøe 算法 Java 端口）替代 `java.util.Random`——seed(42)→12 天、seed(12345)→11 天，精准匹配 PRD 预期值。 |
 | 47 | REST API 模式引入 | `FlashcardController` 为代码库首个 `@RestController`（`POST /api/cards/add` + `GET /api/tags`）。认证走 JSESSIONID cookie（与 WebSocket 一致），`/api/**` 不走 `permit-all-paths`（需要认证），CSRF 对 `/api/**` 在 `SecurityConfig` 中禁用。 |
+| 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。首阶段：`shared/nav.js` → `Nav.tsx`。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试。Vite Library Mode 输出 IIFE bundle，暴露全局命名空间。构建挂接到 Maven `exec-maven-plugin` 的 `process-resources` 阶段。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
 
 ---
 
@@ -75,7 +76,7 @@
 | TTS | 浏览器 SpeechSynthesis | 通过消息气泡 🔊 按钮用户手势触发播放（规避 iOS Safari 自动播放限制） |
 | 通信 | WebSocket | Spring WebSocketHandler |
 | 数据库 | H2 File | Spring Data JPA |
-| 前端 | HTML + CSS + Vanilla JS | 单文件 SPA |
+| 前端 | React 18 + TypeScript (Vite) + Vanilla JS（渐进迁移）| 多页面（Library Mode bundle 共用）|
 
 ### 关键 Maven 依赖
 
