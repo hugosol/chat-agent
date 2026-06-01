@@ -16,6 +16,11 @@ data/
 .DS_Store
 Thumbs.db
 
+# Frontend
+node_modules/
+dist/
+src/main/resources/static/shared/*-bundle.*
+
 # Environment
 .env
 *.env

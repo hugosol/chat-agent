@@ -9,7 +9,7 @@
 </head>
 <body>
     <div id="app">
-        <header data-show-token="true"></header>
+        <header></header>
 
         <main>
             <div class="main-layout">
@@ -122,7 +122,26 @@
         </div>
     </template>
 
-    <script src="/shared/nav.js"></script>
+    <link rel="stylesheet" href="/shared/header-bundle.css">
+    <script src="/shared/react.production.min.js"></script>
+    <script src="/shared/react-dom.production.min.js"></script>
+    <script src="/shared/header-bundle.js"></script>
+    <script>
+        var _headerRoot;
+        window.updateTokenBar = function (pct) {
+            if (_headerRoot) {
+                ChatAgent.mountHeader(_headerRoot, { tokenPercent: pct });
+            }
+        };
+        function _mountHeader() {
+            _headerRoot = document.querySelector('header');
+            if (_headerRoot) {
+                ChatAgent.mountHeader(_headerRoot);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', _mountHeader);
+        if (document.readyState !== 'loading') _mountHeader();
+    </script>
     <script src="app.js"></script>
     <script src="flashcard.js"></script>
 </body>
