@@ -16,6 +16,10 @@ data/
 .DS_Store
 Thumbs.db
 
+# Frontend
+node_modules/
+src/main/resources/static/shared/nav-bundle.*
+
 # Environment
 .env
 *.env

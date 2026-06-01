@@ -6,7 +6,7 @@
 # Verify the build
 mvn compile
 
-# Run unit tests (existing unit tests only)
+# Run unit tests (Java + Vitest frontend tests)
 mvn test
 
 # Run E2E regression tests (Playwright + WireMock, first run downloads Chromium ~150MB)
