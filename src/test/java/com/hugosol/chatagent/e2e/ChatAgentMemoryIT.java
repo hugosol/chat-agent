@@ -52,11 +52,11 @@ class ChatAgentMemoryIT extends E2ETestBase {
         assertTrue(profileV1.isPresent(), "learning profile should be generated");
         assertEquals(1, profileV1.get().getVersion());
 
-        // --- Session 2: use "New Session" button to restart ---
-        page.locator("#newSessionBtn").click();
+        // --- Session 2: close report modal and start new session ---
+        page.locator("#closeReportBtn").click();
         page.waitForFunction(
-                "() => !document.getElementById('textInputBar').classList.contains('hidden')");
-        takeScreenshot("memory-s2-started");
+                "() => !document.getElementById('reportModal') || document.getElementById('reportModal').classList.contains('hidden')");
+        startSession(AgentMode.WORKPLACE_STANDUP.name());
 
         String sid2 = sessionId();
         assertNotNull(sid2);

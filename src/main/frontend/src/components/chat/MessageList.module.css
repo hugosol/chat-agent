@@ -1,0 +1,90 @@
+.message {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    font-size: 16px;
+    line-height: 1.5;
+    max-width: 85%;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.collapsed {
+    display: none;
+}
+
+.role {
+    font-weight: 600;
+    font-size: 0.75em;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.messageUser {
+    background: #0f3460;
+    margin-left: auto;
+    text-align: right;
+}
+
+.messageUser .role {
+    color: #4fc3f7;
+}
+
+.messageAgent {
+    background: #16213e;
+    margin-right: auto;
+    position: relative;
+}
+
+.messageAgent .role {
+    color: #66bb6a;
+}
+
+.btnPlay {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 2px 4px;
+    transition: opacity 0.2s;
+}
+
+.btnPlay:hover {
+    opacity: 1;
+}
+
+.correctionBubble {
+    background: #1a2a1a;
+    margin-right: auto;
+    border-left: 3px solid #e94560;
+    font-size: 0.8em;
+    max-width: 70%;
+}
+
+.correctionBubble .role {
+    color: #e94560;
+}
+
+.correctionBubble .contentText {
+    white-space: pre-line;
+    line-height: 1.6;
+}
+
+.streamCursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: #e94560;
+    animation: blink 0.8s infinite;
+    vertical-align: text-bottom;
+    margin-left: 1px;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}

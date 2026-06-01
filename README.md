@@ -32,7 +32,7 @@ mvn spring-boot:run
 #    (credentials configurable via app.initial-users in application.yml)
 ```
 
-> **Note**: Frontend is **incrementally migrating** to React + TypeScript (built with Vite). **Phase 2 complete**: `useReducer + context` centralized state management (ChatProvider + chatReducer + useChatWebSocket Hook). Phase 1: shared Header component + CorrectionSidebar. Chat (`app.js`), flashcard (`flashcard.js`), and manage panels (`manage/*.js`) remain vanilla JS for now (Phase 3). `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development.
+> **Note**: Frontend is **incrementally migrating** to React + TypeScript (built with Vite). **Phase 3 complete**: MessageList, ChatInput, and Footer components migrated to React (Portal-rendered into existing DOM). `useChatWebSocket` removed — WS lifecycle now managed inside `ChatProvider`. `ChatAgent.send()` removed — all sends go through `useChatContext().send`. Vanilla callback bridge preserved for 5 non-React message types (SESSION_REPORT, ERROR, TOKEN_WARNING, STATE_UPDATE, WS_CLOSED). Chat message rendering, input, and session controls are now fully React-managed. `app.js` retains only Report Modal, Status Bar, Debug Panel handlers. `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development.
 
 ## How to Use
 

@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import { ChatProvider, useChatContext } from "../state/ChatContext";
-import { useChatWebSocket } from "../hooks/useChatWebSocket";
 import { Header } from "../components/Header/Header";
 import { CorrectionSidebar } from "../components/CorrectionSidebar/CorrectionSidebar";
+import { MessageList } from "../components/chat/MessageList";
+import { ChatInput } from "../components/chat/ChatInput";
+import { Footer } from "../components/chat/Footer";
 import type { CorrectionData } from "../shared/types";
 
 const TOKEN_MAX = 128000;
@@ -32,17 +34,13 @@ function ChatSidebar(): JSX.Element {
   );
 }
 
-function WsConnector(): JSX.Element {
-  const { dispatch } = useChatContext();
-  useChatWebSocket(dispatch);
-  return React.createElement("div", { style: { display: "none" } });
-}
-
 function App(): JSX.Element {
   return React.createElement(
     ChatProvider,
     null,
-    React.createElement(WsConnector),
+    React.createElement(MessageList),
+    React.createElement(ChatInput),
+    React.createElement(Footer),
     React.createElement(TokenHeader),
     React.createElement(ChatSidebar)
   );

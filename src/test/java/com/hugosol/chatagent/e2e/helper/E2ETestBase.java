@@ -138,7 +138,7 @@ public abstract class E2ETestBase {
         page.locator("#modeSelect").selectOption(mode);
         page.locator("#startBtn").click();
         page.waitForFunction(
-                "() => !document.getElementById('textInputBar').classList.contains('hidden')");
+                "() => !document.getElementById('endBtn').disabled");
     }
 
     protected void sendMessage(String text) {
@@ -150,7 +150,7 @@ public abstract class E2ETestBase {
     protected void waitForAgentResponse() {
         page.waitForFunction("() => !document.getElementById('textInput').disabled");
         page.waitForFunction(
-                "expected => document.querySelectorAll('.correction-bubble').length >= expected",
+                "expected => document.querySelectorAll('[data-testid=\"correction-bubble\"]').length >= expected",
                 turnNumber);
     }
 
@@ -162,23 +162,23 @@ public abstract class E2ETestBase {
 
     protected void reloadPage() {
         page.reload();
-        page.waitForSelector(".message.user");
+        page.waitForSelector("[data-testid=\"message\"][data-role=\"user\"]");
     }
 
     protected int countUserMessages() {
-        return page.locator(".message.user").count();
+        return page.locator("[data-testid=\"message\"][data-role=\"user\"]").count();
     }
 
     protected int countAgentMessages() {
-        return page.locator(".message.agent").count();
+        return page.locator("[data-testid=\"message\"][data-role=\"agent\"]").count();
     }
 
     protected int countCorrectionBubbles() {
-        return page.locator(".message.correction-bubble").count();
+        return page.locator("[data-testid=\"correction-bubble\"]").count();
     }
 
     protected boolean hasCorrectionBubbleWith(String containedText) {
-        return page.locator(".correction-bubble .content-text")
+        return page.locator("[data-testid=\"correction-bubble\"] [data-testid=\"message-content\"]")
                 .filter(new Locator.FilterOptions().setHasText(containedText))
                 .count() > 0;
     }

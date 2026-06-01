@@ -13,6 +13,7 @@ export interface ChatState {
   tokenUsage: number;
   connectionStatus: "connecting" | "connected" | "disconnected";
   streamInProgress: boolean;
+  sessionStatus: "idle" | "active";
 }
 
 export const initialState: ChatState = {
@@ -21,6 +22,7 @@ export const initialState: ChatState = {
   tokenUsage: 0,
   connectionStatus: "connecting",
   streamInProgress: false,
+  sessionStatus: "idle",
 };
 
 export type Action =
@@ -35,4 +37,6 @@ export type Action =
       corrections: CorrectionData[];
       tokenUsage: number;
     }
-  | { type: "WS_CLOSED" };
+  | { type: "WS_CLOSED" }
+  | { type: "USER_MESSAGE_SENT"; messageId: number; text: string }
+  | { type: "SESSION_REPORT"; report: Record<string, unknown> };

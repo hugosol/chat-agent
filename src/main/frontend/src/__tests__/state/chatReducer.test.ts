@@ -3,6 +3,12 @@ import { chatReducer } from "../../state/chatReducer";
 import type { ChatState } from "../../state/chatState";
 import { initialState } from "../../state/chatState";
 
+describe("initialState", () => {
+  it("has sessionStatus idle by default", () => {
+    expect(initialState.sessionStatus).toBe("idle");
+  });
+});
+
 function seededState(): ChatState {
   return {
     messages: [
@@ -21,11 +27,12 @@ function seededState(): ChatState {
     tokenUsage: 5000,
     connectionStatus: "connected",
     streamInProgress: false,
+    sessionStatus: "active",
   };
 }
 
 describe("chatReducer", () => {
-  it("SESSION_STARTED resets state to initial with connected status", () => {
+  it("SESSION_STARTED resets state to initial with connected status and active session", () => {
     const state = chatReducer(seededState(), {
       type: "SESSION_STARTED",
       sessionId: "abc-123",
@@ -35,6 +42,7 @@ describe("chatReducer", () => {
     expect(state).toEqual({
       ...initialState,
       connectionStatus: "connected",
+      sessionStatus: "active",
     });
   });
 
@@ -130,7 +138,7 @@ describe("chatReducer", () => {
     expect(state.tokenUsage).toBe(320);
   });
 
-  it("SESSION_RESUMED batch rebuilds messages, corrections, and tokenUsage", () => {
+  it("SESSION_RESUMED batch rebuilds messages, corrections, tokenUsage, and sets active", () => {
     const state = chatReducer(initialState, {
       type: "SESSION_RESUMED",
       messages: [
@@ -166,16 +174,76 @@ describe("chatReducer", () => {
     expect(state.corrections[0].type).toBe("WORD_CHOICE");
     expect(state.tokenUsage).toBe(250);
     expect(state.connectionStatus).toBe("connected");
+    expect(state.sessionStatus).toBe("active");
   });
 
-  it("WS_CLOSED resets all state with disconnected status", () => {
+  it("WS_CLOSED resets all state with disconnected and idle status", () => {
     const state = chatReducer(seededState(), {
       type: "WS_CLOSED",
     });
 
-    expect(state).toEqual({
-      ...initialState,
-      connectionStatus: "disconnected",
+    expect(state.connectionStatus).toBe("disconnected");
+    expect(state.sessionStatus).toBe("idle");
+    expect(state.messages).toEqual([]);
+    expect(state.corrections).toEqual([]);
+  });
+
+  it("USER_MESSAGE_SENT appends a user message to the messages array", () => {
+    const state = chatReducer(initialState, {
+      type: "USER_MESSAGE_SENT",
+      messageId: 1,
+      text: "Hello Coach",
     });
+
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0]).toEqual({
+      id: 1,
+      role: "user",
+      text: "Hello Coach",
+      streaming: false,
+    });
+    expect(state.sessionStatus).toBe("idle");
+  });
+
+  it("USER_MESSAGE_SENT appends after existing messages with correct next id", () => {
+    const withMessages = chatReducer(initialState, {
+      type: "SESSION_RESUMED",
+      messages: [
+        { role: "USER", content: "First", messageId: 1 },
+        { role: "AGENT", content: "Reply", messageId: 1 },
+      ],
+      corrections: [],
+      tokenUsage: 0,
+    });
+
+    const state = chatReducer(withMessages, {
+      type: "USER_MESSAGE_SENT",
+      messageId: 2,
+      text: "Second",
+    });
+
+    expect(state.messages).toHaveLength(3);
+    expect(state.messages[2]).toEqual({
+      id: 2,
+      role: "user",
+      text: "Second",
+      streaming: false,
+    });
+  });
+
+  it("SESSION_REPORT sets idle sessionStatus and stops streaming", () => {
+    const streaming = chatReducer(initialState, {
+      type: "AGENT_STREAM_DELTA",
+      messageId: 1,
+      delta: "Hello",
+    });
+
+    const state = chatReducer(streaming, {
+      type: "SESSION_REPORT",
+      report: { score: 85 },
+    });
+
+    expect(state.sessionStatus).toBe("idle");
+    expect(state.streamInProgress).toBe(false);
   });
 });
