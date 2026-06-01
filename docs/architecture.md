@@ -59,7 +59,7 @@
 | 45 | 闪卡模块解耦 | 独立 JPA 实体 (Card, Tag) + REST API (`FlashcardController`) + 前端 `flashcard.js`。闪卡模块与现有聊天功能完全解耦——不依赖 WebSocket，不依赖 Practice session。Tag 有可空 `type` 字段，为未来 Deck 概念预留。 |
 | 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~300 行），无 JNI 依赖。`FsrsScheduler` 为无状态纯函数——`initNewCard()` 返回 py-fsrs 兼容初始态（用于测试验证），`createInitState()` 返回 PRD 默认值（用于 Card 实体初始化）。12 个单元测试：8 个来自 PRD 测试向量 + 4 个来自 ts-fsrs（首次复习值、retrievability）。Fuzz 使用自研 `AleaPrng`（Johannes Baagøe 算法 Java 端口）替代 `java.util.Random`——seed(42)→12 天、seed(12345)→11 天，精准匹配 PRD 预期值。 |
 | 47 | REST API 模式引入 | `FlashcardController` 为代码库首个 `@RestController`（`POST /api/cards/add` + `GET /api/tags`）。认证走 JSESSIONID cookie（与 WebSocket 一致），`/api/**` 不走 `permit-all-paths`（需要认证），CSRF 对 `/api/**` 在 `SecurityConfig` 中禁用。 |
-| 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。首阶段：`shared/nav.js` → `Header.tsx`，产物 `header-bundle.js`/`header-bundle.css`，全局命名空间 `window.ChatAgent.mountHeader()`。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试。Vite Library Mode 输出 IIFE bundle。构建挂接到 Maven `exec-maven-plugin` 的 `process-resources` 阶段；Vitest 挂在 `process-test-classes`。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
+| 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。首阶段：`shared/nav.js` → `Header.tsx`，产物 `header-bundle.js`/`header-bundle.css`，全局命名空间 `window.ChatAgent.mountHeader()`。第二阶段：提取共享层 `src/shared/`（`utils.ts`、`tts.ts`、`Modal.tsx`、`Toast.tsx`、`ChipInput.tsx`、`useTagAutocomplete.ts`），建立 `src/__tests__/` 按功能领域（`shared/`、`header/`）组织测试。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试。Vite Library Mode 输出 IIFE bundle。构建挂接到 Maven `exec-maven-plugin` 的 `process-resources` 阶段；Vitest 挂在 `process-test-classes`。共享代码采用内联策略——各页面级组件 bundle 直接 import 共享源码，Vite/Rollup 自动内联打包，无需单独的 shared bundle。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
 
 ---
 
@@ -695,6 +695,39 @@ chat-agent/
     ├── app.js                              // WebSocket 客户端 + Visibility API 自动 resume + window.activePanel
     ├── flashcard.js                        // 闪卡面板（两阶段录入 + chip 标签 + 保存 + debug 面板互斥）
     └── style.css                           // 深色主题 + 闪卡面板样式 + toast 动画
+```
+
+### 前端源码目录 (`src/main/frontend/`)
+
+```
+src/main/frontend/
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+└── src/
+    ├── shared/                              // 共享工具 + 通用 React 组件
+    │   ├── utils.ts                         (escapeHtml, formatDate, truncate, englishOnly)
+    │   ├── tts.ts                           (speakText)
+    │   ├── Modal.tsx                        (声明式 <Modal>)
+    │   ├── Toast.tsx                        (command 式 showToast + 内部 <Toast>)
+    │   ├── ChipInput.tsx                    (受控 <ChipInput>)
+    │   └── useTagAutocomplete.ts            (Hook：封装 GET /api/tags + 客户端过滤)
+    ├── components/
+    │   └── Header/
+    │       ├── Header.tsx
+    │       └── Header.module.css
+    ├── entry/
+    │   └── header-entry.tsx
+    └── __tests__/                           // 按功能领域组织
+        ├── shared/
+        │   ├── utils.test.ts
+        │   ├── tts.test.ts
+        │   ├── Modal.test.tsx
+        │   ├── Toast.test.tsx
+        │   ├── ChipInput.test.tsx
+        │   └── useTagAutocomplete.test.ts
+        └── header/
+            └── Header.test.tsx
 ```
 
 > **图结构简化**: `ConversationNode` 和 `MergeResponseNode` 已移除。对话流式生成由 `TurnProcessor` 直接调用 `ConversationAgent`，token 计数由 `TokenTracker` 封装在 `SessionStateStore` 中管理。

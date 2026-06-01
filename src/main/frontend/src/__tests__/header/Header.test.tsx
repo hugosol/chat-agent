@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
-import { Header } from "./Header";
+import { Header } from "../../components/Header/Header";
 
 function setPath(path: string): void {
   Object.defineProperty(window, "location", {
