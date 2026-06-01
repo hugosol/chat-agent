@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
+    "noEmit": true,
     "rootDir": "./src",
     "declaration": false,
     "sourceMap": false

@@ -18,6 +18,7 @@ Thumbs.db
 
 # Frontend
 node_modules/
+dist/
 src/main/resources/static/shared/nav-bundle.*
 
 # Environment
