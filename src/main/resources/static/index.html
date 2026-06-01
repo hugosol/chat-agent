@@ -6,8 +6,7 @@
     <title>Chat Agent</title>
     <link rel="stylesheet" href="/shared/base.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="/shared/header-bundle.css">
-    <link rel="stylesheet" href="/shared/correction-sidebar-bundle.css">
+    <link rel="stylesheet" href="/shared/chat-bundle.css">
 </head>
 <body>
     <div id="app">
@@ -104,35 +103,7 @@
 
     <script src="/shared/react.production.min.js"></script>
     <script src="/shared/react-dom.production.min.js"></script>
-    <script src="/shared/header-bundle.js"></script>
-    <script src="/shared/correction-sidebar-bundle.js"></script>
-    <script>
-        var _headerRoot;
-        window.updateTokenBar = function (pct) {
-            if (_headerRoot) {
-                ChatAgent.mountHeader(_headerRoot, { tokenPercent: pct });
-            }
-        };
-        function _mountHeader() {
-            _headerRoot = document.querySelector('header');
-            if (_headerRoot) {
-                ChatAgent.mountHeader(_headerRoot);
-            }
-        }
-        document.addEventListener('DOMContentLoaded', _mountHeader);
-        if (document.readyState !== 'loading') _mountHeader();
-
-        var _sidebarApi;
-        function _mountSidebar() {
-            var root = document.getElementById('correction-sidebar-root');
-            if (root) {
-                _sidebarApi = ChatAgent.mountCorrectionSidebar(root);
-                window.__sidebarApi = _sidebarApi;
-            }
-        }
-        document.addEventListener('DOMContentLoaded', _mountSidebar);
-        if (document.readyState !== 'loading') _mountSidebar();
-    </script>
+    <script src="/shared/chat-bundle.js"></script>
     <script src="app.js"></script>
     <script src="flashcard.js"></script>
 </body>

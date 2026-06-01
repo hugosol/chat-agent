@@ -71,12 +71,29 @@ define:
 Vite Library Mode 的 IIFE 格式不支持 `build.lib.entry` 对象形式。多入口构建方案：每个入口一个独立 Vite 配置文件，`package.json` build 脚本串联执行：
 
 ```json
-"build": "vite build && vite build --config vite.config.correction-sidebar.ts"
+"build": "vite build && vite build --config vite.config.correction-sidebar.ts && vite build --config vite.config.chat.ts"
 ```
 
 - **产物命名**：`{entry-name}-bundle.js` + `{entry-name}-bundle.css`
 - **全局命名空间**：所有入口共享 `window.ChatAgent`，通过 `ChatAgent || {}` 模式累加挂载方法
+- **Phase 2 新增**：`vite.config.chat.ts` 产出 `chat-bundle.js` + `chat-bundle.css`（含 ChatProvider + Header + CorrectionSidebar + WS Hook）。Chat 页面 (`index.html`) 仅加载 `chat-bundle.js` 即可，`header-bundle.js` 和 `correction-sidebar-bundle.js` 仅用于 Manage/Login 等非 Chat 页面
 
 ### 纯组件 + 连接器模式
 
 CorrectionSidebar 迁移引入的组件架构模式：纯展示组件通过 props 接收数据、通过 callbacks 发出事件，entry wrapper 通过本地 `useState` 管理状态并暴露命令式 API（`addCorrection`/`clear`/`getCount`）。此模式为后续 `useReducer + context` 集中状态管理做前向兼容。详见 ADR `centralized-chat-state.md`。
+
+### Phase 2: useReducer + context 集中状态管理
+
+Phase 2 完成后，前端新增以下模块：
+
+- **`src/state/chatState.ts`** — `ChatState`、`Message`、`Action` 类型定义 + `initialState`
+- **`src/state/chatReducer.ts`** — 纯函数 reducer，处理 7 种 WS 消息 + `WS_CLOSED`
+- **`src/state/ChatContext.tsx`** — `ChatProvider` + `useChatContext`（React context + `useReducer`）
+- **`src/hooks/useChatWebSocket.ts`** — WS 生命周期管理 + 双重路径分发（reducer + vanilla callbacks）
+- **`src/entry/chat-agent-entry.tsx`** — ChatProvider 包裹 Header（React portal）和 CorrectionSidebar（React portal），启动 WS 连接
+
+关键 Gotcha：
+
+- **ChatProvider 包裹顺序**：Header 和 CorrectionSidebar 通过 React portals 注入 `<header>` 和 `#correction-sidebar-root` DOM 元素，但组件必须在 `<ChatProvider>` 树内才能消费 `useChatContext()`
+- **vanilla callbacks 调用顺序**：必须在 `dispatch(action)` 之后调用，确保 reducer state 已更新
+- **4 处 Phase 2 胶水代码**：`vanillaHandlers` Set、`vanillaHandlers.forEach()` 旁路调用、`registerHandler()`、`send()` 均标注 `// Phase 2 compat — Phase 3 移除`

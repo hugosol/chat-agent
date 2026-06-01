@@ -20,7 +20,7 @@
 | Phase | 内容 | 状态管理方式 | 命令式 API |
 |-------|------|------------|-----------|
 | 1 | CorrectionSidebar 独立模块 | 本地 `useState`（entry wrapper 内管理） | 有（`addCorrection`/`clear`/`getCount`） |
-| 2 | 抽取 WebSocket 服务层 + 引入 `useReducer + context` | 一个 reducer 处理所有 WS 消息，context 下发 state | 保留为兼容路径 |
+| 2 | 抽取 WebSocket 服务层 + 引入 `useReducer + context` | 一个 reducer 处理所有 WS 消息，context 下发 state | **已完成 — 命令式 API 已移除，组件直接从 context 读取** |
 | 3 | MessageList、ReportModal、DebugPanel、InputBar 全部迁移为 React | 统一 React 树，WS context → 各组件 | 移除 |
 
 ### Phase 1 纯组件 + 连接器模式
@@ -44,3 +44,18 @@ Phase 1 不引入集中状态管理。CorrectionSidebar 为纯展示组件（pro
 - **可逆转**：纯组件 + 连接器模式为向后兼容设计。如果 Phase 2 时发现 `useReducer + context` 不合适，可直接替代 entry wrapper 而不影响组件
 - **渐进式**：每期均可独立验证。Phase 1 的 CorrectionSidebar 可独立运行，Phase 2 引入 context 时不破坏现有功能
 - **简单优先**：Phase 1 避免过度设计，保持命令式 API 的简洁性
+
+## Phase 2 完成总结
+
+Phase 2 已于 2026-06 完成，实现了以下目标：
+
+- **chatReducer**：纯函数处理 7 种消息类型（`src/state/chatReducer.ts`），8 个 Vitest 单元测试完全通过
+- **ChatProvider + useChatContext**：`React.createContext` + `useReducer` 提供集中状态，react portals 将 Header 和 CorrectionSidebar 接入统一数据流
+- **useChatWebSocket Hook**：封装 WebSocket 连接生命周期，实现双重路径分发（dispatch 进 reducer + 遍历 vanilla 回调兼容 app.js）
+- **msg → Action 映射**：`toAction()` 函数将 10 种 WS 消息映射为 reducer action，TOKEN_WARNING 和 LLM ERROR 改为 Toast 通知
+- **app.js 改造**：移除 `connect()` / `ws` / `updateTokenBar()` / sidebar API 调用，改用 `ChatAgent.registerHandler()` + `ChatAgent.send()`
+- **CorrectionSidebar 连接器简化**：从 `ChatContext` 读取 `corrections`，删除命令式 API（`addCorrection`/`clear`/`getCount`）
+- **Header Token Bar 改造**：直接从 `ChatContext` 读取 `tokenUsage`，退役 `window.updateTokenBar()`
+- **构建**：新增第三个 Vite config (`vite.config.chat.ts`)，产出 `chat-bundle.js` + `chat-bundle.css`，内含 Header + CorrectionSidebar + ChatProvider
+
+余下的 vanilla `app.js` 渲染逻辑（消息气泡 DOM、报告弹窗、调试面板、输入框）通过 `vanillaHandlers` 回调继续运行，Phase 3 时删除。4 处 Phase 2 胶水代码均标注 `// Phase 2 compat — Phase 3 移除`。

@@ -1,12 +1,10 @@
-    (function () {
+(function () {
     'use strict';
 
     var MAX_VISIBLE_MSGS = 10;
-    var WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/chat';
 
     window.activePanel = null;
 
-    var ws = null;
     var sessionId = null;
     var synth = window.speechSynthesis;
     var messageCount = 0;
@@ -48,38 +46,6 @@
         els.debugLog.scrollTop = els.debugLog.scrollHeight;
     }
 
-    function connect() {
-        debugLog('connect()');
-        ws = new WebSocket(WS_URL);
-        ws.onopen = function () {
-            debugLog('ws.onopen');
-            setStatus('Connected', 'connected');
-            var savedSessionId = localStorage.getItem('sessionId');
-            if (savedSessionId) {
-                debugLog('resuming session: ' + savedSessionId);
-                ws.send(JSON.stringify({ type: 'RESUME_SESSION', sessionId: savedSessionId }));
-            }
-        };
-        ws.onclose = function () {
-            debugLog('ws.onclose');
-            setStatus('Disconnected', 'disconnected');
-            resetUI();
-        };
-        ws.onerror = function () {
-            debugLog('ws.onerror');
-            setStatus('Connection error', 'disconnected');
-        };
-        ws.onmessage = function (event) {
-            try {
-                var msg = JSON.parse(event.data);
-                debugLog('ws.onmessage: ' + event.data.slice(0, 120));
-                handleMessage(msg);
-            } catch (e) {
-                debugLog('onmessage ERROR: ' + e.message);
-            }
-        };
-    }
-
     function handleMessage(msg) {
         switch (msg.type) {
             case 'SESSION_STARTED':
@@ -93,8 +59,6 @@
                 turnCounter = 0;
                 streamBubbles = {};
                 els.messages.innerHTML = '';
-                var sidebar = window.__sidebarApi;
-                if (sidebar) sidebar.clear();
                 els.earlierMarker.classList.add('hidden');
                 els.reportModal.classList.add('hidden');
                 showTextInput();
@@ -120,7 +84,6 @@
             case 'STATE_UPDATE':
                 debugLog('STATE_UPDATE state=' + msg.state + ' token=' + (msg.tokenUsage || 0));
                 setStatus(msg.state, msg.state.toLowerCase());
-                updateTokenBar(msg.tokenUsage);
                 break;
 
             case 'SESSION_RESUMED':
@@ -138,6 +101,11 @@
             case 'ERROR':
                 debugLog('ERROR: ' + msg.message);
                 setStatus('Error: ' + msg.message, 'error');
+                break;
+
+            // Phase 2 compat — Phase 3 移除
+            case 'WS_CLOSED':
+                resetUI();
                 break;
         }
     }
@@ -168,7 +136,6 @@
                 delete streamBubbles[msgId];
                 handleCollapse();
             }
-            updateTokenBar(tokenUsage);
         } catch (e) {
             debugLog('handleStreamEnd ERROR: ' + e.message + ' stack=' + e.stack);
         }
@@ -193,13 +160,6 @@
         userBubble.insertAdjacentElement('afterend', corrBubble);
         messageCount++;
 
-        var sidebar = window.__sidebarApi;
-        if (sidebar) {
-            for (var i = 0; i < corrections.length; i++) {
-                sidebar.addCorrection(corrections[i]);
-            }
-        }
-
         handleCollapse();
         els.chatArea.scrollTop = els.chatArea.scrollHeight;
     }
@@ -215,8 +175,6 @@
         messageCount = 0;
         streamBubbles = {};
         els.messages.innerHTML = '';
-        var sidebar = window.__sidebarApi;
-        if (sidebar) sidebar.clear();
         els.earlierMarker.classList.add('hidden');
         els.reportModal.classList.add('hidden');
 
@@ -239,7 +197,6 @@
             var byMsgId = {};
             for (var j = 0; j < msg.corrections.length; j++) {
                 var c = msg.corrections[j];
-                if (sidebar) sidebar.addCorrection(c);
                 var mid = c.messageId || 0;
                 if (!byMsgId[mid]) byMsgId[mid] = [];
                 byMsgId[mid].push(c);
@@ -259,7 +216,6 @@
             }
         }
 
-        updateTokenBar(msg.tokenUsage);
         showTextInput();
     }
 
@@ -334,7 +290,7 @@
         els.messages.appendChild(userBubble);
         messageCount++;
 
-        ws.send(JSON.stringify({ type: 'USER_INPUT', text: text, messageId: msgId }));
+        ChatAgent.send({ type: 'USER_INPUT', text: text, messageId: msgId });
         els.textInput.value = '';
         els.textInput.disabled = true;
         els.sendTextBtn.disabled = true;
@@ -358,14 +314,6 @@
             for (var i = 0; i < children.length - MAX_VISIBLE_MSGS; i++) {
                 children[i].classList.add('collapsed');
             }
-        }
-    }
-
-    function updateTokenBar(usage) {
-        if (usage == null) return;
-        var pct = Math.min(100, Math.round(usage * 100));
-        if (typeof window.updateTokenBar === 'function') {
-            window.updateTokenBar(pct);
         }
     }
 
@@ -409,6 +357,9 @@
         return div.innerHTML;
     }
 
+    // Phase 2 compat — app.js registers as a vanilla handler
+    ChatAgent.registerHandler(handleMessage);
+
     els.sendTextBtn.addEventListener('click', function () {
         sendTextInput();
     });
@@ -422,31 +373,22 @@
 
     els.startBtn.addEventListener('click', function () {
         debugLog('BTN start session');
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            connect();
-            setTimeout(function () {
-                sendStart();
-            }, 300);
-        } else {
-            sendStart();
-        }
+        sendStart();
     });
 
     function sendStart() {
         debugLog('sendStart: ' + els.modeSelect.value);
-        ws.send(JSON.stringify({
+        ChatAgent.send({
             type: 'START_SESSION',
             mode: els.modeSelect.value
-        }));
+        });
     }
 
     els.endBtn.addEventListener('click', function () {
         debugLog('BTN end session');
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            els.textInputBar.classList.add('hidden');
-            synth.cancel();
-            ws.send(JSON.stringify({ type: 'END_SESSION' }));
-        }
+        els.textInputBar.classList.add('hidden');
+        synth.cancel();
+        ChatAgent.send({ type: 'END_SESSION' });
     });
 
     els.showEarlierBtn.addEventListener('click', function () {
@@ -460,8 +402,6 @@
     els.newSessionBtn.addEventListener('click', function () {
         els.reportModal.classList.add('hidden');
         els.messages.innerHTML = '';
-        var sidebar = window.__sidebarApi;
-        if (sidebar) sidebar.clear();
         els.earlierMarker.classList.add('hidden');
         messageCount = 0;
         streamBubbles = {};
@@ -490,11 +430,9 @@
     });
 
     document.addEventListener('visibilitychange', function () {
-        if (!document.hidden && sessionId && ws && ws.readyState === WebSocket.OPEN) {
+        if (!document.hidden && sessionId) {
             debugLog('visibilitychange: resuming session ' + sessionId);
-            ws.send(JSON.stringify({ type: 'RESUME_SESSION', sessionId: sessionId }));
+            ChatAgent.send({ type: 'RESUME_SESSION', sessionId: sessionId });
         }
     });
-
-    connect();
 })();

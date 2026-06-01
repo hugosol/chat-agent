@@ -32,7 +32,7 @@ mvn spring-boot:run
 #    (credentials configurable via app.initial-users in application.yml)
 ```
 
-> **Note**: Frontend is **incrementally migrating** to React + TypeScript (built with Vite). Phase 1: shared Header component + CorrectionSidebar. Phase 2: shared utility layer (`src/shared/` — utils, TTS, Modal, Toast, ChipInput, types) + test framework (`src/__tests__/` by functional domain). Chat (`app.js`), flashcard (`flashcard.js`), and manage panels (`manage/*.js`) remain vanilla JS for now. `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development.
+> **Note**: Frontend is **incrementally migrating** to React + TypeScript (built with Vite). **Phase 2 complete**: `useReducer + context` centralized state management (ChatProvider + chatReducer + useChatWebSocket Hook). Phase 1: shared Header component + CorrectionSidebar. Chat (`app.js`), flashcard (`flashcard.js`), and manage panels (`manage/*.js`) remain vanilla JS for now (Phase 3). `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development.
 
 ## How to Use
 
