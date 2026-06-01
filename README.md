@@ -32,7 +32,7 @@ mvn spring-boot:run
 #    (credentials configurable via app.initial-users in application.yml)
 ```
 
-> **Note**: Frontend is **migrating** to React + TypeScript (built with Vite). `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (plain JS/CSS) is placed in `src/main/resources/static/`. Node.js is required for local development.
+> **Note**: Frontend is **incrementally migrating** to React + TypeScript (built with Vite). The shared Header component is already React; chat (`app.js`), flashcard (`flashcard.js`), and manage panels (`manage/*.js`) remain vanilla JS. `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development.
 
 ## How to Use
 
@@ -254,7 +254,10 @@ chat-agent/
 │   │   ├── modal.js
 │   │   └── manage.css
 │   ├── shared/
-│   │   ├── nav.js
+│   │   ├── header-bundle.js          // React Header IIFE bundle (replaces nav.js)
+│   │   ├── header-bundle.css         // React Header styles (CSS Modules)
+│   │   ├── react.production.min.js   // React 18 runtime (UMD)
+│   │   ├── react-dom.production.min.js // ReactDOM 18 runtime (UMD)
 │   │   └── base.css
 │   ├── index.html
 │   ├── app.js
