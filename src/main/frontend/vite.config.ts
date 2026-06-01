@@ -11,11 +11,11 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: resolve(__dirname, "src/entry/nav-entry.tsx"),
-      name: "ChatAgentNav",
+      entry: resolve(__dirname, "src/entry/header-entry.tsx"),
+      name: "ChatAgent",
       formats: ["iife"],
-      fileName: (format, name) => format === "iife" ? "nav-bundle.js" : `nav-bundle.${format}`,
-      cssFileName: "nav-bundle",
+      fileName: (format, name) => format === "iife" ? "header-bundle.js" : `header-bundle.${format}`,
+      cssFileName: "header-bundle",
     },
     outDir: resolve(__dirname, "../resources/static/shared"),
     emptyOutDir: false,

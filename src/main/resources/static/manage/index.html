@@ -28,19 +28,19 @@
         </div>
     </div>
 
-    <link rel="stylesheet" href="/shared/nav-bundle.css">
+    <link rel="stylesheet" href="/shared/header-bundle.css">
     <script src="/shared/react.production.min.js"></script>
     <script src="/shared/react-dom.production.min.js"></script>
-    <script src="/shared/nav-bundle.js"></script>
+    <script src="/shared/header-bundle.js"></script>
     <script>
-        function _mountNav() {
+        function _mountHeader() {
             var root = document.querySelector('header');
             if (root) {
-                ChatAgentNav.mount(root);
+                ChatAgent.mountHeader(root);
             }
         }
-        document.addEventListener('DOMContentLoaded', _mountNav);
-        if (document.readyState !== 'loading') _mountNav();
+        document.addEventListener('DOMContentLoaded', _mountHeader);
+        if (document.readyState !== 'loading') _mountHeader();
     </script>
     <script src="/manage/modal.js"></script>
     <script src="/manage/tag.js"></script>

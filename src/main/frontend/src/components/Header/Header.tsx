@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
-import classes from "./Nav.module.css";
+import classes from "./Header.module.css";
 
-interface NavProps {
+interface HeaderProps {
   tokenPercent?: number;
 }
 
@@ -15,7 +15,7 @@ function tokenColor(pct: number): string {
   return GREEN;
 }
 
-function Nav({ tokenPercent }: NavProps): JSX.Element {
+function Header({ tokenPercent }: HeaderProps): JSX.Element {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
@@ -100,5 +100,5 @@ function Nav({ tokenPercent }: NavProps): JSX.Element {
   );
 }
 
-export { Nav };
-export type { NavProps };
+export { Header };
+export type { HeaderProps };
