@@ -86,6 +86,20 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 | **Cross-session query** | A query that spans multiple Practice sessions (e.g., history listing, progress aggregation) -- must filter by Learner | Multi-session query, user-scoped query |
 | **Per-session query** | A query scoped to a single Practice session UUID -- naturally isolated without a Learner filter | Single-session query, session-scoped query |
 
+## Flashcard 模块
+
+| Term | Definition | Aliases to avoid |
+|------|------------|-----------------|
+| **Flashcard** | A vocabulary review card created by the Learner, containing front (word/expression) and back (definition), with user-assigned Tags for organization. Independent of Practice sessions. | Card, 闪卡 |
+| **Front / Back** | The two faces of a Flashcard: front = the word or phrase to remember, back = the translation or correction. | 正面/背面, question/answer |
+| **Tag** | A label for categorizing Flashcards. Linked to Cards via Many-to-Many. The `type` field is nullable (null in MVP), reserved for future Deck concept — when set to a specific value, the Tag effectively becomes a deck. | Label, 标签, 牌组 |
+| **FSRS-6** | Free Spaced Repetition Scheduler version 6 — a 21-parameter algorithm for computing review intervals. In MVP, used only to initialize a Card's scheduling state (`stability=2.5, difficulty=0.0, state=0`). The `repeat()` function is implemented but not yet exposed via REST. | Scheduler, 算法 |
+| **Alea PRNG** | A deterministic pseudo-random number generator (Johannes Baagøe's algorithm) used for fuzz in the FSRS scheduler. Replaces `java.util.Random` to enable cross-implementation reproducibility. | Fuzz, deterministic random |
+| **Two-stage input** | The flashcard creation UI flow: Stage 1 = minimal panel (~60px) with only front input, Stage 2 = expanded panel (~70vh) with back input + chip tag input + save button. Designed to let the Learner type while still seeing the chat. | 两阶段录入 |
+| **Chip tag input** | An autocomplete tag input where selected tags render as inline "chips" with × to remove. Data sourced from `GET /api/tags`, filtered client-side. Backspace on empty input removes the last chip. | Chip input, 标签输入 |
+| **activePanel** | A `window`-global variable (`null | 'debug' | 'flashcard'`) that enforces mutual exclusivity between the Debug panel and the Flashcard panel — opening one collapses the other. | Panel state, panel toggle |
+| **FlashcardController** | The first `@RestController` in the codebase, serving `POST /api/cards/add` (create card with Tag auto-upsert) and `GET /api/tags` (autocomplete data source). Authenticated via JSESSIONID cookie; CSRF exempt via `SecurityConfig`. | REST controller, 闪卡 API |
+
 ## Relationships
 
 - A **Learner** has exactly one **Login session** at a time (per browser).

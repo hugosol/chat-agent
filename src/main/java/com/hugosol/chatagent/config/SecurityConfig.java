@@ -62,7 +62,7 @@ public class SecurityConfig {
                     .tokenValiditySeconds(1209600)
             )
             .csrf(csrf -> csrf
-                    .ignoringRequestMatchers("/ws/chat/**", "/h2-console/**", "/logout", "/login")
+                    .ignoringRequestMatchers("/ws/chat/**", "/h2-console/**", "/logout", "/login", "/api/**")
             );
         return http.build();
     }

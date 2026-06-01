@@ -1,8 +1,10 @@
-(function () {
+    (function () {
     'use strict';
 
     var MAX_VISIBLE_MSGS = 10;
     var WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/chat';
+
+    window.activePanel = null;
 
     var ws = null;
     var sessionId = null;
@@ -37,8 +39,9 @@
         correctionSidebar:      document.getElementById('correctionSidebar'),
         correctionSidebarContent: document.getElementById('correctionSidebarContent'),
         correctionSidebarToggle:  document.getElementById('correctionSidebarToggle'),
-        correctionShowBtn:   document.getElementById('correctionShowBtn'),
+        correctionSidebarClose:   document.getElementById('correctionSidebarClose'),
         correctionBadge:     document.getElementById('correctionBadge'),
+        correctionBadgeHeader: document.getElementById('correctionBadgeHeader'),
     };
 
     function debugLog(msg) {
@@ -76,8 +79,13 @@
             setStatus('Connection error', 'disconnected');
         };
         ws.onmessage = function (event) {
-            debugLog('ws.onmessage: ' + event.data.slice(0, 120));
-            handleMessage(JSON.parse(event.data));
+            try {
+                var msg = JSON.parse(event.data);
+                debugLog('ws.onmessage: ' + event.data.slice(0, 120));
+                handleMessage(msg);
+            } catch (e) {
+                debugLog('onmessage ERROR: ' + e.message);
+            }
         };
     }
 
@@ -161,15 +169,19 @@
     }
 
     function handleStreamEnd(msgId, fullText, tokenUsage) {
-        var bubble = streamBubbles[msgId];
-        if (bubble) {
-            var contentEl = bubble.querySelector('.content-text');
-            contentEl.textContent = fullText;
-            addPlayButton(bubble, fullText);
-            delete streamBubbles[msgId];
-            handleCollapse();
+        try {
+            var bubble = streamBubbles[msgId];
+            if (bubble) {
+                var contentEl = bubble.querySelector('.content-text');
+                contentEl.textContent = fullText;
+                addPlayButton(bubble, fullText);
+                delete streamBubbles[msgId];
+                handleCollapse();
+            }
+            updateTokenBar(tokenUsage);
+        } catch (e) {
+            debugLog('handleStreamEnd ERROR: ' + e.message + ' stack=' + e.stack);
         }
-        updateTokenBar(tokenUsage);
         try { speakText(fullText); } catch (e) { debugLog('TTS error: ' + e); }
         showTextInput();
     }
@@ -327,10 +339,11 @@
 
     function updateCorrectionBadge() {
         els.correctionBadge.textContent = correctionCount;
+        els.correctionBadgeHeader.textContent = correctionCount;
         if (correctionCount > 0) {
-            els.correctionBadge.style.color = '#e94560';
+            els.correctionSidebarToggle.classList.remove('hidden');
         } else {
-            els.correctionBadge.style.color = '';
+            els.correctionSidebarToggle.classList.add('hidden');
         }
     }
 
@@ -386,7 +399,7 @@
     }
 
     function updateTokenBar(usage) {
-        if (usage == null) return;
+        if (usage == null || !els.tokenBar || !els.tokenPct) return;
         var pct = Math.min(100, Math.round(usage * 100));
         els.tokenBar.style.width = pct + '%';
         els.tokenPct.textContent = pct + '%';
@@ -418,8 +431,8 @@
         els.startBtn.disabled = false;
         els.endBtn.disabled = true;
         els.modeSelect.disabled = false;
-        els.tokenBar.style.width = '0%';
-        els.tokenPct.textContent = '0%';
+        if (els.tokenBar) els.tokenBar.style.width = '0%';
+        if (els.tokenPct) els.tokenPct.textContent = '0%';
         els.textInputBar.classList.add('hidden');
         els.textInput.value = '';
         els.textInput.placeholder = 'Type or use 🎤 on keyboard...';
@@ -506,23 +519,34 @@
 
     els.debugToggle.addEventListener('click', function () {
         els.debugLog.classList.toggle('hidden');
+        if (els.debugLog.classList.contains('hidden')) {
+            window.activePanel = null;
+        } else {
+            if (window.activePanel === 'flashcard') {
+                document.getElementById('flashcardPanel').classList.add('collapsed');
+            }
+            window.activePanel = 'debug';
+        }
     });
 
     els.debugClear.addEventListener('click', function () {
         els.debugLog.innerHTML = '';
     });
 
-    els.correctionSidebarToggle.addEventListener('click', function () {
+    function toggleCorrectionSidebar() {
         els.correctionSidebar.classList.toggle('collapsed');
-        var collapsed = els.correctionSidebar.classList.contains('collapsed');
-        els.correctionShowBtn.classList.toggle('hidden', !collapsed);
-    });
+        if (correctionCount > 0) {
+            if (els.correctionSidebar.classList.contains('collapsed')) {
+                els.correctionSidebarToggle.classList.remove('hidden');
+            } else {
+                els.correctionSidebarToggle.classList.add('hidden');
+            }
+        }
+    }
 
-    els.correctionShowBtn.addEventListener('click', function () {
-        els.correctionSidebar.classList.toggle('collapsed');
-        var collapsed = els.correctionSidebar.classList.contains('collapsed');
-        els.correctionShowBtn.classList.toggle('hidden', !collapsed);
-    });
+    els.correctionSidebarClose.addEventListener('click', toggleCorrectionSidebar);
+
+    els.correctionSidebarToggle.addEventListener('click', toggleCorrectionSidebar);
 
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden && sessionId && ws && ws.readyState === WebSocket.OPEN) {

@@ -4,25 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Chat Agent</title>
+    <link rel="stylesheet" href="/shared/base.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
-        <header>
-            <form action="/logout" method="post" class="logout-form" id="logoutForm">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-            <div class="token-bar-container">
-                <div class="token-bar-label">Token</div>
-                <div class="token-bar">
-                    <div class="token-bar-fill" id="tokenBar"></div>
-                </div>
-                <div class="token-bar-pct" id="tokenPct">0%</div>
-            </div>
-            <button id="correctionShowBtn" class="correction-show-btn hidden">
-                Corrections <span id="correctionBadge">0</span>
-            </button>
-        </header>
+        <header data-show-token="true"></header>
 
         <main>
             <div class="main-layout">
@@ -32,10 +19,12 @@
                     </div>
                     <div id="messages"></div>
                 </div>
+                <button id="correctionSidebarToggle" class="correction-sidebar-toggle-btn hidden">
+                    ⚠️ <span id="correctionBadge">0</span> ◂
+                </button>
                 <div id="correctionSidebar" class="correction-sidebar collapsed">
                     <div class="correction-sidebar-header">
-                        <span>Corrections</span>
-                        <button id="correctionSidebarToggle">&times;</button>
+                        <button id="correctionSidebarClose">▸ ⚠️ Correction <span id="correctionBadgeHeader">0</span></button>
                     </div>
                     <div id="correctionSidebarContent" class="correction-sidebar-content">
                         <div class="correction-sidebar-empty">No corrections yet.</div>
@@ -76,10 +65,33 @@
         </div>
     </div>
 
+    <div id="flashcardPanel" class="flashcard-panel collapsed">
+        <div class="flashcard-header">
+            <span class="flashcard-title">anki</span>
+            <button id="flashcardClose" class="flashcard-close">&times;</button>
+        </div>
+        <div id="flashcardStage1" class="flashcard-stage">
+            <input id="flashcardFront" type="text" placeholder="单词或表达..." autocomplete="off">
+            <button id="flashcardContinue" class="flashcard-btn primary">继续</button>
+        </div>
+        <div id="flashcardStage2" class="flashcard-stage hidden">
+            <textarea id="flashcardBack" placeholder="释义或校正文..." rows="2"></textarea>
+            <div id="flashcardTagArea">
+                <div id="flashcardTagChips"></div>
+                <input id="flashcardTagInput" type="text" placeholder="输入搜索标签后点击选择..." autocomplete="off">
+                <div id="flashcardTagSuggestions" class="tag-suggestions hidden"></div>
+            </div>
+            <button id="flashcardSave" class="flashcard-btn primary">保存</button>
+        </div>
+    </div>
+
+    <div id="flashcardToast" class="flashcard-toast hidden">已保存</div>
+
     <div id="debugPanel" class="debug-panel">
         <div class="debug-header">
             <button id="debugToggle">Log</button>
             <button id="debugClear">Clear</button>
+            <button id="flashcardToggle">anki</button>
         </div>
         <div id="debugLog" class="debug-log hidden"></div>
     </div>
@@ -110,6 +122,8 @@
         </div>
     </template>
 
+    <script src="/shared/nav.js"></script>
     <script src="app.js"></script>
+    <script src="flashcard.js"></script>
 </body>
 </html>

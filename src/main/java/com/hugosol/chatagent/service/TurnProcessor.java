@@ -159,6 +159,7 @@ public class TurnProcessor {
 
             @Override
             public void onCompleteResponse(ChatResponse response) {
+                try {
                 String agentText = fullText.toString();
                 int tokens = (response != null && response.tokenUsage() != null)
                         ? response.tokenUsage().totalTokenCount() : 0;
@@ -184,6 +185,10 @@ public class TurnProcessor {
                 sessionService.recordTokens(sessionId, AgentType.CONVERSATION, tokens);
 
                 callback.onConversationComplete(agentText, messageId, tokens);
+                } catch (Exception e) {
+                    log.error("Conversation complete callback failed for session {}", sessionId, e);
+                    callback.onError("Conversation error: " + e.getMessage());
+                }
             }
 
             @Override

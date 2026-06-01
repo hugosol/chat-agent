@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Cards - Chat Agent</title>
+    <link rel="stylesheet" href="/shared/base.css">
+    <link rel="stylesheet" href="/manage/manage.css">
+</head>
+<body>
+    <div id="app">
+        <header data-show-token="false"></header>
+
+        <div class="manage-layout">
+            <div class="manage-content" id="manageContent">
+                <div id="cardsTab" class="manage-tab-content">
+                    <div class="empty-state">暂无卡片，创建第一张卡片</div>
+                </div>
+                <div id="tagsTab" class="manage-tab-content hidden">
+                    <div class="empty-state">暂无标签，创建标签</div>
+                </div>
+            </div>
+
+            <nav class="manage-tabs">
+                <button class="manage-tab-btn active" data-tab="cards">Cards</button>
+                <button class="manage-tab-btn" data-tab="tags">Tags</button>
+            </nav>
+        </div>
+    </div>
+
+    <script src="/shared/nav.js"></script>
+    <script src="/manage/modal.js"></script>
+    <script src="/manage/tag.js"></script>
+    <script src="/manage/card.js"></script>
+    <script>
+        (function () {
+            'use strict';
+            var currentTab = 'cards';
+
+            function switchTab(tab) {
+                if (tab === currentTab) return;
+                if (currentTab === 'tags' && window.manageTags) {
+                    window.manageTags.destroy();
+                }
+                if (currentTab === 'cards' && window.manageCards) {
+                    window.manageCards.destroy();
+                }
+                document.getElementById(currentTab + 'Tab').classList.add('hidden');
+                document.getElementById(tab + 'Tab').classList.remove('hidden');
+                document.querySelectorAll('.manage-tab-btn').forEach(function (btn) {
+                    btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
+                });
+                currentTab = tab;
+                if (tab === 'tags' && window.manageTags) {
+                    window.manageTags.init();
+                }
+                if (tab === 'cards' && window.manageCards) {
+                    window.manageCards.init();
+                }
+            }
+
+            if (window.manageCards) {
+                window.manageCards.init();
+            }
+
+            document.querySelectorAll('.manage-tab-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    switchTab(this.getAttribute('data-tab'));
+                });
+            });
+        })();
+    </script>
+</body>
+</html>
