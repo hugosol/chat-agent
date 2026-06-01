@@ -19,7 +19,7 @@ Thumbs.db
 # Frontend
 node_modules/
 dist/
-src/main/resources/static/shared/header-bundle.*
+src/main/resources/static/shared/*-bundle.*
 
 # Environment
 .env
