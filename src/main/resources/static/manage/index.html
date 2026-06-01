@@ -9,7 +9,7 @@
 </head>
 <body>
     <div id="app">
-        <header data-show-token="false"></header>
+        <header></header>
 
         <div class="manage-layout">
             <div class="manage-content" id="manageContent">
@@ -28,7 +28,20 @@
         </div>
     </div>
 
-    <script src="/shared/nav.js"></script>
+    <link rel="stylesheet" href="/shared/nav-bundle.css">
+    <script src="/shared/react.production.min.js"></script>
+    <script src="/shared/react-dom.production.min.js"></script>
+    <script src="/shared/nav-bundle.js"></script>
+    <script>
+        function _mountNav() {
+            var root = document.querySelector('header');
+            if (root) {
+                ChatAgentNav.mount(root);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', _mountNav);
+        if (document.readyState !== 'loading') _mountNav();
+    </script>
     <script src="/manage/modal.js"></script>
     <script src="/manage/tag.js"></script>
     <script src="/manage/card.js"></script>

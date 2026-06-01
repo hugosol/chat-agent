@@ -58,42 +58,6 @@ header h1 {
     white-space: nowrap;
 }
 
-.token-bar-container {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-}
-
-.token-bar-label {
-    font-size: 0.7em;
-    color: #888;
-    white-space: nowrap;
-}
-
-.token-bar {
-    flex: 1;
-    height: 6px;
-    background: #0f3460;
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.token-bar-fill {
-    height: 100%;
-    width: 0%;
-    background: #27ae60;
-    transition: width 0.3s, background-color 0.3s;
-    border-radius: 3px;
-}
-
-.token-bar-pct {
-    font-size: 0.7em;
-    color: #888;
-    min-width: 35px;
-    text-align: right;
-}
-
 main {
     flex: 1;
     display: flex;

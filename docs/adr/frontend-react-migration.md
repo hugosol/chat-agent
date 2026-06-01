@@ -36,3 +36,32 @@ Chat Agent 的前端当前全部使用原生 HTML + Vanilla JS（无类型安全
 - **产物体积**：每个组件 bundle 约 4KB（不含 React），React 本地托管文件约 130KB（全站共享一次加载）。
 - **文档同步**：README.md、AGENTS.md、docs/architecture.md 需更新以反映新前端技术栈。
 - **E2E 测试**：CSS class 选择器不再可靠（CSS Modules 哈希化），使用 `data-testid` 属性替代。
+
+## Implementation Notes
+
+以下是在 Nav 组件迁移过程中踩过的坑，后续模块迁移时务必注意：
+
+### CSS 产物分离
+
+Vite Library Mode（包括 IIFE 格式）**总是**将 CSS 提取为独立文件，不会内联到 JS bundle 中。后果：
+
+- HTML 页面必须同时加载 JS bundle 和 CSS 文件：`<script src="xxx-bundle.js">` + `<link href="xxx-bundle.css">`
+- `vite.config.ts` 中用 `build.lib.cssFileName` 固定 CSS 文件名，避免基于 `package.json#name` 的随机命名
+- `emptyOutDir: false` 导致旧构建产物残留（如 `chat-agent-frontend.css`），需手动清理
+
+### `process.env.NODE_ENV` 条件 define
+
+`vite.config.ts` 中的 `define` 会对**所有模式**生效（含 Vitest）。如果把 `process.env.NODE_ENV` 替换为 `"production"`，Vitest 会加载 React 生产版（无 `act()`），导致 `@testing-library/react` 全部测试失败。
+
+**正确做法**：仅在非 test 环境替换。
+
+```ts
+define:
+  typeof process !== "undefined" && process.env?.NODE_ENV === "test"
+    ? {}
+    : { "process.env.NODE_ENV": JSON.stringify("production") },
+```
+
+### React 根元素在 flex 容器内
+
+当 mount 的目标元素本身是 flex 容器（如 `<header>` 有 `display: flex`），React 组件渲染的根 `<div>` 作为唯一 flex 子元素无法自动撑满宽度。需要给根元素设置 `flex: 1; min-width: 0`，内部子元素的 `flex` 和 `margin-left: auto` 才能正常生效。

@@ -15,8 +15,6 @@
     var correctionCount = 0;
 
     var els = {
-        tokenBar:        document.getElementById('tokenBar'),
-        tokenPct:        document.getElementById('tokenPct'),
         chatArea:        document.getElementById('chatArea'),
         messages:        document.getElementById('messages'),
         earlierMarker:   document.getElementById('earlierMarker'),
@@ -399,16 +397,10 @@
     }
 
     function updateTokenBar(usage) {
-        if (usage == null || !els.tokenBar || !els.tokenPct) return;
+        if (usage == null) return;
         var pct = Math.min(100, Math.round(usage * 100));
-        els.tokenBar.style.width = pct + '%';
-        els.tokenPct.textContent = pct + '%';
-        if (pct >= 80) {
-            els.tokenBar.style.backgroundColor = '#e74c3c';
-        } else if (pct >= 50) {
-            els.tokenBar.style.backgroundColor = '#f39c12';
-        } else {
-            els.tokenBar.style.backgroundColor = '#27ae60';
+        if (typeof window.updateTokenBar === 'function') {
+            window.updateTokenBar(pct);
         }
     }
 

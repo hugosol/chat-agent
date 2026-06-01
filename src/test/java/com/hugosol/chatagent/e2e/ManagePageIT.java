@@ -33,18 +33,18 @@ class ManagePageIT extends E2ETestBase {
         // === Step 1: nav sidebar on chat page ===
         takeScreenshot("step1a-chat-page");
 
-        page.waitForSelector("header .nav-menu-btn");
-        page.locator(".nav-menu-btn").click();
-        page.waitForSelector("#navSidebar.open");
+        page.waitForSelector("[data-testid='nav-menu-btn']");
+        page.locator("[data-testid='nav-menu-btn']").click();
+        page.waitForSelector("[data-testid='nav-sidebar'][aria-expanded='true']");
 
-        assertThat(page.locator(".nav-sidebar-links .nav-link").count()).isEqualTo(2);
-        assertThat(page.locator(".nav-link.active").textContent()).isEqualTo("💬 Chat");
+        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(2);
+        assertThat(page.locator("[data-testid='nav-link'][data-active='true']").textContent()).isEqualTo("💬 Chat");
 
         takeScreenshot("step1b-nav-open");
 
-        page.locator("#navSidebar .nav-sidebar-header button").click();
+        page.locator("[data-testid='nav-sidebar-close']").click();
         page.waitForFunction(
-                "() => !document.getElementById('navSidebar').classList.contains('open')");
+                "() => document.querySelector(\"[data-testid='nav-sidebar']\").getAttribute('aria-expanded') !== 'true'");
 
         page.navigate("http://localhost:" + serverPort + "/manage/index.html");
         page.waitForSelector(".manage-layout");
@@ -350,20 +350,20 @@ class ManagePageIT extends E2ETestBase {
         takeScreenshot("step13-tags-all-deleted");
 
         // === Step 14: nav sidebar on manage page ===
-        page.locator(".nav-menu-btn").click();
-        page.waitForSelector("#navSidebar.open");
+        page.locator("[data-testid='nav-menu-btn']").click();
+        page.waitForSelector("[data-testid='nav-sidebar'][aria-expanded='true']");
 
-        assertThat(page.locator(".nav-link.active").textContent()).isEqualTo("📋 Manage");
-        assertThat(page.locator(".nav-sidebar-links .nav-link").count()).isEqualTo(2);
+        assertThat(page.locator("[data-testid='nav-link'][data-active='true']").textContent()).isEqualTo("📋 Manage");
+        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(2);
 
         takeScreenshot("step14-nav-manage");
 
-        page.locator("#navSidebar .nav-sidebar-header button").click();
+        page.locator("[data-testid='nav-sidebar-close']").click();
         page.waitForFunction(
-                "() => !document.getElementById('navSidebar').classList.contains('open')");
+                "() => document.querySelector(\"[data-testid='nav-sidebar']\").getAttribute('aria-expanded') !== 'true'");
 
         page.navigate("http://localhost:" + serverPort + "/");
-        page.waitForSelector("header .nav-menu-btn");
+        page.waitForSelector("[data-testid='nav-menu-btn']");
 
         takeScreenshot("step14-back-to-chat");
     }
