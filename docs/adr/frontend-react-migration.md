@@ -65,3 +65,18 @@ define:
 ### React 根元素在 flex 容器内
 
 当 mount 的目标元素本身是 flex 容器（如 `<header>` 有 `display: flex`），React 组件渲染的根 `<div>` 作为唯一 flex 子元素无法自动撑满宽度。需要给根元素设置 `flex: 1; min-width: 0`，内部子元素的 `flex` 和 `margin-left: auto` 才能正常生效。
+
+### 多入口构建
+
+Vite Library Mode 的 IIFE 格式不支持 `build.lib.entry` 对象形式。多入口构建方案：每个入口一个独立 Vite 配置文件，`package.json` build 脚本串联执行：
+
+```json
+"build": "vite build && vite build --config vite.config.correction-sidebar.ts"
+```
+
+- **产物命名**：`{entry-name}-bundle.js` + `{entry-name}-bundle.css`
+- **全局命名空间**：所有入口共享 `window.ChatAgent`，通过 `ChatAgent || {}` 模式累加挂载方法
+
+### 纯组件 + 连接器模式
+
+CorrectionSidebar 迁移引入的组件架构模式：纯展示组件通过 props 接收数据、通过 callbacks 发出事件，entry wrapper 通过本地 `useState` 管理状态并暴露命令式 API（`addCorrection`/`clear`/`getCount`）。此模式为后续 `useReducer + context` 集中状态管理做前向兼容。详见 ADR `centralized-chat-state.md`。

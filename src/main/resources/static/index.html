@@ -6,6 +6,8 @@
     <title>Chat Agent</title>
     <link rel="stylesheet" href="/shared/base.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/shared/header-bundle.css">
+    <link rel="stylesheet" href="/shared/correction-sidebar-bundle.css">
 </head>
 <body>
     <div id="app">
@@ -19,17 +21,7 @@
                     </div>
                     <div id="messages"></div>
                 </div>
-                <button id="correctionSidebarToggle" class="correction-sidebar-toggle-btn hidden">
-                    ⚠️ <span id="correctionBadge">0</span> ◂
-                </button>
-                <div id="correctionSidebar" class="correction-sidebar collapsed">
-                    <div class="correction-sidebar-header">
-                        <button id="correctionSidebarClose">▸ ⚠️ Correction <span id="correctionBadgeHeader">0</span></button>
-                    </div>
-                    <div id="correctionSidebarContent" class="correction-sidebar-content">
-                        <div class="correction-sidebar-empty">No corrections yet.</div>
-                    </div>
-                </div>
+                <div id="correction-sidebar-root"></div>
             </div>
 
             <div id="statusBar" class="status-bar">
@@ -110,22 +102,10 @@
         </div>
     </template>
 
-    <template id="correctionSidebarItemTemplate">
-        <div class="correction-item">
-            <div class="correction-type"></div>
-            <div class="correction-detail">
-                <span class="correction-original"></span>
-                <span class="correction-arrow">&rarr;</span>
-                <span class="correction-corrected"></span>
-            </div>
-            <div class="correction-explanation"></div>
-        </div>
-    </template>
-
-    <link rel="stylesheet" href="/shared/header-bundle.css">
     <script src="/shared/react.production.min.js"></script>
     <script src="/shared/react-dom.production.min.js"></script>
     <script src="/shared/header-bundle.js"></script>
+    <script src="/shared/correction-sidebar-bundle.js"></script>
     <script>
         var _headerRoot;
         window.updateTokenBar = function (pct) {
@@ -141,6 +121,17 @@
         }
         document.addEventListener('DOMContentLoaded', _mountHeader);
         if (document.readyState !== 'loading') _mountHeader();
+
+        var _sidebarApi;
+        function _mountSidebar() {
+            var root = document.getElementById('correction-sidebar-root');
+            if (root) {
+                _sidebarApi = ChatAgent.mountCorrectionSidebar(root);
+                window.__sidebarApi = _sidebarApi;
+            }
+        }
+        document.addEventListener('DOMContentLoaded', _mountSidebar);
+        if (document.readyState !== 'loading') _mountSidebar();
     </script>
     <script src="app.js"></script>
     <script src="flashcard.js"></script>

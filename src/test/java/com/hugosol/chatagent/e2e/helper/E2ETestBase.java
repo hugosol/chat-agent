@@ -184,7 +184,7 @@ public abstract class E2ETestBase {
     }
 
     protected int countCorrectionSidebarItems() {
-        return page.locator(".correction-item").count();
+        return page.locator("[data-testid=\"correction-item\"]").count();
     }
 
     protected boolean isReportModalVisible() {

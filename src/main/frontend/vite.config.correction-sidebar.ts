@@ -4,18 +4,15 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
 export default defineConfig({
-  define:
-    typeof process !== "undefined" && process.env?.NODE_ENV === "test"
-      ? {}
-      : { "process.env.NODE_ENV": JSON.stringify("production") },
+  define: { "process.env.NODE_ENV": JSON.stringify("production") },
   plugins: [react()],
   build: {
     lib: {
-      entry: resolve(__dirname, "src/entry/header-entry.tsx"),
+      entry: resolve(__dirname, "src/entry/correction-sidebar-entry.tsx"),
       name: "ChatAgent",
       formats: ["iife"],
-      fileName: () => "header-bundle.js",
-      cssFileName: "header-bundle",
+      fileName: () => "correction-sidebar-bundle.js",
+      cssFileName: "correction-sidebar-bundle",
     },
     outDir: resolve(__dirname, "../resources/static/shared"),
     emptyOutDir: false,
@@ -32,15 +29,6 @@ export default defineConfig({
   css: {
     modules: {
       localsConvention: "camelCaseOnly",
-    },
-  },
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test-setup.ts"],
-    css: {
-      modules: {
-        classNameStrategy: "non-scoped",
-      },
     },
   },
 });

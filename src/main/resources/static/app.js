@@ -12,7 +12,6 @@
     var messageCount = 0;
     var turnCounter = 0;
     var streamBubbles = {};
-    var correctionCount = 0;
 
     var els = {
         chatArea:        document.getElementById('chatArea'),
@@ -34,12 +33,6 @@
         debugLog:        document.getElementById('debugLog'),
         debugToggle:     document.getElementById('debugToggle'),
         debugClear:      document.getElementById('debugClear'),
-        correctionSidebar:      document.getElementById('correctionSidebar'),
-        correctionSidebarContent: document.getElementById('correctionSidebarContent'),
-        correctionSidebarToggle:  document.getElementById('correctionSidebarToggle'),
-        correctionSidebarClose:   document.getElementById('correctionSidebarClose'),
-        correctionBadge:     document.getElementById('correctionBadge'),
-        correctionBadgeHeader: document.getElementById('correctionBadgeHeader'),
     };
 
     function debugLog(msg) {
@@ -100,9 +93,8 @@
                 turnCounter = 0;
                 streamBubbles = {};
                 els.messages.innerHTML = '';
-                els.correctionSidebarContent.innerHTML = '<div class="correction-sidebar-empty">No corrections yet.</div>';
-                correctionCount = 0;
-                updateCorrectionBadge();
+                var sidebar = window.__sidebarApi;
+                if (sidebar) sidebar.clear();
                 els.earlierMarker.classList.add('hidden');
                 els.reportModal.classList.add('hidden');
                 showTextInput();
@@ -201,8 +193,11 @@
         userBubble.insertAdjacentElement('afterend', corrBubble);
         messageCount++;
 
-        for (var i = 0; i < corrections.length; i++) {
-            addCorrectionSidebarItem(corrections[i]);
+        var sidebar = window.__sidebarApi;
+        if (sidebar) {
+            for (var i = 0; i < corrections.length; i++) {
+                sidebar.addCorrection(corrections[i]);
+            }
         }
 
         handleCollapse();
@@ -220,8 +215,8 @@
         messageCount = 0;
         streamBubbles = {};
         els.messages.innerHTML = '';
-        els.correctionSidebarContent.innerHTML = '';
-        correctionCount = 0;
+        var sidebar = window.__sidebarApi;
+        if (sidebar) sidebar.clear();
         els.earlierMarker.classList.add('hidden');
         els.reportModal.classList.add('hidden');
 
@@ -244,7 +239,7 @@
             var byMsgId = {};
             for (var j = 0; j < msg.corrections.length; j++) {
                 var c = msg.corrections[j];
-                addCorrectionSidebarItem(c);
+                if (sidebar) sidebar.addCorrection(c);
                 var mid = c.messageId || 0;
                 if (!byMsgId[mid]) byMsgId[mid] = [];
                 byMsgId[mid].push(c);
@@ -263,7 +258,6 @@
                 }
             }
         }
-        updateCorrectionBadge();
 
         updateTokenBar(msg.tokenUsage);
         showTextInput();
@@ -314,35 +308,6 @@
             speakText(ttsText);
         });
         bubble.appendChild(btn);
-    }
-
-    function addCorrectionSidebarItem(c) {
-        var empty = els.correctionSidebarContent.querySelector('.correction-sidebar-empty');
-        if (empty) empty.remove();
-
-        var item = document.createElement('div');
-        item.className = 'correction-item';
-        item.innerHTML =
-            '<div class="correction-type">' + escapeHtml(c.type) + '</div>' +
-            '<div class="correction-detail">' +
-                '<span class="correction-original">' + escapeHtml(c.original) + '</span>' +
-                '<span class="correction-arrow">\u2192</span>' +
-                '<span class="correction-corrected">' + escapeHtml(c.corrected) + '</span>' +
-            '</div>' +
-            '<div class="correction-explanation">' + escapeHtml(c.explanation || '') + '</div>';
-        els.correctionSidebarContent.appendChild(item);
-        correctionCount++;
-        updateCorrectionBadge();
-    }
-
-    function updateCorrectionBadge() {
-        els.correctionBadge.textContent = correctionCount;
-        els.correctionBadgeHeader.textContent = correctionCount;
-        if (correctionCount > 0) {
-            els.correctionSidebarToggle.classList.remove('hidden');
-        } else {
-            els.correctionSidebarToggle.classList.add('hidden');
-        }
     }
 
     function showTextInput() {
@@ -495,9 +460,8 @@
     els.newSessionBtn.addEventListener('click', function () {
         els.reportModal.classList.add('hidden');
         els.messages.innerHTML = '';
-        els.correctionSidebarContent.innerHTML = '<div class="correction-sidebar-empty">No corrections yet.</div>';
-        correctionCount = 0;
-        updateCorrectionBadge();
+        var sidebar = window.__sidebarApi;
+        if (sidebar) sidebar.clear();
         els.earlierMarker.classList.add('hidden');
         messageCount = 0;
         streamBubbles = {};
@@ -524,21 +488,6 @@
     els.debugClear.addEventListener('click', function () {
         els.debugLog.innerHTML = '';
     });
-
-    function toggleCorrectionSidebar() {
-        els.correctionSidebar.classList.toggle('collapsed');
-        if (correctionCount > 0) {
-            if (els.correctionSidebar.classList.contains('collapsed')) {
-                els.correctionSidebarToggle.classList.remove('hidden');
-            } else {
-                els.correctionSidebarToggle.classList.add('hidden');
-            }
-        }
-    }
-
-    els.correctionSidebarClose.addEventListener('click', toggleCorrectionSidebar);
-
-    els.correctionSidebarToggle.addEventListener('click', toggleCorrectionSidebar);
 
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden && sessionId && ws && ws.readyState === WebSocket.OPEN) {
