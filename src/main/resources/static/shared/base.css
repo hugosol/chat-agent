@@ -13,14 +13,6 @@ body {
     padding-top: env(safe-area-inset-top);
 }
 
-#app {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - env(safe-area-inset-top));
-    max-width: 1000px;
-    margin: 0 auto;
-}
-
 .hidden {
     display: none !important;
 }
