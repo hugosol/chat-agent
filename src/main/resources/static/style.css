@@ -24,7 +24,7 @@ body {
 header {
     padding: 5px 5px;
     background: #16213e;
-    border-top: 20px solid #16213e;
+    border-top: 5px solid #16213e;
     border-bottom: 1px solid #0f3460;
     display: flex;
     align-items: center;
@@ -176,7 +176,7 @@ main {
 }
 
 footer {
-    padding: 10px 16px 32px;
+    padding: 10px 16px 45px;
     background: #16213e;
     border-top: 1px solid #0f3460;
     flex-shrink: 0;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
 import { ChatContext } from "../../state/ChatContext";
 import type { ChatState } from "../../state/chatState";
@@ -32,6 +32,11 @@ function Wrapper({
 
 import { Footer } from "../../components/chat/Footer";
 
+const MODES_FIXTURE = [
+  { name: "WORKPLACE_STANDUP", displayName: "Standup Meeting" },
+  { name: "DAILY_TALK", displayName: "Daily Talk" },
+];
+
 describe("Footer", () => {
   let footer: HTMLElement;
 
@@ -41,6 +46,9 @@ describe("Footer", () => {
       footer = document.createElement("footer");
       document.body.appendChild(footer);
     }
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(MODES_FIXTURE),
+    });
   });
 
   it("disables Start and enables End when session is active", () => {
@@ -52,12 +60,14 @@ describe("Footer", () => {
     expect(endBtn.disabled).toBe(false);
   });
 
-  it("enables Start and disables End when session is idle", () => {
+  it("enables Start and disables End when session is idle and modes loaded", async () => {
     const ctx = createCtx({ sessionStatus: "idle" });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
-    const startBtn = screen.getByTestId("start-btn") as HTMLButtonElement;
+    await waitFor(() => {
+      const startBtn = screen.getByTestId("start-btn") as HTMLButtonElement;
+      expect(startBtn.disabled).toBe(false);
+    });
     const endBtn = screen.getByTestId("end-btn") as HTMLButtonElement;
-    expect(startBtn.disabled).toBe(false);
     expect(endBtn.disabled).toBe(true);
   });
 
@@ -68,16 +78,21 @@ describe("Footer", () => {
     expect(modeSelect.disabled).toBe(true);
   });
 
-  it("enables Mode Select when session is idle", () => {
+  it("enables Mode Select when session is idle and modes loaded", async () => {
     const ctx = createCtx({ sessionStatus: "idle" });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
-    const modeSelect = screen.getByTestId("mode-select") as HTMLSelectElement;
-    expect(modeSelect.disabled).toBe(false);
+    await waitFor(() => {
+      const modeSelect = screen.getByTestId("mode-select") as HTMLSelectElement;
+      expect(modeSelect.disabled).toBe(false);
+    });
   });
 
-  it("sends START_SESSION with selected mode on Start click", () => {
+  it("sends START_SESSION with selected mode on Start click", async () => {
     const ctx = createCtx({ sessionStatus: "idle" });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
+    await waitFor(() => {
+      expect(screen.getByText("Daily Talk")).toBeInTheDocument();
+    });
     const modeSelect = screen.getByTestId("mode-select") as HTMLSelectElement;
     fireEvent.change(modeSelect, { target: { value: "DAILY_TALK" } });
     fireEvent.click(screen.getByTestId("start-btn"));
@@ -92,5 +107,15 @@ describe("Footer", () => {
     render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
     fireEvent.click(screen.getByTestId("end-btn"));
     expect(ctx.send).toHaveBeenCalledWith({ type: "END_SESSION" });
+  });
+
+  it("keeps Start and select disabled when API fails", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("fetch unavailable"));
+    const ctx = createCtx({ sessionStatus: "idle" });
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
+    const startBtn = screen.getByTestId("start-btn") as HTMLButtonElement;
+    const modeSelect = screen.getByTestId("mode-select") as HTMLSelectElement;
+    expect(startBtn.disabled).toBe(true);
+    expect(modeSelect.disabled).toBe(true);
   });
 });
