@@ -112,3 +112,29 @@ Phase 3 完成后，前端新增以下变更：
 | MessageList | ChatProvider | `messages`, `corrections`, `streamInProgress` |
 | ChatInput | ChatProvider | `streamInProgress`, `sessionStatus`, `send` |
 | Footer | ChatProvider | `sessionStatus`, `send` |
+
+### StatusBar — 待迁移模块
+
+当前 `#statusIndicator` 仍由 `app.js` 的 `setStatus()` 管理。迁移后：
+
+- **新建 React `StatusBar` 组件**：Portal 渲染到 `#statusBar`，从 `ChatContext` 读取两个字段。
+- **`ChatState` 扩展**：新增 `statusMessage: string`（显示文字）和 `statusType: string`（CSS class）两个状态字段。
+
+状态生命周期（每次 Practice session）：
+
+```
+页面加载        → ("Disconnected", "disconnected")
+ws.onopen       → ("Connected", "connected")
+ChatInput 就绪   → ("Type your message", "connected")
+用户发送消息     → ("Processing...", "processing")
+服务端 STATE_UPDATE → (msg.state, msg.state.toLowerCase())
+回复结束        → ("Type your message", "connected")
+ws.onclose      → ("Disconnected", "disconnected")
+TOKEN_WARNING   → ("Warning: ...", "warning")
+ERROR           → ("Error: ...", "error")
+```
+
+迁移完成后：
+- `app.js` 移除 `setStatus()` 函数
+- `VANILLA_TYPES` 从 5 种缩减为 2 种（`SESSION_REPORT`、`WS_CLOSED`）
+- Footer Start 按钮的 `disabled` 条件增加 `connectionStatus !== "connected"` 的 gating，替代 v1.3.0 的 `connect()+setTimeout` 自动重连逻辑
