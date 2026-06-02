@@ -100,22 +100,8 @@ function getWsUrl(): string {
 
 const ChatContextObj = createContext<ChatContextValue | null>(null);
 
-function getInitialSessionStatus(): "idle" | "active" {
-  if (
-    typeof localStorage !== "undefined" &&
-    localStorage.getItem("sessionId")
-  ) {
-    return "active";
-  }
-  return "idle";
-}
-
 function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
-  const initState: ChatState = {
-    ...initialState,
-    sessionStatus: getInitialSessionStatus(),
-  };
-  const [state, dispatch] = useReducer(chatReducer, initState);
+  const [state, dispatch] = useReducer(chatReducer, initialState);
   const wsRef = useRef<WebSocket | null>(null);
 
   const send = useCallback((msg: unknown): void => {
@@ -153,6 +139,11 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
         if (msg.type === "SESSION_STARTED" && msg.sessionId) {
           if (typeof localStorage !== "undefined") {
             localStorage.setItem("sessionId", msg.sessionId as string);
+          }
+        }
+        if (msg.type === "SESSION_REPORT") {
+          if (typeof localStorage !== "undefined") {
+            localStorage.removeItem("sessionId");
           }
         }
         if (msg.type === "TOKEN_WARNING") {
