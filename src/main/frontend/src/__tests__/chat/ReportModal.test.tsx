@@ -31,7 +31,7 @@ function Wrapper({
   return React.createElement(ChatContext.Provider, { value: ctx }, children);
 }
 
-import { ReportModal } from "../../components/chat/ReportModal";
+import { ReportModal } from "../../components/ReportModal/ReportModal";
 
 describe("ReportModal", () => {
   it("does not render when report is null", () => {

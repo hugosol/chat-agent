@@ -1,5 +1,6 @@
 .navRoot {
   display: flex;
+  border-top: 30px solid #1a1a2e;
   align-items: center;
   gap: 16px;
   min-width: 0;
