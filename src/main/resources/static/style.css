@@ -24,7 +24,7 @@ body {
 header {
     padding: 5px 5px;
     background: #16213e;
-    border-top: 5px solid #16213e;
+    border-top: 30px solid #16213e;
     border-bottom: 1px solid #0f3460;
     display: flex;
     align-items: center;
@@ -176,7 +176,7 @@ main {
 }
 
 footer {
-    padding: 10px 16px 45px;
+    padding: 10px 16px 100px;
     background: #16213e;
     border-top: 1px solid #0f3460;
     flex-shrink: 0;
@@ -211,6 +211,12 @@ footer {
 .btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+#startBtn, #endBtn {
+    padding: 12px 24px;
+    font-size: 1em;
+    min-height: 44px;
 }
 
 .btn-primary {
