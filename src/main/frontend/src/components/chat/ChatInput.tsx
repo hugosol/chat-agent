@@ -1,20 +1,12 @@
 import React, { useRef } from "react";
-import { createPortal } from "react-dom";
 import { useChatContext } from "../../state/ChatContext";
+import { isSessionActive } from "../../shared/utils";
 
 export function ChatInput(): React.ReactElement {
   const { state, dispatch, send } = useChatContext();
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const targetEl = document.getElementById("textInputBar");
-  if (!targetEl) return React.createElement("div");
 
-  if (state.sessionStatus === "active") {
-    targetEl.classList.remove("hidden");
-  } else {
-    targetEl.classList.add("hidden");
-  }
-
-  const disabled = state.sessionStatus !== "active" || state.streamInProgress;
+  const disabled = !isSessionActive(state.appStatus) || state.streamInProgress;
 
   function handleSend(): void {
     const input = inputRef.current;
@@ -31,32 +23,28 @@ export function ChatInput(): React.ReactElement {
     if (e.key === "Enter") handleSend();
   }
 
-  return createPortal(
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement("input", {
+      ref: inputRef,
+      "data-testid": "text-input",
+      type: "text",
+      disabled,
+      placeholder: state.streamInProgress ? "Agent is typing..." : "Type your message...",
+      autoComplete: "off",
+      onKeyDown,
+    }),
     React.createElement(
-      React.Fragment,
-      null,
-      React.createElement("input", {
-        ref: inputRef,
-        "data-testid": "chat-text-input",
-        id: "textInput",
-        type: "text",
+      "button",
+      {
+        key: "send",
+        "data-testid": "send-btn",
+        className: "btn btn-send",
         disabled,
-        placeholder: state.streamInProgress ? "Agent is typing..." : "Type your message...",
-        autoComplete: "off",
-        onKeyDown,
-      }),
-      React.createElement(
-        "button",
-        {
-          key: "send",
-          id: "sendTextBtn",
-          className: "btn btn-send",
-          disabled,
-          onClick: handleSend,
-        },
-        "Send"
-      )
-    ),
-    targetEl
+        onClick: handleSend,
+      },
+      "Send"
+    )
   );
 }

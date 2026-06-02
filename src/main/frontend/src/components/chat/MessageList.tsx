@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { createPortal } from "react-dom";
 import { useChatContext } from "../../state/ChatContext";
 import { speakText } from "../../shared/tts";
 import type { Message } from "../../state/chatState";
@@ -103,8 +102,6 @@ function groupCorrections(corrections: CorrectionData[]): Map<number, Correction
 export function MessageList(): React.ReactElement {
   const { state } = useChatContext();
   const [showAll, setShowAll] = useState(false);
-  const targetEl = document.getElementById("messages");
-  if (!targetEl) return React.createElement("div");
 
   const correctionGroups = groupCorrections(state.corrections);
   const items: React.ReactNode[] = [];
@@ -140,8 +137,5 @@ export function MessageList(): React.ReactElement {
     }
   }
 
-  return createPortal(
-    React.createElement("div", null, ...items),
-    targetEl
-  );
+  return React.createElement("div", null, ...items);
 }

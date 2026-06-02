@@ -4,13 +4,23 @@ import type { ChatState } from "../../state/chatState";
 import { initialState } from "../../state/chatState";
 
 describe("initialState", () => {
-  it("has sessionStatus idle by default", () => {
-    expect(initialState.sessionStatus).toBe("idle");
+  it("has appStatus Connecting by default", () => {
+    expect(initialState.appStatus).toBe("Connecting");
+  });
+
+  it("has statusPayload null by default", () => {
+    expect(initialState.statusPayload).toBeNull();
+  });
+
+  it("has report null by default", () => {
+    expect(initialState.report).toBeNull();
   });
 });
 
 function seededState(): ChatState {
   return {
+    appStatus: "UserTurn",
+    statusPayload: null,
     messages: [
       { id: 1, role: "user", text: "Hello", streaming: false },
       { id: 2, role: "agent", text: "Hi there!", streaming: false },
@@ -25,14 +35,13 @@ function seededState(): ChatState {
       },
     ],
     tokenUsage: 5000,
-    connectionStatus: "connected",
     streamInProgress: false,
-    sessionStatus: "active",
+    report: null,
   };
 }
 
 describe("chatReducer", () => {
-  it("SESSION_STARTED resets state to initial with connected status and active session", () => {
+  it("SESSION_STARTED resets state and sets appStatus to UserTurn", () => {
     const state = chatReducer(seededState(), {
       type: "SESSION_STARTED",
       sessionId: "abc-123",
@@ -41,8 +50,7 @@ describe("chatReducer", () => {
 
     expect(state).toEqual({
       ...initialState,
-      connectionStatus: "connected",
-      sessionStatus: "active",
+      appStatus: "UserTurn",
     });
   });
 
@@ -173,8 +181,7 @@ describe("chatReducer", () => {
     expect(state.corrections).toHaveLength(1);
     expect(state.corrections[0].type).toBe("WORD_CHOICE");
     expect(state.tokenUsage).toBe(250);
-    expect(state.connectionStatus).toBe("connected");
-    expect(state.sessionStatus).toBe("active");
+    expect(state.appStatus).toBe("UserTurn");
   });
 
   it("WS_CLOSED resets all state with disconnected and idle status", () => {
@@ -182,8 +189,7 @@ describe("chatReducer", () => {
       type: "WS_CLOSED",
     });
 
-    expect(state.connectionStatus).toBe("disconnected");
-    expect(state.sessionStatus).toBe("idle");
+    expect(state.appStatus).toBe("Disconnected");
     expect(state.messages).toEqual([]);
     expect(state.corrections).toEqual([]);
   });
@@ -202,7 +208,7 @@ describe("chatReducer", () => {
       text: "Hello Coach",
       streaming: false,
     });
-    expect(state.sessionStatus).toBe("idle");
+    expect(state.appStatus).toBe("Connecting");
   });
 
   it("USER_MESSAGE_SENT appends after existing messages with correct next id", () => {
@@ -231,7 +237,34 @@ describe("chatReducer", () => {
     });
   });
 
-  it("SESSION_REPORT sets idle sessionStatus and stops streaming", () => {
+  it("SET_APP_STATUS updates appStatus and statusPayload", () => {
+    const state = chatReducer(initialState, {
+      type: "SET_APP_STATUS",
+      appStatus: "Warning",
+      statusPayload: "Token usage at 85%",
+    });
+
+    expect(state.appStatus).toBe("Warning");
+    expect(state.statusPayload).toBe("Token usage at 85%");
+  });
+
+  it("SET_APP_STATUS clears statusPayload when not provided", () => {
+    const withPayload = chatReducer(initialState, {
+      type: "SET_APP_STATUS",
+      appStatus: "Warning",
+      statusPayload: "old warning",
+    });
+
+    const state = chatReducer(withPayload, {
+      type: "SET_APP_STATUS",
+      appStatus: "UserTurn",
+    });
+
+    expect(state.appStatus).toBe("UserTurn");
+    expect(state.statusPayload).toBeNull();
+  });
+
+  it("SESSION_REPORT resets to initial state with Connected appStatus and stores report", () => {
     const streaming = chatReducer(initialState, {
       type: "AGENT_STREAM_DELTA",
       messageId: 1,
@@ -243,7 +276,22 @@ describe("chatReducer", () => {
       report: { score: 85 },
     });
 
-    expect(state.sessionStatus).toBe("idle");
+    expect(state.appStatus).toBe("Connected");
     expect(state.streamInProgress).toBe(false);
+    expect(state.report).toEqual({ score: 85 });
+  });
+
+  it("DISMISS_REPORT sets report to null", () => {
+    const withReport = chatReducer(initialState, {
+      type: "SESSION_REPORT",
+      report: { score: 85 },
+    });
+
+    const state = chatReducer(withReport, {
+      type: "DISMISS_REPORT",
+    });
+
+    expect(state.report).toBeNull();
+    expect(state.appStatus).toBe("Connected");
   });
 });

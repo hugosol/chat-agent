@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { escapeHtml, formatDate, truncate, englishOnly } from "../../shared/utils";
+import { escapeHtml, formatDate, truncate, englishOnly, isSessionActive, deriveStatus } from "../../shared/utils";
 
 describe("escapeHtml", () => {
   it("escapes < > and & to HTML entities via DOM textContent", () => {
@@ -64,5 +64,79 @@ describe("englishOnly", () => {
   it("returns empty string for empty input", () => {
     expect(englishOnly("")).toBe("");
     expect(englishOnly(null as unknown as string)).toBe("");
+  });
+});
+
+describe("isSessionActive", () => {
+  it("returns true for UserTurn", () => {
+    expect(isSessionActive("UserTurn")).toBe(true);
+  });
+
+  it("returns true for Processing", () => {
+    expect(isSessionActive("Processing")).toBe(true);
+  });
+
+  it("returns true for Warning", () => {
+    expect(isSessionActive("Warning")).toBe(true);
+  });
+
+  it("returns true for Error", () => {
+    expect(isSessionActive("Error")).toBe(true);
+  });
+
+  it("returns false for Connecting", () => {
+    expect(isSessionActive("Connecting")).toBe(false);
+  });
+
+  it("returns false for Connected", () => {
+    expect(isSessionActive("Connected")).toBe(false);
+  });
+
+  it("returns false for Disconnected", () => {
+    expect(isSessionActive("Disconnected")).toBe(false);
+  });
+});
+
+describe("deriveStatus", () => {
+  it('returns Connecting message', () => {
+    const result = deriveStatus("Connecting", null);
+    expect(result.type).toBe("connecting");
+    expect(result.message).toContain("Connecting");
+  });
+
+  it('returns Connected message', () => {
+    const result = deriveStatus("Connected", null);
+    expect(result.type).toBe("connected");
+    expect(result.message).toContain("Connected");
+  });
+
+  it('returns UserTurn message', () => {
+    const result = deriveStatus("UserTurn", null);
+    expect(result.type).toBe("userturn");
+    expect(result.message).toContain("Type");
+  });
+
+  it('returns Processing message', () => {
+    const result = deriveStatus("Processing", null);
+    expect(result.type).toBe("processing");
+    expect(result.message).toContain("Processing");
+  });
+
+  it('returns Warning with custom payload', () => {
+    const result = deriveStatus("Warning", "Token usage at 80%");
+    expect(result.type).toBe("warning");
+    expect(result.message).toContain("Token usage at 80%");
+  });
+
+  it('returns Error with custom payload', () => {
+    const result = deriveStatus("Error", "Connection failed");
+    expect(result.type).toBe("error");
+    expect(result.message).toContain("Connection failed");
+  });
+
+  it('returns Disconnected message', () => {
+    const result = deriveStatus("Disconnected", null);
+    expect(result.type).toBe("disconnected");
+    expect(result.message).toContain("Disconnected");
   });
 });

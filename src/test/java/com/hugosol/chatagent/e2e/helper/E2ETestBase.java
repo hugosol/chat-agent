@@ -136,29 +136,30 @@ public abstract class E2ETestBase {
     }
 
     protected void startSession(String mode) {
-        page.locator("#modeSelect").selectOption(mode);
-        page.locator("#startBtn").click();
+        page.locator("[data-testid=\"mode-select\"]").selectOption(mode);
+        page.locator("[data-testid=\"start-btn\"]").click();
         page.waitForFunction(
-                "() => !document.getElementById('endBtn').disabled");
+                "() => document.querySelector('[data-testid=\"end-btn\"]') && !document.querySelector('[data-testid=\"end-btn\"]').disabled");
     }
 
     protected void sendMessage(String text) {
         turnNumber++;
-        page.locator("#textInput").fill(text);
-        page.locator("#sendTextBtn").click();
+        page.locator("[data-testid=\"text-input\"]").fill(text);
+        page.locator("[data-testid=\"send-btn\"]").click();
     }
 
     protected void waitForAgentResponse() {
-        page.waitForFunction("() => !document.getElementById('textInput').disabled");
+        page.waitForFunction(
+                "() => document.querySelector('[data-testid=\"text-input\"]') && !document.querySelector('[data-testid=\"text-input\"]').disabled");
         page.waitForFunction(
                 "expected => document.querySelectorAll('[data-testid=\"correction-bubble\"]').length >= expected",
                 turnNumber);
     }
 
     protected void endSession() {
-        page.locator("#endBtn").click();
+        page.locator("[data-testid=\"end-btn\"]").click();
         page.waitForFunction(
-                "() => !document.getElementById('reportModal').classList.contains('hidden')");
+                "() => document.querySelector('[data-testid=\"report-modal\"]') && document.querySelector('[data-testid=\"report-modal\"]').getAttribute('aria-hidden') !== 'true'");
     }
 
     protected void reloadPage() {
@@ -189,11 +190,11 @@ public abstract class E2ETestBase {
     }
 
     protected boolean isReportModalVisible() {
-        return page.locator("#reportModal").isVisible();
+        return page.locator("[data-testid=\"report-modal\"]").isVisible();
     }
 
     protected String getReportModalText() {
-        return page.locator("#reportContent").innerText();
+        return page.locator("[data-testid=\"report-content\"]").innerText();
     }
 
     private static void housekeepScreenshots() {

@@ -1,0 +1,47 @@
+.statusBar {
+  padding: 6px 12px;
+  font-size: 13px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  background: var(--status-bg, #f5f5f5);
+  color: var(--text-color, #333);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.indicator {
+  display: inline-block;
+}
+
+.connecting {
+  color: #999;
+}
+
+.connected {
+  color: #4caf50;
+}
+
+.userturn {
+  color: #2196f3;
+}
+
+.processing {
+  color: #ff9800;
+}
+
+.warning {
+  color: #e91e63;
+  font-weight: 500;
+}
+
+.error {
+  color: #f44336;
+  font-weight: 500;
+}
+
+.disconnected {
+  color: #999;
+}

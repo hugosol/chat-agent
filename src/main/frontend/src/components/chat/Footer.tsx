@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useChatContext } from "../../state/ChatContext";
+import { isSessionActive } from "../../shared/utils";
 
 type ModeOption = { name: string; displayName: string };
 
@@ -8,8 +8,6 @@ export function Footer(): React.ReactElement {
   const { state, send } = useChatContext();
   const [mode, setMode] = useState("");
   const [modes, setModes] = useState<ModeOption[]>([]);
-  const targetEl = document.querySelector("footer");
-  if (!targetEl) return React.createElement("div");
 
   useEffect(() => {
     fetch("/api/modes")
@@ -27,50 +25,44 @@ export function Footer(): React.ReactElement {
       });
   }, []);
 
-  const isActive = state.sessionStatus === "active";
+  const isActive = isSessionActive(state.appStatus);
   const noModes = modes.length === 0;
 
-  return createPortal(
+  return React.createElement(
+    "div",
+    { className: "controls" },
     React.createElement(
-      "div",
-      { className: "controls" },
-      React.createElement(
-        "select",
-        {
-          "data-testid": "mode-select",
-          id: "modeSelect",
-          value: mode,
-          disabled: isActive || noModes,
-          onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
-            setMode(e.target.value),
-        },
-        ...modes.map((m) =>
-          React.createElement("option", { key: m.name, value: m.name }, m.displayName)
-        )
-      ),
-      React.createElement(
-        "button",
-        {
-          "data-testid": "start-btn",
-          id: "startBtn",
-          className: "btn btn-primary",
-          disabled: isActive || noModes,
-          onClick: () => send({ type: "START_SESSION", mode }),
-        },
-        "Start"
-      ),
-      React.createElement(
-        "button",
-        {
-          "data-testid": "end-btn",
-          id: "endBtn",
-          className: "btn btn-danger",
-          disabled: !isActive,
-          onClick: () => send({ type: "END_SESSION" }),
-        },
-        "End"
+      "select",
+      {
+        "data-testid": "mode-select",
+        value: mode,
+        disabled: isActive || noModes,
+        onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
+          setMode(e.target.value),
+      },
+      ...modes.map((m) =>
+        React.createElement("option", { key: m.name, value: m.name }, m.displayName)
       )
     ),
-    targetEl
+    React.createElement(
+      "button",
+      {
+        "data-testid": "start-btn",
+        className: "btn btn-primary",
+        disabled: isActive || noModes,
+        onClick: () => send({ type: "START_SESSION", mode }),
+      },
+      "Start"
+    ),
+    React.createElement(
+      "button",
+      {
+        "data-testid": "end-btn",
+        className: "btn btn-danger",
+        disabled: !isActive,
+        onClick: () => send({ type: "END_SESSION" }),
+      },
+      "End"
+    )
   );
 }

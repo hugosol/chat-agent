@@ -53,9 +53,9 @@ class ChatAgentMemoryIT extends E2ETestBase {
         assertEquals(1, profileV1.get().getVersion());
 
         // --- Session 2: close report modal and start new session ---
-        page.locator("#closeReportBtn").click();
+        page.locator("[data-testid=\"report-close-btn\"]").click();
         page.waitForFunction(
-                "() => !document.getElementById('reportModal') || document.getElementById('reportModal').classList.contains('hidden')");
+                "() => { const el = document.querySelector('[data-testid=\"report-modal\"]'); return !el || el.getAttribute('aria-hidden') === 'true'; }");
         startSession(AgentMode.WORKPLACE_STANDUP.name());
 
         String sid2 = sessionId();
@@ -63,7 +63,8 @@ class ChatAgentMemoryIT extends E2ETestBase {
         assertNotEquals(sid1, sid2);
 
         sendMessage("I'm back. Can we talk about travel vocabulary?");
-        page.waitForFunction("() => !document.getElementById('textInput').disabled");
+        page.waitForFunction(
+                "() => document.querySelector('[data-testid=\"text-input\"]') && !document.querySelector('[data-testid=\"text-input\"]').disabled");
         takeScreenshot("memory-s2-round1");
 
         assertEquals(1, countUserMessages());

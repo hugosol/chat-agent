@@ -5,7 +5,7 @@ import { CorrectionSidebar } from "../../components/CorrectionSidebar/Correction
 describe("CorrectionSidebar", () => {
   it("renders placeholder text when corrections list is empty", () => {
     const { getByTestId } = render(
-      <CorrectionSidebar corrections={[]} collapsed={true} onToggle={() => {}} />
+      <CorrectionSidebar corrections={[]} isOpen={false} onToggle={() => {}} />
     );
     expect(getByTestId("correction-sidebar-empty").textContent).toBe("No corrections yet.");
   });
@@ -15,7 +15,7 @@ describe("CorrectionSidebar", () => {
       { type: "GRAMMAR" as const, original: "I go", corrected: "I went", explanation: "", messageId: 1 },
     ];
     const { getByTestId, getAllByTestId } = render(
-      <CorrectionSidebar corrections={corrections} collapsed={true} onToggle={() => {}} />
+      <CorrectionSidebar corrections={corrections} isOpen={false} onToggle={() => {}} />
     );
     const items = getAllByTestId("correction-item");
     expect(items).toHaveLength(1);
@@ -30,7 +30,7 @@ describe("CorrectionSidebar", () => {
       { type: "WORD_CHOICE" as const, original: "big", corrected: "large", explanation: "", messageId: 1 },
     ];
     const { getAllByTestId } = render(
-      <CorrectionSidebar corrections={corrections} collapsed={true} onToggle={() => {}} />
+      <CorrectionSidebar corrections={corrections} isOpen={false} onToggle={() => {}} />
     );
     const items = getAllByTestId("correction-item");
     expect(items).toHaveLength(2);
@@ -43,21 +43,21 @@ describe("CorrectionSidebar", () => {
       { type: "CHINGLISH" as const, original: "open light", corrected: "turn on light", explanation: "Use 'turn on' for devices", messageId: 1 },
     ];
     const { getByTestId } = render(
-      <CorrectionSidebar corrections={corrections} collapsed={true} onToggle={() => {}} />
+      <CorrectionSidebar corrections={corrections} isOpen={false} onToggle={() => {}} />
     );
     expect(getByTestId("correction-item").textContent).toContain("Use 'turn on' for devices");
   });
 
   it("shows aria-expanded false when collapsed is true", () => {
     const { getByTestId } = render(
-      <CorrectionSidebar corrections={[]} collapsed={true} onToggle={() => {}} />
+      <CorrectionSidebar corrections={[]} isOpen={false} onToggle={() => {}} />
     );
     expect(getByTestId("correction-sidebar").getAttribute("aria-expanded")).toBe("false");
   });
 
   it("shows aria-expanded true when collapsed is false", () => {
     const { getByTestId } = render(
-      <CorrectionSidebar corrections={[]} collapsed={false} onToggle={() => {}} />
+      <CorrectionSidebar corrections={[]} isOpen={true} onToggle={() => {}} />
     );
     expect(getByTestId("correction-sidebar").getAttribute("aria-expanded")).toBe("true");
   });
@@ -68,14 +68,14 @@ describe("CorrectionSidebar", () => {
       { type: "GRAMMAR" as const, original: "c", corrected: "d", explanation: "", messageId: 2 },
     ];
     const { getByTestId } = render(
-      <CorrectionSidebar corrections={corrections} collapsed={true} onToggle={() => {}} />
+      <CorrectionSidebar corrections={corrections} isOpen={false} onToggle={() => {}} />
     );
     expect(getByTestId("correction-badge").textContent).toBe("2");
   });
 
   it("hides badge when correction count is zero", () => {
     const { queryByTestId } = render(
-      <CorrectionSidebar corrections={[]} collapsed={true} onToggle={() => {}} />
+      <CorrectionSidebar corrections={[]} isOpen={false} onToggle={() => {}} />
     );
     expect(queryByTestId("correction-badge")).toBeNull();
   });
@@ -86,7 +86,7 @@ describe("CorrectionSidebar", () => {
       { type: "GRAMMAR" as const, original: "a", corrected: "b", explanation: "", messageId: 1 },
     ];
     const { getByTestId } = render(
-      <CorrectionSidebar corrections={corrections} collapsed={true} onToggle={onToggle} />
+      <CorrectionSidebar corrections={corrections} isOpen={false} onToggle={onToggle} />
     );
     fireEvent.click(getByTestId("correction-toggle"));
     expect(onToggle).toHaveBeenCalledTimes(1);
@@ -95,7 +95,7 @@ describe("CorrectionSidebar", () => {
   it("calls onToggle when close button is clicked", () => {
     const onToggle = vi.fn();
     const { getByTestId } = render(
-      <CorrectionSidebar corrections={[]} collapsed={false} onToggle={onToggle} />
+      <CorrectionSidebar corrections={[]} isOpen={true} onToggle={onToggle} />
     );
     fireEvent.click(getByTestId("correction-sidebar-close"));
     expect(onToggle).toHaveBeenCalledTimes(1);

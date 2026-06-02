@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import { ChatContext } from "../../state/ChatContext";
@@ -8,12 +8,13 @@ import type { Dispatch } from "react";
 function createCtx(overrides: Partial<ChatState> = {}) {
   return {
     state: {
+      appStatus: "UserTurn" as const,
+      statusPayload: null,
       messages: [],
       corrections: [],
       tokenUsage: 0,
-      connectionStatus: "connected" as const,
       streamInProgress: false,
-      sessionStatus: "active" as const,
+      report: null,
       ...overrides,
     },
     dispatch: vi.fn(),
@@ -34,47 +35,38 @@ function Wrapper({
 import { ChatInput } from "../../components/chat/ChatInput";
 
 describe("ChatInput", () => {
-  let textInputBar: HTMLDivElement;
-
-  beforeEach(() => {
-    const existing = document.getElementById("textInputBar");
-    if (existing) existing.remove();
-    textInputBar = document.createElement("div");
-    textInputBar.id = "textInputBar";
-    document.body.appendChild(textInputBar);
-    const input = document.createElement("input");
-    input.id = "textInput";
-    textInputBar.appendChild(input);
-    const btn = document.createElement("button");
-    btn.id = "sendTextBtn";
-    textInputBar.appendChild(btn);
-  });
-
-  it("is disabled when sessionStatus is idle", () => {
-    const ctx = createCtx({ sessionStatus: "idle" });
+  it("is disabled when appStatus is not an active session state", () => {
+    const ctx = createCtx({ appStatus: "Connected" });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
-    const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
+    const input = screen.getByTestId("text-input") as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
 
   it("is disabled when streamInProgress is true", () => {
     const ctx = createCtx({ streamInProgress: true });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
-    const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
+    const input = screen.getByTestId("text-input") as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
 
-  it("is enabled when sessionStatus is active and not streaming", () => {
-    const ctx = createCtx({ sessionStatus: "active", streamInProgress: false });
+  it("is enabled when appStatus is UserTurn and not streaming", () => {
+    const ctx = createCtx({ appStatus: "UserTurn", streamInProgress: false });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
-    const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
+    const input = screen.getByTestId("text-input") as HTMLInputElement;
+    expect(input.disabled).toBe(false);
+  });
+
+  it("is enabled when appStatus is Warning", () => {
+    const ctx = createCtx({ appStatus: "Warning", statusPayload: "test" });
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
+    const input = screen.getByTestId("text-input") as HTMLInputElement;
     expect(input.disabled).toBe(false);
   });
 
   it("sends USER_INPUT and dispatches USER_MESSAGE_SENT on Enter", () => {
-    const ctx = createCtx({ sessionStatus: "active" });
+    const ctx = createCtx({ appStatus: "UserTurn" });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
-    const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
+    const input = screen.getByTestId("text-input") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Hello Coach" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(ctx.send).toHaveBeenCalledWith({
@@ -90,9 +82,9 @@ describe("ChatInput", () => {
   });
 
   it("does not send when input is empty", () => {
-    const ctx = createCtx({ sessionStatus: "active" });
+    const ctx = createCtx({ appStatus: "UserTurn" });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
-    const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
+    const input = screen.getByTestId("text-input") as HTMLInputElement;
     fireEvent.keyDown(input, { key: "Enter" });
     expect(ctx.send).not.toHaveBeenCalled();
     expect(ctx.dispatch).not.toHaveBeenCalled();
@@ -100,7 +92,7 @@ describe("ChatInput", () => {
 
   it("derives correct messageId from existing user messages", () => {
     const ctx = createCtx({
-      sessionStatus: "active",
+      appStatus: "UserTurn",
       messages: [
         { id: 1, role: "user", text: "First", streaming: false },
         { id: 1, role: "agent", text: "Reply", streaming: false },
@@ -108,7 +100,7 @@ describe("ChatInput", () => {
       ],
     });
     render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
-    const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
+    const input = screen.getByTestId("text-input") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Third" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(ctx.send).toHaveBeenCalledWith({
@@ -116,5 +108,12 @@ describe("ChatInput", () => {
       text: "Third",
       messageId: 3,
     });
+  });
+
+  it("has text-input and send-btn data-testid", () => {
+    const ctx = createCtx({ appStatus: "UserTurn" });
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
+    expect(screen.getByTestId("text-input")).toBeTruthy();
+    expect(screen.getByTestId("send-btn")).toBeTruthy();
   });
 });

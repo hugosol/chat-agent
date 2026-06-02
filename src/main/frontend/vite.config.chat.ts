@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: resolve(__dirname, "src/entry/chat-agent-entry.tsx"),
+      entry: resolve(__dirname, "src/entry/chat-entry.tsx"),
       name: "ChatAgent",
       formats: ["iife"],
       fileName: () => "chat-bundle.js",

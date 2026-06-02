@@ -11,8 +11,8 @@ import React, {
 import type { ChatState, Action } from "./chatState";
 import { initialState } from "./chatState";
 import { chatReducer } from "./chatReducer";
-import { showToast } from "../shared/Toast";
 import { speakText } from "../shared/tts";
+import { debugLog } from "../shared/debugLog";
 import type { CorrectionData } from "../shared/types";
 
 interface ChatContextValue {
@@ -22,16 +22,6 @@ interface ChatContextValue {
 }
 
 type ServerMessage = { type: string; [key: string]: unknown };
-type VanillaHandler = (msg: ServerMessage) => void;
-const vanillaHandlers: Set<VanillaHandler> = new Set();
-
-const VANILLA_TYPES = new Set([
-  "SESSION_REPORT",
-  "ERROR",
-  "TOKEN_WARNING",
-  "STATE_UPDATE",
-  "WS_CLOSED",
-]);
 
 function toAction(msg: ServerMessage): Action | null {
   switch (msg.type) {
@@ -83,9 +73,6 @@ function toAction(msg: ServerMessage): Action | null {
         type: "SESSION_REPORT",
         report: (msg.report || {}) as Record<string, unknown>,
       };
-    case "ERROR":
-    case "TOKEN_WARNING":
-      return null;
     default:
       return null;
   }
@@ -105,6 +92,7 @@ const ChatContextObj = createContext<ChatContextValue | null>(null);
 function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(chatReducer, initialState);
   const wsRef = useRef<WebSocket | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const send = useCallback((msg: unknown): void => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -116,15 +104,15 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
     const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
-       (ns as Record<string, unknown>).send = send;
-
     ws.onopen = () => {
-      dispatch({ type: "STATE_UPDATE", state: "Connected", tokenUsage: 0 });
+      debugLog("WS: connected");
+      dispatch({ type: "SET_APP_STATUS", appStatus: "Connected" });
       const savedSessionId =
         typeof localStorage !== "undefined"
           ? localStorage.getItem("sessionId")
           : null;
       if (savedSessionId) {
+        sessionIdRef.current = savedSessionId;
         ws.send(
           JSON.stringify({ type: "RESUME_SESSION", sessionId: savedSessionId })
         );
@@ -134,31 +122,47 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
     ws.onmessage = (event: MessageEvent) => {
       try {
         const msg = JSON.parse(event.data as string) as ServerMessage;
+        debugLog(`WS ← ${msg.type}`);
         const action = toAction(msg);
         if (action) {
           dispatch(action);
         }
         if (msg.type === "SESSION_STARTED" && msg.sessionId) {
+          sessionIdRef.current = msg.sessionId as string;
           if (typeof localStorage !== "undefined") {
             localStorage.setItem("sessionId", msg.sessionId as string);
           }
         }
         if (msg.type === "SESSION_REPORT") {
+          sessionIdRef.current = null;
           if (typeof localStorage !== "undefined") {
             localStorage.removeItem("sessionId");
           }
         }
         if (msg.type === "TOKEN_WARNING") {
-          showToast(msg.message as string, 5000);
+          dispatch({
+            type: "SET_APP_STATUS",
+            appStatus: "Warning",
+            statusPayload: msg.message as string,
+          });
         }
         if (msg.type === "ERROR") {
-          showToast("Error: " + (msg.message as string), 5000);
+          dispatch({
+            type: "SET_APP_STATUS",
+            appStatus: "Error",
+            statusPayload: msg.message as string,
+          });
+        }
+        if (msg.type === "STATE_UPDATE") {
+          const serverState = msg.state as string;
+          if (serverState === "PROCESSING") {
+            dispatch({ type: "SET_APP_STATUS", appStatus: "Processing" });
+          } else if (serverState === "SPEAKING") {
+            dispatch({ type: "SET_APP_STATUS", appStatus: "UserTurn" });
+          }
         }
         if (msg.type === "AGENT_STREAM_END" && msg.text && document.visibilityState === "visible") {
           speakText(msg.text as string);
-        }
-        if (VANILLA_TYPES.has(msg.type)) {
-          vanillaHandlers.forEach((fn) => fn(msg));
         }
       } catch {
         // ignore parse errors
@@ -166,17 +170,33 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
     };
 
     ws.onclose = () => {
+      debugLog("WS: disconnected");
+      if (typeof speechSynthesis !== "undefined") {
+        speechSynthesis.cancel();
+      }
       dispatch({ type: "WS_CLOSED" });
-      vanillaHandlers.forEach((fn) => fn({ type: "WS_CLOSED" }));
     };
 
     ws.onerror = () => {
-      // handled by onclose
+      debugLog("WS: error");
     };
 
+    function onVisibilityChange(): void {
+      if (document.visibilityState === "visible" && sessionIdRef.current) {
+        debugLog("Resume: tab activated");
+        ws.send(
+          JSON.stringify({
+            type: "RESUME_SESSION",
+            sessionId: sessionIdRef.current,
+          })
+        );
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       wsRef.current = null;
-      delete (ns as Record<string, unknown>).send;
       ws.close();
     };
   }, []);
@@ -193,13 +213,6 @@ function useChatContext(): ChatContextValue {
   }
   return ctx;
 }
-
-// Phase 2 compat — vanilla bridge for app.js (only 5 non-React message types)
-const ns = (window as unknown as Record<string, unknown>).ChatAgent || {};
-(window as unknown as Record<string, unknown>).ChatAgent = ns;
-(ns as Record<string, unknown>).registerHandler = (handler: VanillaHandler) => {
-  vanillaHandlers.add(handler);
-};
 
 export { ChatProvider, useChatContext };
 export { ChatContextObj as ChatContext };

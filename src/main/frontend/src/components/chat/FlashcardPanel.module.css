@@ -1,0 +1,137 @@
+.panel {
+  position: fixed;
+  bottom: 60px;
+  right: 8px;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.closed {
+  /* toggle button only */
+}
+
+.open .content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toggleBtn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+}
+
+.content {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  max-width: 320px;
+  width: 90vw;
+}
+
+.stage2 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: #e3f2fd;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #1565c0;
+}
+
+.chipRemove {
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.6;
+}
+
+.chipRemove:hover {
+  opacity: 1;
+}
+
+.suggestions {
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.suggestionItem {
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.suggestionItem:hover {
+  background: #f0f0f0;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: 1px solid #1976d2;
+  border-radius: 6px;
+  background: #1976d2;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #d32f2f;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.toast {
+  padding: 8px 16px;
+  background: #4caf50;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 13px;
+}

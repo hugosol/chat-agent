@@ -3,12 +3,12 @@ import classes from "./CorrectionSidebar.module.css";
 
 interface CorrectionSidebarProps {
   corrections: CorrectionData[];
-  collapsed: boolean;
+  isOpen: boolean;
   onToggle: () => void;
 }
 
-function CorrectionSidebar({ corrections, collapsed, onToggle }: CorrectionSidebarProps): JSX.Element {
-  const expanded = !collapsed;
+function CorrectionSidebar({ corrections, isOpen, onToggle }: CorrectionSidebarProps): JSX.Element {
+  const expanded = isOpen;
 
   return (
     <>

@@ -7,22 +7,33 @@ export interface Message {
   streaming?: boolean;
 }
 
+export type AppStatus =
+  | "Connecting"
+  | "Connected"
+  | "UserTurn"
+  | "Processing"
+  | "Warning"
+  | "Error"
+  | "Disconnected";
+
 export interface ChatState {
+  appStatus: AppStatus;
+  statusPayload: string | null;
   messages: Message[];
   corrections: CorrectionData[];
   tokenUsage: number;
-  connectionStatus: "connecting" | "connected" | "disconnected";
   streamInProgress: boolean;
-  sessionStatus: "idle" | "active";
+  report: Record<string, unknown> | null;
 }
 
 export const initialState: ChatState = {
+  appStatus: "Connecting",
+  statusPayload: null,
   messages: [],
   corrections: [],
   tokenUsage: 0,
-  connectionStatus: "connecting",
   streamInProgress: false,
-  sessionStatus: "idle",
+  report: null,
 };
 
 export type Action =
@@ -39,4 +50,6 @@ export type Action =
     }
   | { type: "WS_CLOSED" }
   | { type: "USER_MESSAGE_SENT"; messageId: number; text: string }
-  | { type: "SESSION_REPORT"; report: Record<string, unknown> };
+  | { type: "SESSION_REPORT"; report: Record<string, unknown> }
+  | { type: "SET_APP_STATUS"; appStatus: AppStatus; statusPayload?: string | null }
+  | { type: "DISMISS_REPORT" };

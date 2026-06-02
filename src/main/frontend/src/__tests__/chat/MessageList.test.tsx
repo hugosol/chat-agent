@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 import { ChatContext } from "../../state/ChatContext";
@@ -12,12 +12,13 @@ function createContextValue(overrides: Partial<ChatState> = {}): {
 } {
   return {
     state: {
+      appStatus: "UserTurn",
+      statusPayload: null,
       messages: [],
       corrections: [],
       tokenUsage: 0,
-      connectionStatus: "connected",
       streamInProgress: false,
-      sessionStatus: "active",
+      report: null,
       ...overrides,
     },
     dispatch: vi.fn(),
@@ -38,15 +39,6 @@ function TestWrapper({
 import { MessageList } from "../../components/chat/MessageList";
 
 describe("MessageList", () => {
-  beforeEach(() => {
-    const existing = document.getElementById("messages");
-    if (!existing) {
-      const div = document.createElement("div");
-      div.id = "messages";
-      document.body.appendChild(div);
-    }
-  });
-
   it("renders a user message bubble with data-testid and data-role", () => {
     const ctxValue = createContextValue({
       messages: [{ id: 1, role: "user", text: "Hello Coach", streaming: false }],

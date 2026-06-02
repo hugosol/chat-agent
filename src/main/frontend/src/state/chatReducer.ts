@@ -6,8 +6,7 @@ export function chatReducer(state: ChatState, action: Action): ChatState {
     case "SESSION_STARTED":
       return {
         ...initialState,
-        connectionStatus: "connected",
-        sessionStatus: "active",
+        appStatus: "UserTurn",
       };
     case "AGENT_STREAM_DELTA": {
       const existingIdx = state.messages.findIndex(
@@ -81,14 +80,13 @@ export function chatReducer(state: ChatState, action: Action): ChatState {
         messages,
         corrections: action.corrections,
         tokenUsage: action.tokenUsage,
-        connectionStatus: "connected",
-        sessionStatus: "active",
+        appStatus: "UserTurn",
       };
     }
     case "WS_CLOSED":
       return {
         ...initialState,
-        connectionStatus: "disconnected",
+        appStatus: "Disconnected",
       };
     case "USER_MESSAGE_SENT":
       return {
@@ -105,9 +103,20 @@ export function chatReducer(state: ChatState, action: Action): ChatState {
       };
     case "SESSION_REPORT":
       return {
+        ...initialState,
+        appStatus: "Connected",
+        report: action.report,
+      };
+    case "SET_APP_STATUS":
+      return {
         ...state,
-        sessionStatus: "idle",
-        streamInProgress: false,
+        appStatus: action.appStatus,
+        statusPayload: action.statusPayload ?? null,
+      };
+    case "DISMISS_REPORT":
+      return {
+        ...state,
+        report: null,
       };
     default:
       return state;
