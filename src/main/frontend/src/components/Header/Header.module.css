@@ -1,8 +1,8 @@
 .navRoot {
   display: flex;
+  border-top: 5px solid #1a1a2e;
   align-items: center;
   gap: 16px;
-  flex: 1;
   min-width: 0;
 }
 

@@ -1,0 +1,88 @@
+.footer {
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: #16213e;
+  border-top: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.select {
+  padding: 8px 12px;
+  background: #0f3460;
+  color: #e0e0e0;
+  border: 1px solid #1a5276;
+  border-radius: 6px;
+  font-size: 0.85em;
+  outline: none;
+}
+
+.select:focus {
+  border-color: #e94560;
+}
+
+.select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+  transition: background 0.2s;
+  background: #0f3460;
+  color: #e0e0e0;
+  border: 1px solid #1a5276;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn:hover:not(:disabled) {
+  background: #1a5276;
+}
+
+.btnPrimary {
+  background: #e94560;
+  color: #fff;
+  border-color: #e94560;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #c73a54;
+}
+
+.btnDanger {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: #a93226;
+}
+
+.startBtn {
+  composes: btn btnPrimary;
+  padding: 12px 24px;
+  font-size: 1em;
+  min-height: 44px;
+}
+
+.endBtn {
+  composes: btn btnDanger;
+  padding: 12px 24px;
+  font-size: 1em;
+  min-height: 44px;
+}

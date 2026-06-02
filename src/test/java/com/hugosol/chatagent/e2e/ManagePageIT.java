@@ -147,13 +147,18 @@ class ManagePageIT extends E2ETestBase {
                 "() => document.querySelector('.modal') === null");
 
         page.waitForSelector("#cardsTab .card-front");
+        page.waitForFunction(
+                "() => { var el = document.querySelector('#cardsTab .card-front'); " +
+                "return el && el.textContent && el.textContent.includes('Yesterday'); }");
         assertThat(page.locator("#cardsTab .card-front").textContent()).contains("Yesterday");
 
         takeScreenshot("step4-card-edited");
 
         // === Step 5: Search ===
         page.locator("#cardSearch").fill("yesterday");
-        page.waitForTimeout(400);
+        page.waitForFunction(
+                "() => { var el = document.querySelector('#cardsTab .card-front'); " +
+                "return el && el.textContent && el.textContent.includes('Yesterday'); }");
 
         assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(1);
         assertThat(page.locator("#cardsTab .card-front").textContent()).contains("Yesterday");
@@ -203,7 +208,9 @@ class ManagePageIT extends E2ETestBase {
         assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(2);
 
         page.locator(".deck-chip:has-text('Daily English')").click();
-        page.waitForTimeout(400);
+        page.waitForFunction(
+                "() => { var el = document.querySelector('#cardsTab .card-front'); " +
+                "return el && el.textContent && el.textContent.includes('Yesterday'); }");
         assertThat(page.locator("#cardsTab .card-block").count()).isEqualTo(1);
         assertThat(page.locator("#cardsTab .card-front").textContent()).contains("Yesterday");
 
@@ -258,6 +265,13 @@ class ManagePageIT extends E2ETestBase {
         var detailItems = page.locator(".modal .detail-item");
         assertThat(detailItems.count()).isGreaterThanOrEqualTo(5);
 
+        page.waitForFunction(
+                "() => { var labels = document.querySelectorAll('.modal .detail-item .detail-label'); " +
+                "for (var i = 0; i < labels.length; i++) { " +
+                "if (labels[i].textContent === 'Front') { " +
+                "var val = labels[i].nextElementSibling; " +
+                "return val && val.textContent && val.textContent.includes('Yesterday'); " +
+                "} } return false; }");
         assertThat(page.locator(".modal .detail-item .detail-label:has-text('Front') + .detail-value").textContent())
                 .contains("Yesterday");
         assertThat(page.locator(".modal .detail-item .detail-label:has-text('Back') + .detail-value").textContent())

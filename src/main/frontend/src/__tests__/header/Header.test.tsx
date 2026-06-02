@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { Header } from "../../components/Header/Header";
 
@@ -93,5 +93,34 @@ describe("Header", () => {
     const bar = getByTestId("token-bar-fill");
     expect(bar.style.width).toBe("80%");
     expect(bar.style.backgroundColor).toBe("rgb(231, 76, 60)");
+  });
+
+  it("calls onTogglePanel with 'menu' when hamburger is clicked", () => {
+    const onTogglePanel = vi.fn();
+    const { getByTestId } = render(<Header onTogglePanel={onTogglePanel} />);
+    fireEvent.click(getByTestId("nav-menu-btn"));
+    expect(onTogglePanel).toHaveBeenCalledWith("menu");
+  });
+
+  it("calls onTogglePanel with 'menu' when close button is clicked", () => {
+    const onTogglePanel = vi.fn();
+    const { getByTestId } = render(
+      <Header activePanel="menu" onTogglePanel={onTogglePanel} />
+    );
+    fireEvent.click(getByTestId("nav-sidebar-close"));
+    expect(onTogglePanel).toHaveBeenCalledWith("menu");
+  });
+
+  it("shows sidebar open when activePanel is 'menu'", () => {
+    const { getByTestId } = render(
+      <Header activePanel="menu" onTogglePanel={() => {}} />
+    );
+    expect(getByTestId("nav-sidebar").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("falls back to local state when onTogglePanel is not provided", () => {
+    const { getByTestId } = render(<Header />);
+    fireEvent.click(getByTestId("nav-menu-btn"));
+    expect(getByTestId("nav-sidebar").getAttribute("aria-expanded")).toBe("true");
   });
 });

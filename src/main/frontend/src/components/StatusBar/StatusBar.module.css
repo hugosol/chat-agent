@@ -1,0 +1,24 @@
+.statusBar {
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 0.85em;
+  border-top: 1px solid #0f3460;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.indicator {
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.connecting { color: #888; }
+.connected { color: #66bb6a; }
+.userturn { color: #66bb6a; }
+.processing { color: #f39c12; }
+.warning { color: #e74c3c; font-weight: bold; }
+.error { color: #e74c3c; background: #2c1a1a; }
+.disconnected { color: #888; }

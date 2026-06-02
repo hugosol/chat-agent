@@ -32,7 +32,7 @@ mvn spring-boot:run
 #    (credentials configurable via app.initial-users in application.yml)
 ```
 
-> **Note**: Frontend is **incrementally migrating** to React + TypeScript (built with Vite). Phase 1: shared Header component. Phase 2: shared utility layer (`src/shared/` — utils, TTS, Modal, Toast, ChipInput) + test framework (`src/__tests__/` by functional domain). Chat (`app.js`), flashcard (`flashcard.js`), and manage panels (`manage/*.js`) remain vanilla JS for now. `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development.
+> **Note**: Frontend is **incrementally migrating** to React + TypeScript (built with Vite). **Phase 3 complete**: MessageList, ChatInput, and Footer components migrated to React (Portal-rendered into existing DOM). `useChatWebSocket` removed — WS lifecycle now managed inside `ChatProvider`. `ChatAgent.send()` removed — all sends go through `useChatContext().send`. Vanilla callback bridge preserved for 5 non-React message types (SESSION_REPORT, ERROR, TOKEN_WARNING, STATE_UPDATE, WS_CLOSED). Chat message rendering, input, and session controls are now fully React-managed. `app.js` retains only Report Modal, Status Bar, Debug Panel handlers. `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development.
 
 ## How to Use
 
@@ -128,7 +128,7 @@ Records older than 3 days are automatically cleaned up on startup.
 | Agent orchestration | langgraph4j 1.8.16 (`org.bsc.langgraph4j`) |
 | Database | H2 (file mode) + Spring Data JPA |
 | Communication | WebSocket (JSON protocol) |
-| Frontend | React 18 + TypeScript (Vite build) + Vanilla HTML/JS (incremental migration) |
+| Frontend | React 18 + TypeScript (Vite Library Mode) + Vanilla JS (incremental migration) |
 | TTS | Browser SpeechSynthesis (user-gesture triggered for iOS support) |
 | Embedding & RAG | ONNX all-MiniLM-L6-v2 (384-dim, ~200MB heap) + InMemoryEmbeddingStore (JSON disk persistence) |
 
@@ -253,12 +253,14 @@ chat-agent/
 │   │   ├── tag.js
 │   │   ├── modal.js
 │   │   └── manage.css
-│   ├── shared/
-│   │   ├── header-bundle.js          // React Header IIFE bundle (replaces nav.js)
-│   │   ├── header-bundle.css         // React Header styles (CSS Modules)
-│   │   ├── react.production.min.js   // React 18 runtime (UMD)
-│   │   ├── react-dom.production.min.js // ReactDOM 18 runtime (UMD)
-│   │   └── base.css
+    │   ├── shared/
+    │   │   ├── header-bundle.js          // React Header IIFE bundle
+    │   │   ├── header-bundle.css         // React Header styles (CSS Modules)
+    │   │   ├── correction-sidebar-bundle.js   // React CorrectionSidebar IIFE bundle
+    │   │   ├── correction-sidebar-bundle.css  // React CorrectionSidebar styles (CSS Modules)
+    │   │   ├── react.production.min.js   // React 18 runtime (UMD)
+    │   │   ├── react-dom.production.min.js // ReactDOM 18 runtime (UMD)
+    │   │   └── base.css
 │   ├── index.html
 │   ├── app.js
 │   ├── flashcard.js

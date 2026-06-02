@@ -1,8 +1,12 @@
 import { useState, useCallback } from "react";
 import classes from "./Header.module.css";
 
+type PanelType = "menu" | "correction" | "debug" | "flashcard" | null;
+
 interface HeaderProps {
   tokenPercent?: number;
+  activePanel?: PanelType;
+  onTogglePanel?: (panel: PanelType) => void;
 }
 
 const GREEN = "rgb(39, 174, 96)";
@@ -15,11 +19,26 @@ function tokenColor(pct: number): string {
   return GREEN;
 }
 
-function Header({ tokenPercent }: HeaderProps): JSX.Element {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.Element {
+  const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
 
-  const openSidebar = useCallback(() => setSidebarOpen(true), []);
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const sidebarOpen = activePanel !== undefined ? activePanel === "menu" : localSidebarOpen;
+
+  const openSidebar = useCallback(() => {
+    if (onTogglePanel) {
+      onTogglePanel("menu");
+    } else {
+      setLocalSidebarOpen(true);
+    }
+  }, [onTogglePanel]);
+
+  const closeSidebar = useCallback(() => {
+    if (onTogglePanel) {
+      onTogglePanel("menu");
+    } else {
+      setLocalSidebarOpen(false);
+    }
+  }, [onTogglePanel]);
 
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
   const isChatPage = currentPath === "/" || currentPath === "/index.html" || currentPath === "";

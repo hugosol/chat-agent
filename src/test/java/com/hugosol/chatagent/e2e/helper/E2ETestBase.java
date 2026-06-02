@@ -108,6 +108,7 @@ public abstract class E2ETestBase {
                 .setIsMobile(true)
                 .setDeviceScaleFactor(3));
         page = context.newPage();
+        page.setDefaultTimeout(20_000);
         page.navigate("http://localhost:" + serverPort);
 
         WireMockStubs.registerAllStubs(wireMockServer);
@@ -135,64 +136,65 @@ public abstract class E2ETestBase {
     }
 
     protected void startSession(String mode) {
-        page.locator("#modeSelect").selectOption(mode);
-        page.locator("#startBtn").click();
+        page.locator("[data-testid=\"mode-select\"]").selectOption(mode);
+        page.locator("[data-testid=\"start-btn\"]").click();
         page.waitForFunction(
-                "() => !document.getElementById('textInputBar').classList.contains('hidden')");
+                "() => document.querySelector('[data-testid=\"end-btn\"]') && !document.querySelector('[data-testid=\"end-btn\"]').disabled");
     }
 
     protected void sendMessage(String text) {
         turnNumber++;
-        page.locator("#textInput").fill(text);
-        page.locator("#sendTextBtn").click();
+        page.locator("[data-testid=\"text-input\"]").fill(text);
+        page.locator("[data-testid=\"send-btn\"]").click();
     }
 
     protected void waitForAgentResponse() {
-        page.waitForFunction("() => !document.getElementById('textInput').disabled");
         page.waitForFunction(
-                "expected => document.querySelectorAll('.correction-bubble').length >= expected",
+                "() => document.querySelector('[data-testid=\"text-input\"]') && !document.querySelector('[data-testid=\"text-input\"]').disabled");
+        page.waitForFunction(
+                "expected => document.querySelectorAll('[data-testid=\"correction-bubble\"]').length >= expected",
                 turnNumber);
     }
 
     protected void endSession() {
-        page.locator("#endBtn").click();
+        page.locator("[data-testid=\"end-btn\"]").click();
         page.waitForFunction(
-                "() => !document.getElementById('reportModal').classList.contains('hidden')");
+                "() => document.querySelector('[data-testid=\"report-modal\"]') && document.querySelector('[data-testid=\"report-modal\"]').getAttribute('aria-hidden') !== 'true'");
     }
 
     protected void reloadPage() {
         page.reload();
-        page.waitForSelector(".message.user");
+        page.waitForSelector("[data-testid=\"message\"][data-role=\"user\"]");
     }
 
     protected int countUserMessages() {
-        return page.locator(".message.user").count();
+        return page.locator("[data-testid=\"message\"][data-role=\"user\"]").count();
     }
 
     protected int countAgentMessages() {
-        return page.locator(".message.agent").count();
+        return page.locator("[data-testid=\"message\"][data-role=\"agent\"]").count();
     }
 
     protected int countCorrectionBubbles() {
-        return page.locator(".message.correction-bubble").count();
+        return page.locator("[data-testid=\"correction-bubble\"]").count();
     }
 
     protected boolean hasCorrectionBubbleWith(String containedText) {
-        return page.locator(".correction-bubble .content-text")
+        return page.locator("[data-testid=\"correction-bubble\"] [data-testid=\"message-content\"]")
                 .filter(new Locator.FilterOptions().setHasText(containedText))
                 .count() > 0;
     }
 
     protected int countCorrectionSidebarItems() {
-        return page.locator(".correction-item").count();
+        return page.locator("[data-testid=\"correction-item\"]").count();
     }
 
     protected boolean isReportModalVisible() {
-        return page.locator("#reportModal").isVisible();
+        return page.locator("[data-testid=\"report-modal\"]").isVisible();
     }
 
     protected String getReportModalText() {
-        return page.locator("#reportContent").innerText();
+        return page.locator("[data-testid=\"report-content\"]").innerText();
     }
 
     private static void housekeepScreenshots() {

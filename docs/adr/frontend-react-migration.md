@@ -65,3 +65,76 @@ define:
 ### React 根元素在 flex 容器内
 
 当 mount 的目标元素本身是 flex 容器（如 `<header>` 有 `display: flex`），React 组件渲染的根 `<div>` 作为唯一 flex 子元素无法自动撑满宽度。需要给根元素设置 `flex: 1; min-width: 0`，内部子元素的 `flex` 和 `margin-left: auto` 才能正常生效。
+
+### 多入口构建
+
+Vite Library Mode 的 IIFE 格式不支持 `build.lib.entry` 对象形式。多入口构建方案：每个入口一个独立 Vite 配置文件，`package.json` build 脚本串联执行：
+
+```json
+"build": "vite build && vite build --config vite.config.correction-sidebar.ts && vite build --config vite.config.chat.ts"
+```
+
+- **产物命名**：`{entry-name}-bundle.js` + `{entry-name}-bundle.css`
+- **全局命名空间**：所有入口共享 `window.ChatAgent`，通过 `ChatAgent || {}` 模式累加挂载方法
+- **Phase 2 新增**：`vite.config.chat.ts` 产出 `chat-bundle.js` + `chat-bundle.css`（含 ChatProvider + Header + CorrectionSidebar + WS Hook）。Chat 页面 (`index.html`) 仅加载 `chat-bundle.js` 即可，`header-bundle.js` 和 `correction-sidebar-bundle.js` 仅用于 Manage/Login 等非 Chat 页面
+
+### 纯组件 + 连接器模式
+
+CorrectionSidebar 迁移引入的组件架构模式：纯展示组件通过 props 接收数据、通过 callbacks 发出事件，entry wrapper 通过本地 `useState` 管理状态并暴露命令式 API（`addCorrection`/`clear`/`getCount`）。此模式为后续 `useReducer + context` 集中状态管理做前向兼容。详见 ADR `centralized-chat-state.md`。
+
+### Phase 3: MessageList + ChatInput + Footer 迁入 React
+
+Phase 3 完成后，前端新增以下变更：
+
+- **`src/components/chat/MessageList.tsx`** — 消息气泡列表（Portal → `#messages`），统一循环渲染，流式光标 + TTS 播放按钮 + 纠错气泡插值 + 折叠/展开 + auto-scroll
+- **`src/components/chat/ChatInput.tsx`** — 文本输入栏（Portal → `#textInputBar`），Enter 发送 + `disabled` 逻辑（`sessionStatus` + `streamInProgress`）
+- **`src/components/chat/Footer.tsx`** — 底部会话控制栏（Portal → `<footer>`），Mode Select + Start/End 按钮，`disabled` 逻辑统一读 `sessionStatus`
+- **`src/state/chatState.ts` 扩展** — 新增 `sessionStatus: 'idle' | 'active'` 字段 + `USER_MESSAGE_SENT` / `SESSION_REPORT` 两个 Action
+- **`src/state/chatReducer.ts` 扩展** — 新增两个 action 处理 + `sessionStatus` 在 SESSION_STARTED/SESSION_RESUMED/WS_CLOSED 上的转换
+- **`src/state/ChatContext.tsx` 重构** — WS 生命周期内联进 `ChatProvider`（原 `useChatWebSocket` 删除），`send` 加入 context value，vanilla 分发窄化为 5 种非 React 消息类型
+- **`app.js` 裁剪** — 删除 12 个消息渲染函数 + 6 个 Event Listener，仅保留 SESSION_REPORT / ERROR / TOKEN_WARNING / STATE_UPDATE / WS_CLOSED 的 vanilla 处理
+- **`style.css` 清理** — 约 51 行消息相关 CSS 迁移到 `MessageList.module.css`（CSS Modules 哈希化）
+
+关键 Gotcha：
+
+- **ChatProvider 依赖约束**：`initialState` 不可依赖模块级 `localStorage`，由 ChatProvider 运行时覆盖
+- **send 在 context 中**：所有 WS 发送通过 `useChatContext().send`，不再有 `window.ChatAgent.send()`
+- **`useChatWebSocket` 已移除**：WS 生命周期完全在 `ChatProvider` 的 `useEffect` 中管理
+- **E2E 选择器迁移**：CSS Modules 哈希化后，消息相关选择器从 CSS class 改为 `data-testid` 属性（`[data-testid="message"][data-role="user"]` / `[data-testid="correction-bubble"]` 等）
+- **vanilla 桥接窄化**：`registerHandler` 保留但旁路分发仅对 5 种消息类型触发，不再对所有消息广播
+
+### 组件依赖关系表
+
+| 组件 | 依赖 | 消费字段 |
+|------|------|---------|
+| Header | ChatProvider | `tokenUsage` |
+| CorrectionSidebar | ChatProvider | `corrections` |
+| MessageList | ChatProvider | `messages`, `corrections`, `streamInProgress` |
+| ChatInput | ChatProvider | `streamInProgress`, `sessionStatus`, `send` |
+| Footer | ChatProvider | `sessionStatus`, `send` |
+
+### StatusBar — 待迁移模块
+
+当前 `#statusIndicator` 仍由 `app.js` 的 `setStatus()` 管理。迁移后：
+
+- **新建 React `StatusBar` 组件**：Portal 渲染到 `#statusBar`，从 `ChatContext` 读取两个字段。
+- **`ChatState` 扩展**：新增 `statusMessage: string`（显示文字）和 `statusType: string`（CSS class）两个状态字段。
+
+状态生命周期（每次 Practice session）：
+
+```
+页面加载        → ("Disconnected", "disconnected")
+ws.onopen       → ("Connected", "connected")
+ChatInput 就绪   → ("Type your message", "connected")
+用户发送消息     → ("Processing...", "processing")
+服务端 STATE_UPDATE → (msg.state, msg.state.toLowerCase())
+回复结束        → ("Type your message", "connected")
+ws.onclose      → ("Disconnected", "disconnected")
+TOKEN_WARNING   → ("Warning: ...", "warning")
+ERROR           → ("Error: ...", "error")
+```
+
+迁移完成后：
+- `app.js` 移除 `setStatus()` 函数
+- `VANILLA_TYPES` 从 5 种缩减为 2 种（`SESSION_REPORT`、`WS_CLOSED`）
+- Footer Start 按钮的 `disabled` 条件增加 `connectionStatus !== "connected"` 的 gating，替代 v1.3.0 的 `connect()+setTimeout` 自动重连逻辑

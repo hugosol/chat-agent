@@ -14,7 +14,7 @@ export default defineConfig({
       entry: resolve(__dirname, "src/entry/header-entry.tsx"),
       name: "ChatAgent",
       formats: ["iife"],
-      fileName: (format, name) => format === "iife" ? "header-bundle.js" : `header-bundle.${format}`,
+      fileName: () => "header-bundle.js",
       cssFileName: "header-bundle",
     },
     outDir: resolve(__dirname, "../resources/static/shared"),

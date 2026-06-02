@@ -37,13 +37,13 @@ class ChatAgentSessionIT extends E2ETestBase {
 
         assertEquals(6, countCorrectionSidebarItems(), "sidebar should have 6 correction items (3 from round 1, 2 from round 2, 1 from round 3)");
 
-        page.waitForSelector("#correctionSidebarToggle:not(.hidden)");
-        page.locator("#correctionSidebarToggle").click();
+        page.waitForSelector("[data-testid='correction-toggle']");
+        page.locator("[data-testid='correction-toggle']").click();
         page.waitForFunction(
-                "() => !document.getElementById('correctionSidebar').classList.contains('collapsed')");
-        page.locator("#correctionSidebarClose").click();
+                "() => document.querySelector('[data-testid=\"correction-sidebar\"]').getAttribute('aria-expanded') === 'true'");
+        page.locator("[data-testid='correction-sidebar-close']").click();
         page.waitForFunction(
-                "() => document.getElementById('correctionSidebar').classList.contains('collapsed')");
+                "() => document.querySelector('[data-testid=\"correction-sidebar\"]').getAttribute('aria-expanded') === 'false'");
 
         endSession();
         takeScreenshot("report");

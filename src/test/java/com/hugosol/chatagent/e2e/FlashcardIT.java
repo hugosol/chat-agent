@@ -26,33 +26,33 @@ class FlashcardIT extends E2ETestBase {
 
     @Test
     void fullFlashcardCreateFlow_persistsCardAndTags() {
-        page.locator("#flashcardToggle").click();
-        page.waitForSelector("#flashcardPanel:not(.collapsed)");
+        page.locator("[data-testid=\"flashcard-toggle\"]").click();
+        page.waitForSelector("[data-testid=\"flashcard-panel\"][aria-expanded=\"true\"]");
 
-        page.locator("#flashcardFront").fill("yesterday");
-        page.locator("#flashcardContinue").click();
-        page.waitForSelector("#flashcardStage2:not(.hidden)");
+        page.locator("[data-testid=\"flashcard-front\"]").fill("yesterday");
+        page.locator("[data-testid=\"flashcard-continue\"]").click();
+        page.waitForSelector("[data-testid=\"flashcard-stage2\"]:not([aria-hidden=\"true\"])");
 
-        page.locator("#flashcardBack").fill("昨天");
+        page.locator("[data-testid=\"flashcard-back\"]").fill("昨天");
 
-        page.locator("#flashcardTagInput").click();
-        page.waitForSelector("#flashcardTagSuggestions:not(.hidden)");
-        page.locator(".tag-suggestion-item").first().click();
-        page.waitForSelector(".flashcard-chip");
+        page.locator("[data-testid=\"flashcard-tag-input\"]").click();
+        page.waitForSelector("[data-testid=\"flashcard-tag-suggestions\"]:not([aria-hidden=\"true\"])");
+        page.locator("[data-testid=\"tag-suggestion-item\"]").first().click();
+        page.waitForSelector("[data-testid=\"flashcard-chip\"]");
 
-        page.locator("#flashcardTagInput").click();
-        page.waitForSelector("#flashcardTagSuggestions:not(.hidden)");
-        page.locator(".tag-suggestion-item").last().click();
+        page.locator("[data-testid=\"flashcard-tag-input\"]").click();
+        page.waitForSelector("[data-testid=\"flashcard-tag-suggestions\"]:not([aria-hidden=\"true\"])");
+        page.locator("[data-testid=\"tag-suggestion-item\"]").last().click();
 
-        var chips = page.locator(".flashcard-chip");
+        var chips = page.locator("[data-testid=\"flashcard-chip\"]");
         assertThat(chips.count()).isEqualTo(2);
 
-        page.locator("#flashcardSave").click();
+        page.locator("[data-testid=\"flashcard-save\"]").click();
 
-        page.waitForSelector("#flashcardToast:not(.hidden)");
+        page.waitForSelector("[data-testid=\"flashcard-toast\"]:not([aria-hidden=\"true\"])");
 
         page.waitForFunction(
-                "() => document.getElementById('flashcardPanel').classList.contains('collapsed')");
+                "() => { const el = document.querySelector('[data-testid=\"flashcard-panel\"]'); return el && el.getAttribute('aria-expanded') === 'false'; }");
 
         var cards = cardRepository.findAll();
         assertThat(cards).hasSize(1);
