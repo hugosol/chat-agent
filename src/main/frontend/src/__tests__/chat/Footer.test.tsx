@@ -45,7 +45,7 @@ describe("Footer", () => {
 
   it("disables Start and enables End when session is active", () => {
     const ctx = createCtx({ sessionStatus: "active" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(Footer)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
     const startBtn = screen.getByTestId("start-btn") as HTMLButtonElement;
     const endBtn = screen.getByTestId("end-btn") as HTMLButtonElement;
     expect(startBtn.disabled).toBe(true);
@@ -54,7 +54,7 @@ describe("Footer", () => {
 
   it("enables Start and disables End when session is idle", () => {
     const ctx = createCtx({ sessionStatus: "idle" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(Footer)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
     const startBtn = screen.getByTestId("start-btn") as HTMLButtonElement;
     const endBtn = screen.getByTestId("end-btn") as HTMLButtonElement;
     expect(startBtn.disabled).toBe(false);
@@ -63,21 +63,21 @@ describe("Footer", () => {
 
   it("disables Mode Select when session is active", () => {
     const ctx = createCtx({ sessionStatus: "active" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(Footer)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
     const modeSelect = screen.getByTestId("mode-select") as HTMLSelectElement;
     expect(modeSelect.disabled).toBe(true);
   });
 
   it("enables Mode Select when session is idle", () => {
     const ctx = createCtx({ sessionStatus: "idle" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(Footer)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
     const modeSelect = screen.getByTestId("mode-select") as HTMLSelectElement;
     expect(modeSelect.disabled).toBe(false);
   });
 
   it("sends START_SESSION with selected mode on Start click", () => {
     const ctx = createCtx({ sessionStatus: "idle" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(Footer)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
     const modeSelect = screen.getByTestId("mode-select") as HTMLSelectElement;
     fireEvent.change(modeSelect, { target: { value: "DAILY_TALK" } });
     fireEvent.click(screen.getByTestId("start-btn"));
@@ -89,7 +89,7 @@ describe("Footer", () => {
 
   it("sends END_SESSION on End click", () => {
     const ctx = createCtx({ sessionStatus: "active" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(Footer)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(Footer) }));
     fireEvent.click(screen.getByTestId("end-btn"));
     expect(ctx.send).toHaveBeenCalledWith({ type: "END_SESSION" });
   });

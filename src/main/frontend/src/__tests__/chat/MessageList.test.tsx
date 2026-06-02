@@ -52,7 +52,7 @@ describe("MessageList", () => {
       messages: [{ id: 1, role: "user", text: "Hello Coach", streaming: false }],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     const msg = screen.getByTestId("message");
     expect(msg.getAttribute("data-role")).toBe("user");
@@ -64,7 +64,7 @@ describe("MessageList", () => {
       messages: [{ id: 1, role: "agent", text: "Hi there!", streaming: false }],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     const msg = screen.getByTestId("message");
     expect(msg.getAttribute("data-role")).toBe("agent");
@@ -76,7 +76,7 @@ describe("MessageList", () => {
       messages: [{ id: 1, role: "agent", text: "Partial", streaming: true }],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     const cursor = screen.getByTestId("stream-cursor");
     expect(cursor).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe("MessageList", () => {
       messages: [{ id: 1, role: "agent", text: "Done", streaming: false }],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     expect(screen.queryByTestId("stream-cursor")).toBeNull();
   });
@@ -97,7 +97,7 @@ describe("MessageList", () => {
       messages: [{ id: 1, role: "agent", text: "Done", streaming: false }],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     expect(screen.getByTestId("play-button")).toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe("MessageList", () => {
       messages: [{ id: 1, role: "user", text: "Hello", streaming: false }],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     expect(screen.queryByTestId("play-button")).toBeNull();
   });
@@ -129,7 +129,7 @@ describe("MessageList", () => {
       ],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     const bubbles = screen.getAllByTestId("correction-bubble");
     expect(bubbles).toHaveLength(1);
@@ -158,7 +158,7 @@ describe("MessageList", () => {
       ],
     });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     const bubbles = screen.getAllByTestId("correction-bubble");
     expect(bubbles).toHaveLength(1);
@@ -174,7 +174,7 @@ describe("MessageList", () => {
     }
     const ctxValue = createContextValue({ messages: msgs });
     render(
-      React.createElement(TestWrapper, { ctxValue }, React.createElement(MessageList))
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
     );
     expect(screen.getByTestId("show-earlier-btn")).toBeInTheDocument();
     const allMsgs = screen.getAllByTestId("message");

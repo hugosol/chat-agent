@@ -52,28 +52,28 @@ describe("ChatInput", () => {
 
   it("is disabled when sessionStatus is idle", () => {
     const ctx = createCtx({ sessionStatus: "idle" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(ChatInput)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
     const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
 
   it("is disabled when streamInProgress is true", () => {
     const ctx = createCtx({ streamInProgress: true });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(ChatInput)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
     const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
 
   it("is enabled when sessionStatus is active and not streaming", () => {
     const ctx = createCtx({ sessionStatus: "active", streamInProgress: false });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(ChatInput)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
     const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
     expect(input.disabled).toBe(false);
   });
 
   it("sends USER_INPUT and dispatches USER_MESSAGE_SENT on Enter", () => {
     const ctx = createCtx({ sessionStatus: "active" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(ChatInput)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
     const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Hello Coach" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -91,7 +91,7 @@ describe("ChatInput", () => {
 
   it("does not send when input is empty", () => {
     const ctx = createCtx({ sessionStatus: "active" });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(ChatInput)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
     const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
     fireEvent.keyDown(input, { key: "Enter" });
     expect(ctx.send).not.toHaveBeenCalled();
@@ -107,7 +107,7 @@ describe("ChatInput", () => {
         { id: 2, role: "user", text: "Second", streaming: false },
       ],
     });
-    render(React.createElement(Wrapper, { ctx }, React.createElement(ChatInput)));
+    render(React.createElement(Wrapper, { ctx, children: React.createElement(ChatInput) }));
     const input = screen.getByTestId("chat-text-input") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Third" } });
     fireEvent.keyDown(input, { key: "Enter" });
