@@ -93,6 +93,7 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(chatReducer, initialState);
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const resumePendingRef = useRef(false);
 
   const send = useCallback((msg: unknown): void => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -113,6 +114,7 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
           : null;
       if (savedSessionId) {
         sessionIdRef.current = savedSessionId;
+        resumePendingRef.current = true;
         ws.send(
           JSON.stringify({ type: "RESUME_SESSION", sessionId: savedSessionId })
         );
@@ -129,9 +131,13 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
         }
         if (msg.type === "SESSION_STARTED" && msg.sessionId) {
           sessionIdRef.current = msg.sessionId as string;
+          resumePendingRef.current = false;
           if (typeof localStorage !== "undefined") {
             localStorage.setItem("sessionId", msg.sessionId as string);
           }
+        }
+        if (msg.type === "SESSION_RESUMED") {
+          resumePendingRef.current = false;
         }
         if (msg.type === "SESSION_REPORT") {
           sessionIdRef.current = null;
@@ -147,11 +153,21 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
           });
         }
         if (msg.type === "ERROR") {
-          dispatch({
-            type: "SET_APP_STATUS",
-            appStatus: "Error",
-            statusPayload: msg.message as string,
-          });
+          const errMsg = msg.message as string;
+          if (errMsg.toLowerCase().includes("session not found")
+              && resumePendingRef.current
+              && wsRef.current?.readyState === WebSocket.OPEN) {
+            localStorage.removeItem("sessionId");
+            sessionIdRef.current = null;
+            resumePendingRef.current = false;
+            dispatch({ type: "SET_APP_STATUS", appStatus: "Connected" });
+          } else {
+            dispatch({
+              type: "SET_APP_STATUS",
+              appStatus: "Error",
+              statusPayload: errMsg,
+            });
+          }
         }
         if (msg.type === "STATE_UPDATE") {
           const serverState = msg.state as string;
@@ -171,6 +187,7 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
 
     ws.onclose = () => {
       debugLog("WS: disconnected");
+      resumePendingRef.current = false;
       if (typeof speechSynthesis !== "undefined") {
         speechSynthesis.cancel();
       }

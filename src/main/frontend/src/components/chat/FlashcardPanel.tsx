@@ -103,12 +103,8 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
   }
 
   return React.createElement(
-    "div",
-    {
-      "data-testid": "flashcard-panel",
-      className: `${styles.panel} ${isOpen ? styles.open : styles.closed}`,
-      "aria-expanded": isOpen ? "true" : "false",
-    },
+    React.Fragment,
+    null,
     React.createElement(
       "button",
       {
@@ -118,101 +114,120 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
       },
       "anki"
     ),
-    isOpen &&
-      React.createElement(
-        "div",
-        { className: styles.content },
-        stage === 1 &&
+    React.createElement(
+      "div",
+      {
+        "data-testid": "flashcard-panel",
+        className: styles.panel,
+        "aria-expanded": isOpen ? "true" : "false",
+      },
+      isOpen &&
+        React.createElement(
+          React.Fragment,
+          null,
           React.createElement(
             "div",
-            { "data-testid": "flashcard-stage1" },
-            React.createElement("input", {
-              "data-testid": "flashcard-front",
-              type: "text",
-              className: styles.input,
-              placeholder: "Front (word)",
-              value: front,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-                setFront(e.target.value),
-              onKeyDown: (e: React.KeyboardEvent) => {
-                if (e.key === "Enter") handleContinue();
-              },
-            }),
+            { className: styles.header },
+            React.createElement("span", { className: styles.title }, "anki"),
             React.createElement(
               "button",
-              {
-                "data-testid": "flashcard-continue",
-                className: styles.btn,
-                onClick: handleContinue,
-                disabled: !front.trim(),
-              },
-              "Continue"
+              { className: styles.closeBtn, onClick: onToggle },
+              "\u00d7"
             )
           ),
-        stage === 2 &&
-          React.createElement(
-            "div",
-            { "data-testid": "flashcard-stage2", className: styles.stage2 },
-            React.createElement("textarea", {
-              "data-testid": "flashcard-back",
-              className: styles.textarea,
-              placeholder: "Back (translation/meaning)",
-              value: back,
-              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                setBack(e.target.value),
-            }),
+          stage === 1 &&
             React.createElement(
               "div",
-              { className: styles.chips },
-              ...chips.map((chip, i) =>
-                React.createElement(
-                  "span",
-                  {
-                    key: chip.id,
-                    "data-testid": "flashcard-chip",
-                    className: styles.chip,
-                  },
-                  chip.name,
-                  React.createElement(
-                    "span",
-                    {
-                      className: styles.chipRemove,
-                      onClick: () => removeChip(i),
-                    },
-                    "x"
-                  )
-                )
+              { className: styles.stage, "data-testid": "flashcard-stage1" },
+              React.createElement("input", {
+                "data-testid": "flashcard-front",
+                type: "text",
+                className: styles.frontInput,
+                placeholder: "Front (word)",
+                value: front,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                  setFront(e.target.value),
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === "Enter") handleContinue();
+                },
+              }),
+              React.createElement(
+                "button",
+                {
+                  "data-testid": "flashcard-continue",
+                  className: `${styles.btn} ${styles.btnPrimary} ${styles.continueBtn}`,
+                  onClick: handleContinue,
+                  disabled: !front.trim(),
+                },
+                "Continue"
               )
             ),
-            React.createElement("input", {
-              "data-testid": "flashcard-tag-input",
-              type: "text",
-              className: styles.input,
-              placeholder: "Add tag...",
-              value: tagInput,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                setTagInput(e.target.value);
-                if (!showSuggestions) setShowSuggestions(true);
-              },
-              onFocus: () => {
-                if (!allTags.length) fetchTags();
-                setShowSuggestions(true);
-              },
-              onKeyDown: (e: React.KeyboardEvent) => {
-                if (e.key === "Backspace" && !tagInput && chips.length > 0) {
-                  removeChip(chips.length - 1);
-                }
-              },
-            }),
-            showSuggestions &&
+          stage === 2 &&
+            React.createElement(
+              "div",
+              { "data-testid": "flashcard-stage2", className: styles.stage2 },
+              React.createElement("textarea", {
+                "data-testid": "flashcard-back",
+                className: styles.textarea,
+                placeholder: "Back (translation/meaning)",
+                value: back,
+                onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                  setBack(e.target.value),
+              }),
               React.createElement(
                 "div",
-                {
-                  "data-testid": "flashcard-tag-suggestions",
-                  className: styles.suggestions,
-                },
-                ...(filteredTags.length > 0
-                  ? filteredTags.map((tag) =>
+                { className: styles.tagArea },
+                React.createElement(
+                  "div",
+                  { className: styles.chips },
+                  ...chips.map((chip, i) =>
+                    React.createElement(
+                      "span",
+                      {
+                        key: chip.id,
+                        "data-testid": "flashcard-chip",
+                        className: styles.chip,
+                      },
+                      chip.name,
+                      React.createElement(
+                        "span",
+                        {
+                          className: styles.chipRemove,
+                          onClick: () => removeChip(i),
+                        },
+                        "\u00d7"
+                      )
+                    )
+                  )
+                ),
+                React.createElement("input", {
+                  "data-testid": "flashcard-tag-input",
+                  type: "text",
+                  className: styles.tagInput,
+                  placeholder: "Add tag...",
+                  value: tagInput,
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                    setTagInput(e.target.value);
+                    if (!showSuggestions) setShowSuggestions(true);
+                  },
+                  onFocus: () => {
+                    if (!allTags.length) fetchTags();
+                    setShowSuggestions(true);
+                  },
+                  onKeyDown: (e: React.KeyboardEvent) => {
+                    if (e.key === "Backspace" && !tagInput && chips.length > 0) {
+                      removeChip(chips.length - 1);
+                    }
+                  },
+                }),
+                showSuggestions &&
+                  React.createElement(
+                    "div",
+                    {
+                      "data-testid": "flashcard-tag-suggestions",
+                      className: styles.suggestions,
+                    },
+                    ...filteredTags.map((tag) =>
                       React.createElement(
                         "div",
                         {
@@ -224,34 +239,35 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
                         tag.name
                       )
                     )
-                  : [])
+                  )
               ),
-            error &&
+              error &&
+                React.createElement(
+                  "div",
+                  { className: styles.error },
+                  error
+                ),
               React.createElement(
-                "div",
-                { className: styles.error },
-                error
-              ),
-            React.createElement(
-              "button",
-              {
-                "data-testid": "flashcard-save",
-                className: styles.btn,
-                onClick: handleSave,
-                disabled: saving || !front.trim() || !back.trim(),
-              },
-              saving ? "Saving..." : "Save"
+                "button",
+                {
+                  "data-testid": "flashcard-save",
+                  className: `${styles.btn} ${styles.btnPrimary} ${styles.saveBtn}`,
+                  onClick: handleSave,
+                  disabled: saving || !front.trim() || !back.trim(),
+                },
+                saving ? "Saving..." : "Save"
+              )
             )
-          ),
-        toast &&
-          React.createElement(
-            "div",
-            {
-              "data-testid": "flashcard-toast",
-              className: styles.toast,
-            },
-            "Saved"
-          )
+        )
+    ),
+    toast &&
+      React.createElement(
+        "div",
+        {
+          "data-testid": "flashcard-toast",
+          className: styles.toast,
+        },
+        "Saved"
       )
   );
 }

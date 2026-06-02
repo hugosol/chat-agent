@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { useChatContext } from "../../state/ChatContext";
 import { isSessionActive } from "../../shared/utils";
+import styles from "./ChatInput.module.css";
 
 export function ChatInput(): React.ReactElement {
   const { state, dispatch, send } = useChatContext();
@@ -24,12 +25,13 @@ export function ChatInput(): React.ReactElement {
   }
 
   return React.createElement(
-    React.Fragment,
-    null,
+    "div",
+    { className: styles.bar },
     React.createElement("input", {
       ref: inputRef,
       "data-testid": "text-input",
       type: "text",
+      className: styles.input,
       disabled,
       placeholder: state.streamInProgress ? "Agent is typing..." : "Type your message...",
       autoComplete: "off",
@@ -40,7 +42,7 @@ export function ChatInput(): React.ReactElement {
       {
         key: "send",
         "data-testid": "send-btn",
-        className: "btn btn-send",
+        className: styles.sendBtn,
         disabled,
         onClick: handleSend,
       },
