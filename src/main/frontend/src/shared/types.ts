@@ -7,3 +7,27 @@ export interface CorrectionData {
   explanation: string;
   messageId: number;
 }
+
+export interface Tag {
+  id: number;
+  name: string;
+  type: string | null;
+}
+
+export interface Card {
+  id: string;
+  front: string;
+  back: string;
+  tags: Tag[];
+  due: string | null;
+  cardState: number;
+  createTime: string | null;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+}

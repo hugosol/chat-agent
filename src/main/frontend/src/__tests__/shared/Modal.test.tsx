@@ -49,4 +49,22 @@ describe("Modal", () => {
     render(<Modal open={true} title="X" onClose={vi.fn()}>Body</Modal>);
     expect(screen.queryByTestId("modal-save")).toBeNull();
   });
+
+  it("shows custom save button label when saveLabel is provided", () => {
+    render(
+      <Modal open={true} title="Confirm" onClose={vi.fn()} onSave={vi.fn()} saveLabel="Delete">
+        Are you sure?
+      </Modal>
+    );
+    expect(screen.getByTestId("modal-save")).toHaveTextContent("Delete");
+  });
+
+  it("shows default 'Save' label when saveLabel is not provided", () => {
+    render(
+      <Modal open={true} title="X" onClose={vi.fn()} onSave={vi.fn()}>
+        Body
+      </Modal>
+    );
+    expect(screen.getByTestId("modal-save")).toHaveTextContent("Save");
+  });
 });

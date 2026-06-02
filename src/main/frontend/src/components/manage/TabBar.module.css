@@ -1,0 +1,33 @@
+.tabs {
+  display: flex;
+  flex-direction: column;
+  width: 50px;
+  background: #16213e;
+  border-left: 1px solid #0f3460;
+  flex-shrink: 0;
+  padding-top: 8px;
+  gap: 2px;
+}
+
+.tabBtn {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 12px 6px;
+  cursor: pointer;
+  font-size: 0.7em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 2px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.tabBtn:hover {
+  color: #e0e0e0;
+  background: #0f3460;
+}
+
+.active {
+  color: #e94560;
+  background: #0f3460;
+}

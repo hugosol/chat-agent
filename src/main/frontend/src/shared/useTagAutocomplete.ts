@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-
-interface Tag {
-  id: number;
-  name: string;
-  type: string | null;
-}
+import type { Tag } from "./types";
 
 interface UseTagAutocompleteOptions {
   defer?: boolean;
