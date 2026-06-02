@@ -25,7 +25,7 @@ function renderCorrectionBubble(
       key: "correction-" + messageId,
       "data-testid": "correction-bubble",
       "data-message-id": messageId,
-      className: `${styles.message} ${styles.correctionBubble}`,
+      className: styles.correctionBubble,
     },
     React.createElement(
       "span",

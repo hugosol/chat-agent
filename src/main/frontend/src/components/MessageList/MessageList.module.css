@@ -58,6 +58,7 @@
 }
 
 .correctionBubble {
+    composes: message;
     background: #1a2a1a;
     margin-right: auto;
     border-left: 3px solid #e94560;

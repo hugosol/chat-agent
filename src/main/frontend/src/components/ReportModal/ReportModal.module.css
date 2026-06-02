@@ -22,7 +22,7 @@
   overflow-y: auto;
 }
 
-.modal h2 {
+.title {
   color: #e94560;
   margin-bottom: 16px;
 }
@@ -33,7 +33,7 @@
   line-height: 1.6;
 }
 
-.section strong {
+.sectionLabel {
   color: #4fc3f7;
 }
 

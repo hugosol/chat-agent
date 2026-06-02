@@ -221,10 +221,12 @@
 }
 
 .continueBtn {
+  composes: btn btnPrimary;
   flex-shrink: 0;
 }
 
 .saveBtn {
+  composes: btn btnPrimary;
   margin-top: 4px;
 }
 

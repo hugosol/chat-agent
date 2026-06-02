@@ -155,7 +155,7 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
                 "button",
                 {
                   "data-testid": "flashcard-continue",
-                  className: `${styles.btn} ${styles.btnPrimary} ${styles.continueBtn}`,
+                  className: styles.continueBtn,
                   onClick: handleContinue,
                   disabled: !front.trim(),
                 },
@@ -251,7 +251,7 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
                 "button",
                 {
                   "data-testid": "flashcard-save",
-                  className: `${styles.btn} ${styles.btnPrimary} ${styles.saveBtn}`,
+                  className: styles.saveBtn,
                   onClick: handleSave,
                   disabled: saving || !front.trim() || !back.trim(),
                 },

@@ -53,7 +53,7 @@ export function Footer(): React.ReactElement {
         "button",
         {
           "data-testid": "start-btn",
-          className: `${styles.btn} ${styles.btnPrimary} ${styles.startBtn}`,
+          className: styles.startBtn,
           disabled: isActive || noModes,
           onClick: () => send({ type: "START_SESSION", mode }),
         },
@@ -63,7 +63,7 @@ export function Footer(): React.ReactElement {
         "button",
         {
           "data-testid": "end-btn",
-          className: `${styles.btn} ${styles.btnDanger} ${styles.endBtn}`,
+          className: styles.endBtn,
           disabled: !isActive,
           onClick: () => send({ type: "END_SESSION" }),
         },

@@ -27,31 +27,31 @@ export function ReportModal(): React.ReactElement | null {
     React.createElement(
       "div",
       { className: styles.modal },
-      React.createElement("h2", null, "Session Report"),
+      React.createElement("h2", { className: styles.title }, "Session Report"),
       React.createElement(
         "div",
         { "data-testid": "report-content" },
         assessment &&
           React.createElement("div", { className: styles.section },
-            React.createElement("strong", null, "Overall Assessment"),
+            React.createElement("strong", { className: styles.sectionLabel }, "Overall Assessment"),
             React.createElement("br"),
             assessment
           ),
         fluencyScore !== undefined && fluencyScore >= 0 &&
           React.createElement("div", { className: styles.section },
-            React.createElement("strong", null, "Fluency Score"),
+            React.createElement("strong", { className: styles.sectionLabel }, "Fluency Score"),
             React.createElement("br"),
             fluencyScore
           ),
         errorSummary &&
           React.createElement("div", { className: styles.section },
-            React.createElement("strong", null, "Error Summary"),
+            React.createElement("strong", { className: styles.sectionLabel }, "Error Summary"),
             React.createElement("br"),
             errorSummary
           ),
         keyTakeaway &&
           React.createElement("div", { className: styles.section },
-            React.createElement("strong", null, "Key Takeaway"),
+            React.createElement("strong", { className: styles.sectionLabel }, "Key Takeaway"),
             React.createElement("br"),
             keyTakeaway
           )

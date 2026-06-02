@@ -53,12 +53,6 @@
   background: #1a5276;
 }
 
-.startBtn, .endBtn {
-  padding: 12px 24px;
-  font-size: 1em;
-  min-height: 44px;
-}
-
 .btnPrimary {
   background: #e94560;
   color: #fff;
@@ -77,4 +71,18 @@
 
 .btnDanger:hover:not(:disabled) {
   background: #a93226;
+}
+
+.startBtn {
+  composes: btn btnPrimary;
+  padding: 12px 24px;
+  font-size: 1em;
+  min-height: 44px;
+}
+
+.endBtn {
+  composes: btn btnDanger;
+  padding: 12px 24px;
+  font-size: 1em;
+  min-height: 44px;
 }
