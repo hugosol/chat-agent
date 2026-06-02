@@ -8,7 +8,11 @@ export function ChatInput(): React.ReactElement {
   const targetEl = document.getElementById("textInputBar");
   if (!targetEl) return React.createElement("div");
 
-  targetEl.classList.remove("hidden");
+  if (state.sessionStatus === "active") {
+    targetEl.classList.remove("hidden");
+  } else {
+    targetEl.classList.add("hidden");
+  }
 
   const disabled = state.sessionStatus !== "active" || state.streamInProgress;
 

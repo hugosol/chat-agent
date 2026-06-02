@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { useChatContext } from "../../state/ChatContext";
+import { speakText } from "../../shared/tts";
 import type { Message } from "../../state/chatState";
 import type { CorrectionData } from "../../shared/types";
 import styles from "./MessageList.module.css";
@@ -42,7 +43,15 @@ function renderCorrectionBubble(
 }
 
 function renderMessage(msg: Message): React.ReactElement {
-  const children: React.ReactNode[] = [msg.text];
+  const roleLabel = msg.role === "user" ? "You:" : "Agent:";
+  const children: React.ReactNode[] = [
+    React.createElement("span", { key: "role", className: styles.role }, roleLabel),
+    React.createElement(
+      "span",
+      { key: "content", "data-testid": "message-content", className: styles.contentText },
+      msg.text
+    ),
+  ];
   if (msg.role === "agent" && msg.streaming) {
     children.push(
       React.createElement("span", {
@@ -61,6 +70,7 @@ function renderMessage(msg: Message): React.ReactElement {
           "data-testid": "play-button",
           className: styles.btnPlay,
           title: "Read aloud",
+          onClick: () => speakText(msg.text),
         },
         "\uD83D\uDD0A"
       )
