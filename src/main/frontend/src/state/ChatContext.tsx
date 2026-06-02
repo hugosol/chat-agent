@@ -12,6 +12,7 @@ import type { ChatState, Action } from "./chatState";
 import { initialState } from "./chatState";
 import { chatReducer } from "./chatReducer";
 import { showToast } from "../shared/Toast";
+import type { CorrectionData } from "../shared/types";
 
 interface ChatContextValue {
   state: ChatState;
@@ -53,7 +54,7 @@ function toAction(msg: ServerMessage): Action | null {
         tokenUsage: msg.tokenUsage as number,
       };
     case "CORRECTION_RESULT": {
-      const corrections = (msg.corrections || []) as Action["corrections"];
+      const corrections = (msg.corrections || []) as CorrectionData[];
       return {
         type: "CORRECTION_RESULT",
         messageId: msg.messageId as number,
@@ -67,8 +68,8 @@ function toAction(msg: ServerMessage): Action | null {
         tokenUsage: msg.tokenUsage as number,
       };
     case "SESSION_RESUMED": {
-      const messages = (msg.messages || []) as Action["messages"];
-      const corrections = (msg.corrections || []) as Action["corrections"];
+      const messages = (msg.messages || []) as Array<{ role: string; content: string; messageId?: number }>;
+      const corrections = (msg.corrections || []) as CorrectionData[];
       return {
         type: "SESSION_RESUMED",
         messages,
@@ -114,7 +115,7 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
     const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
-    (ns as Record<string, unknown>).send = send;
+       (ns as Record<string, unknown>).send = send;
 
     ws.onopen = () => {
       dispatch({ type: "STATE_UPDATE", state: "Connected", tokenUsage: 0 });
@@ -190,8 +191,8 @@ function useChatContext(): ChatContextValue {
 }
 
 // Phase 2 compat — vanilla bridge for app.js (only 5 non-React message types)
-const ns = (window as Record<string, unknown>).ChatAgent || {};
-(window as Record<string, unknown>).ChatAgent = ns;
+const ns = (window as unknown as Record<string, unknown>).ChatAgent || {};
+(window as unknown as Record<string, unknown>).ChatAgent = ns;
 (ns as Record<string, unknown>).registerHandler = (handler: VanillaHandler) => {
   vanillaHandlers.add(handler);
 };

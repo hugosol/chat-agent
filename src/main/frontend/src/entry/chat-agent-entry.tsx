@@ -53,8 +53,8 @@ function mountChatAgent(): void {
   createRoot(container).render(React.createElement(App));
 }
 
-const ns = (window as Record<string, unknown>).ChatAgent || {};
-(window as Record<string, unknown>).ChatAgent = ns;
+const ns = (window as unknown as Record<string, unknown>).ChatAgent || {};
+(window as unknown as Record<string, unknown>).ChatAgent = ns;
 (ns as Record<string, unknown>).mountChatAgent = mountChatAgent;
 
 mountChatAgent();
