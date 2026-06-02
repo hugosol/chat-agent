@@ -10,6 +10,7 @@ import { StatusBar } from "../components/StatusBar/StatusBar";
 import { ReportModal } from "../components/ReportModal/ReportModal";
 import { DebugPanel } from "../components/DebugPanel/DebugPanel";
 import { FlashcardPanel } from "../components/FlashcardPanel/FlashcardPanel";
+import { isSessionActive } from "../shared/utils";
 import type { CorrectionData } from "../shared/types";
 import styles from "./ChatPage.module.css";
 
@@ -67,7 +68,7 @@ function AppContent({
         })
       ),
       React.createElement(StatusBar),
-      React.createElement(ChatInput)
+      isSessionActive(state.appStatus) && React.createElement(ChatInput)
     ),
     React.createElement(Footer),
     React.createElement(ReportModal),

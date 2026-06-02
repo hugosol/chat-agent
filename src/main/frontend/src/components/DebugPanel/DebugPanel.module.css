@@ -1,9 +1,4 @@
 .debugPanel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 500;
   background: rgba(0, 0, 0, 0.92);
   border-top: 1px solid #333;
   font-family: 'Courier New', monospace;
@@ -11,6 +6,7 @@
   max-height: 35vh;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .toggleBtn, .clearBtn {
