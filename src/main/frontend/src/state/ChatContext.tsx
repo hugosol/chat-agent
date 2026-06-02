@@ -12,6 +12,7 @@ import type { ChatState, Action } from "./chatState";
 import { initialState } from "./chatState";
 import { chatReducer } from "./chatReducer";
 import { showToast } from "../shared/Toast";
+import { speakText } from "../shared/tts";
 import type { CorrectionData } from "../shared/types";
 
 interface ChatContextValue {
@@ -152,6 +153,9 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
         }
         if (msg.type === "ERROR") {
           showToast("Error: " + (msg.message as string), 5000);
+        }
+        if (msg.type === "AGENT_STREAM_END" && msg.text && document.visibilityState === "visible") {
+          speakText(msg.text as string);
         }
         if (VANILLA_TYPES.has(msg.type)) {
           vanillaHandlers.forEach((fn) => fn(msg));
