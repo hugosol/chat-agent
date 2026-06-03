@@ -35,16 +35,16 @@ class FlashcardIT extends E2ETestBase {
 
         page.locator("[data-testid=\"flashcard-back\"]").fill("昨天");
 
-        page.locator("[data-testid=\"flashcard-tag-input\"]").click();
-        page.waitForSelector("[data-testid=\"flashcard-tag-suggestions\"]:not([aria-hidden=\"true\"])");
-        page.locator("[data-testid=\"tag-suggestion-item\"]").first().click();
-        page.waitForSelector("[data-testid=\"flashcard-chip\"]");
+        page.locator("[data-testid=\"inline-chip-input-field\"]").fill("d");
+        page.waitForSelector("[data-testid=\"inline-chip-suggestion\"]");
+        page.locator("[data-testid=\"inline-chip-suggestion\"]").first().click();
+        page.waitForSelector("[data-testid=\"inline-chip\"]");
 
-        page.locator("[data-testid=\"flashcard-tag-input\"]").click();
-        page.waitForSelector("[data-testid=\"flashcard-tag-suggestions\"]:not([aria-hidden=\"true\"])");
-        page.locator("[data-testid=\"tag-suggestion-item\"]").last().click();
+        page.locator("[data-testid=\"inline-chip-input-field\"]").fill("t");
+        page.waitForSelector("[data-testid=\"inline-chip-suggestion\"]");
+        page.locator("[data-testid=\"inline-chip-suggestion\"]").first().click();
 
-        var chips = page.locator("[data-testid=\"flashcard-chip\"]");
+        var chips = page.locator("[data-testid=\"inline-chip\"]");
         assertThat(chips.count()).isEqualTo(2);
 
         page.locator("[data-testid=\"flashcard-save\"]").click();

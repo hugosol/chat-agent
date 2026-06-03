@@ -1,11 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./FlashcardPanel.module.css";
-
-interface Tag {
-  id: string;
-  name: string;
-  type: string | null;
-}
+import { InlineChipInput } from "../../shared/InlineChipInput";
+import type { Tag } from "../../shared/types";
 
 interface FlashcardPanelProps {
   isOpen: boolean;
@@ -19,25 +15,10 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [chips, setChips] = useState<Tag[]>([]);
-  const [tagInput, setTagInput] = useState("");
   const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [toast, setToast] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const filteredTags = allTags.filter(
-    (t) =>
-      !chips.some((c) => c.id === t.id) &&
-      t.name.toLowerCase().includes(tagInput.toLowerCase())
-  );
-
-  const fetchTags = useCallback(() => {
-    fetch("/api/tags", { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((tags) => setAllTags(tags as Tag[]))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -45,27 +26,17 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
       setFront("");
       setBack("");
       setChips([]);
-      setTagInput("");
-      setShowSuggestions(false);
       setError("");
-      fetchTags();
+      fetch("/api/tags", { credentials: "same-origin" })
+        .then((r) => r.json())
+        .then((tags) => setAllTags(tags as Tag[]))
+        .catch(() => {});
     }
-  }, [isOpen, fetchTags]);
+  }, [isOpen]);
 
   function handleContinue(): void {
     if (!front.trim()) return;
     setStage(2);
-  }
-
-  function addChip(tag: Tag): void {
-    if (chips.some((c) => c.id === tag.id)) return;
-    setChips([...chips, tag]);
-    setTagInput("");
-    setShowSuggestions(false);
-  }
-
-  function removeChip(index: number): void {
-    setChips(chips.filter((_, i) => i !== index));
   }
 
   async function handleSave(): Promise<void> {
@@ -177,69 +148,12 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
               React.createElement(
                 "div",
                 { className: styles.tagArea },
-                React.createElement(
-                  "div",
-                  { className: styles.chips },
-                  ...chips.map((chip, i) =>
-                    React.createElement(
-                      "span",
-                      {
-                        key: chip.id,
-                        "data-testid": "flashcard-chip",
-                        className: styles.chip,
-                      },
-                      chip.name,
-                      React.createElement(
-                        "span",
-                        {
-                          className: styles.chipRemove,
-                          onClick: () => removeChip(i),
-                        },
-                        "\u00d7"
-                      )
-                    )
-                  )
-                ),
-                React.createElement("input", {
-                  "data-testid": "flashcard-tag-input",
-                  type: "text",
-                  className: styles.tagInput,
+                React.createElement(InlineChipInput, {
+                  options: allTags,
+                  value: chips,
+                  onChange: setChips as (tags: Tag[]) => void,
                   placeholder: "Add tag...",
-                  value: tagInput,
-                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                    setTagInput(e.target.value);
-                    if (!showSuggestions) setShowSuggestions(true);
-                  },
-                  onFocus: () => {
-                    if (!allTags.length) fetchTags();
-                    setShowSuggestions(true);
-                  },
-                  onKeyDown: (e: React.KeyboardEvent) => {
-                    if (e.key === "Backspace" && !tagInput && chips.length > 0) {
-                      removeChip(chips.length - 1);
-                    }
-                  },
-                }),
-                showSuggestions &&
-                  React.createElement(
-                    "div",
-                    {
-                      "data-testid": "flashcard-tag-suggestions",
-                      className: styles.suggestions,
-                    },
-                    ...filteredTags.map((tag) =>
-                      React.createElement(
-                        "div",
-                        {
-                          key: tag.id,
-                          "data-testid": "tag-suggestion-item",
-                          className: styles.suggestionItem,
-                          onClick: () => addChip(tag),
-                        },
-                        tag.name
-                      )
-                    )
-                  )
+                })
               ),
               error &&
                 React.createElement(
