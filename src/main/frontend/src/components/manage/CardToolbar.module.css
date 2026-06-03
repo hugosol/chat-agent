@@ -31,7 +31,12 @@
   font-size: 0.75em;
 }
 
-.sortBtn:hover,
+@media (hover: hover) {
+  .sortBtn:hover {
+    color: #e0e0e0;
+    border-color: #e94560;
+  }
+}
 .activeSort {
   color: #e0e0e0;
   border-color: #e94560;
@@ -54,7 +59,13 @@
   transition: background 0.2s, color 0.2s;
 }
 
-.deckChip:hover,
+@media (hover: hover) {
+  .deckChip:hover {
+    background: #e94560;
+    color: #fff;
+    border-color: #e94560;
+  }
+}
 .activeDeck {
   background: #e94560;
   color: #fff;
