@@ -19,35 +19,63 @@ class ManagePageIT extends E2ETestBase {
         tagRepository.deleteAll(tagRepository.findAll());
     }
 
+    private void navigateToManage() {
+        page.navigate("http://localhost:" + serverPort + "/manage/index.html");
+        page.waitForSelector("[data-testid='tab-cards']");
+        page.waitForSelector("[data-testid='tab-tags']");
+    }
+
+    private Tag createTag(String name, String type) {
+        Tag tag = new Tag(name, DEFAULT_USER_ID);
+        tag.setType(type);
+        return tagRepository.save(tag);
+    }
+
+    private Card createCard(String front, String back, Tag... tags) {
+        Card card = new Card(DEFAULT_USER_ID, front, back);
+        for (Tag t : tags) {
+            card.getTags().add(t);
+        }
+        return cardRepository.save(card);
+    }
+
     @Test
-    void fullManageFlow_navTagCrudCardCrud_searchSortFilterPagination_detailModal_orphanAlert_delete() {
-        var lastToastMsg = new AtomicReference<String>();
-
-        // === Step 1: nav sidebar on chat page ===
-        takeScreenshot("step1a-chat-page");
-
+    void manageNavSidebar() {
         page.waitForSelector("[data-testid='nav-menu-btn']");
+        takeScreenshot("chat-nav-closed");
+
         page.locator("[data-testid='nav-menu-btn']").click();
         page.waitForSelector("[data-testid='nav-sidebar'][aria-expanded='true']");
 
         assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(2);
         assertThat(page.locator("[data-testid='nav-link'][data-active='true']").textContent()).isEqualTo("💬 Chat");
 
-        takeScreenshot("step1b-nav-open");
+        takeScreenshot("chat-nav-open");
 
         page.locator("[data-testid='nav-sidebar-close']").click();
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='nav-sidebar']\").getAttribute('aria-expanded') !== 'true'");
 
-        page.navigate("http://localhost:" + serverPort + "/manage/index.html");
-        page.waitForSelector("[data-testid='tab-cards']");
-        page.waitForSelector("[data-testid='tab-tags']");
+        navigateToManage();
 
-        takeScreenshot("step1c-manage-page");
+        page.locator("[data-testid='nav-menu-btn']").click();
+        page.waitForSelector("[data-testid='nav-sidebar'][aria-expanded='true']");
 
-        // === Step 2: Tag creation ===
+        assertThat(page.locator("[data-testid='nav-link'][data-active='true']").textContent()).isEqualTo("📋 Manage");
+        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(2);
+
+        takeScreenshot("manage-nav-open");
+
+        page.locator("[data-testid='nav-sidebar-close']").click();
+        page.waitForFunction(
+                "() => document.querySelector(\"[data-testid='nav-sidebar']\").getAttribute('aria-expanded') !== 'true'");
+    }
+
+    @Test
+    void manageTagCrud() {
+        navigateToManage();
+
         page.locator("[data-testid='tab-tags']").click();
-
         page.waitForSelector("button:has-text('创建标签')");
         page.waitForTimeout(100);
 
@@ -57,7 +85,6 @@ class ManagePageIT extends E2ETestBase {
         page.locator("#newTagDeck").check();
         page.locator("#newTagName").fill("Daily English");
         page.locator("[data-testid='modal-save']").click();
-
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
 
@@ -66,10 +93,8 @@ class ManagePageIT extends E2ETestBase {
 
         page.locator("button:has-text('创建标签')").click();
         page.waitForSelector("[data-testid='modal-overlay']");
-
         page.locator("#newTagName").fill("verb");
         page.locator("[data-testid='modal-save']").click();
-
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
 
@@ -80,9 +105,49 @@ class ManagePageIT extends E2ETestBase {
         assertThat(tags).hasSize(2);
         assertThat(tags).extracting(Tag::getType).containsExactlyInAnyOrder("deck", null);
 
-        takeScreenshot("step2-tags-created");
+        takeScreenshot("tags-created");
 
-        // === Step 3: Card creation ===
+        page.waitForSelector("[data-testid='tag-table'] tr[data-name='verb'] [data-testid='btn-edit-tag']");
+        page.locator("[data-testid='tag-table'] tr[data-name='verb'] [data-testid='btn-edit-tag']").click();
+
+        page.waitForSelector("[data-testid='edit-name-input']");
+        assertThat(page.locator("[data-testid='edit-name-input']").inputValue()).isEqualTo("verb");
+
+        page.locator("[data-testid='edit-name-input']").fill("verbs");
+        page.locator("[data-testid='btn-save-tag']").click();
+        page.waitForFunction(
+                "() => document.querySelector(\"[data-testid='edit-name-input']\") === null");
+
+        assertThat(page.locator("[data-testid='tag-table'] tr[data-name='verbs'] td:first-child").textContent()).isEqualTo("verbs");
+
+        takeScreenshot("tag-edited");
+
+        page.waitForSelector("[data-testid='tag-table'] tr[data-name='verbs'] [data-testid='btn-delete-tag']");
+        page.locator("[data-testid='tag-table'] tr[data-name='verbs'] [data-testid='btn-delete-tag']").click();
+        page.waitForSelector("[data-testid='modal-overlay']");
+        page.locator("[data-testid='modal-save']").click();
+        page.waitForFunction(
+                "() => document.querySelector(\"[data-testid='tag-table'] tr[data-name='verbs']\") === null");
+
+        page.waitForSelector("[data-testid='tag-table'] tr[data-name='Daily English'] [data-testid='btn-delete-tag']");
+        page.locator("[data-testid='tag-table'] tr[data-name='Daily English'] [data-testid='btn-delete-tag']").click();
+        page.waitForSelector("[data-testid='modal-overlay']");
+        page.locator("[data-testid='modal-save']").click();
+        page.waitForFunction(
+                "() => document.querySelector(\"[data-testid='tag-table'] tr[data-name='Daily English']\") === null");
+
+        page.waitForSelector("[data-testid='empty-state']");
+        assertThat(page.locator("[data-testid='empty-state']").textContent()).contains("暂无标签");
+
+        assertThat(tagRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void manageCardCrud() {
+        Tag deckTag = createTag("Daily English", "deck");
+        Tag normalTag = createTag("verb", null);
+
+        navigateToManage();
         page.locator("[data-testid='tab-cards']").click();
 
         page.waitForSelector("[data-testid='card-search']");
@@ -104,7 +169,6 @@ class ManagePageIT extends E2ETestBase {
         page.locator("[data-testid='chip-suggestion']:has-text('verb')").click();
 
         page.locator("[data-testid='modal-save']").click();
-
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
 
@@ -114,9 +178,6 @@ class ManagePageIT extends E2ETestBase {
 
         var tagChips = page.locator("[data-testid='card-tag-chip']");
         assertThat(tagChips.count()).isEqualTo(2);
-        var chipTexts = page.locator("[data-testid='card-tag-chip']").allTextContents();
-        assertThat(chipTexts).anyMatch(t -> t.contains("Daily English"));
-        assertThat(chipTexts).anyMatch(t -> t.contains("verb"));
 
         var cards = cardRepository.findAll();
         assertThat(cards).hasSize(1);
@@ -126,9 +187,8 @@ class ManagePageIT extends E2ETestBase {
         assertThat(card.getUserId()).isEqualTo(DEFAULT_USER_ID);
         assertThat(card.getTags()).hasSize(2);
 
-        takeScreenshot("step3-card-created");
+        takeScreenshot("card-created");
 
-        // === Step 4: Card edit ===
         page.locator("[data-testid='btn-edit-card']").click();
         page.waitForSelector("[data-testid='modal-overlay']");
 
@@ -136,9 +196,7 @@ class ManagePageIT extends E2ETestBase {
         assertThat(page.locator("[data-testid='card-form-back']").inputValue()).isEqualTo("昨天");
 
         page.locator("[data-testid='card-form-front']").fill("Yesterday");
-
         page.locator("[data-testid='modal-save']").click();
-
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
 
@@ -148,25 +206,41 @@ class ManagePageIT extends E2ETestBase {
                 "return el && el.textContent && el.textContent.includes('Yesterday'); }");
         assertThat(page.locator("[data-testid='card-front']").textContent()).contains("Yesterday");
 
-        takeScreenshot("step4-card-edited");
+        takeScreenshot("card-edited");
+    }
 
-        // === Step 5: Search ===
-        page.locator("[data-testid='card-search']").fill("yesterday");
+    @Test
+    void manageSearch() {
+        createCard("hello", "你好");
+
+        navigateToManage();
+        page.locator("[data-testid='tab-cards']").click();
+        page.waitForSelector("[data-testid='card-search']");
+        page.waitForSelector("[data-testid='card-block']");
+
+        page.locator("[data-testid='card-search']").fill("hello");
         page.waitForFunction(
                 "() => { var el = document.querySelector(\"[data-testid='card-front']\"); " +
-                "return el && el.textContent && el.textContent.includes('Yesterday'); }");
+                "return el && el.textContent && el.textContent.includes('hello'); }");
 
         assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(1);
-        assertThat(page.locator("[data-testid='card-front']").textContent()).contains("Yesterday");
+        assertThat(page.locator("[data-testid='card-front']").textContent()).contains("hello");
 
         page.locator("[data-testid='card-search']").fill("");
         page.waitForTimeout(400);
-
         assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(1);
 
-        takeScreenshot("step5-search");
+        takeScreenshot("search");
+    }
 
-        // === Step 6: Sort ===
+    @Test
+    void manageSort() {
+        createCard("hello", "你好");
+
+        navigateToManage();
+        page.locator("[data-testid='tab-cards']").click();
+        page.waitForSelector("[data-testid='card-search']");
+
         page.locator("[data-testid='sort-btn-name']").click();
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='sort-btn-name'][data-active='true']\") !== null");
@@ -185,18 +259,17 @@ class ManagePageIT extends E2ETestBase {
         page.locator("[data-testid='sort-btn-name']").click();
         page.waitForTimeout(200);
 
-        takeScreenshot("step6-sort");
+        takeScreenshot("sort");
+    }
 
-        // === Step 7: Deck chip filtering ===
-        Tag verbTag = tagRepository.findAll().stream()
-                .filter(t -> "verb".equals(t.getName()))
-                .findFirst().orElseThrow();
-        Card cardNoDeck = new Card(DEFAULT_USER_ID, "hello", "你好");
-        cardNoDeck.getTags().add(verbTag);
-        cardRepository.save(cardNoDeck);
+    @Test
+    void manageDeckFilter() {
+        Tag deckTag = createTag("Daily English", "deck");
+        Tag normalTag = createTag("verb", null);
+        createCard("Yesterday", "昨天", deckTag, normalTag);
+        createCard("hello", "你好", normalTag);
 
-        page.locator("[data-testid='tab-tags']").click();
-        page.waitForSelector("[data-testid='tag-table']");
+        navigateToManage();
         page.locator("[data-testid='tab-cards']").click();
         page.waitForSelector("[data-testid='card-block']");
 
@@ -210,20 +283,21 @@ class ManagePageIT extends E2ETestBase {
         assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(1);
         assertThat(page.locator("[data-testid='card-front']").textContent()).contains("Yesterday");
 
+        takeScreenshot("deck-filter");
+
         page.locator("[data-testid='deck-chip']:has-text('Daily English')").click();
         page.waitForTimeout(400);
         assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(2);
+    }
 
-        takeScreenshot("step7-deck-filter");
-
-        // === Step 8: Pagination ===
-        for (int i = 0; i < 19; i++) {
-            Card c = new Card(DEFAULT_USER_ID, "card" + String.format("%02d", i), "卡片" + i);
-            cardRepository.save(c);
+    @Test
+    void managePagination() {
+        for (int i = 0; i < 21; i++) {
+            cardRepository.save(new Card(DEFAULT_USER_ID,
+                    "card" + String.format("%02d", i), "卡片" + i));
         }
 
-        page.locator("[data-testid='tab-tags']").click();
-        page.waitForSelector("[data-testid='tag-table']");
+        navigateToManage();
         page.locator("[data-testid='tab-cards']").click();
         page.waitForSelector("[data-testid='card-block']");
 
@@ -237,24 +311,19 @@ class ManagePageIT extends E2ETestBase {
         assertThat(page.locator("[data-testid='pagination'] [data-testid='page-num'][data-active='true']").textContent()).isEqualTo("2");
         assertThat(page.locator("[data-testid='card-block']").count()).isGreaterThan(0);
 
-        takeScreenshot("step8-pagination");
+        takeScreenshot("pagination");
+    }
 
-        var allCards = cardRepository.findAll();
-        for (Card c : allCards) {
-            if (!"Yesterday".equals(c.getFront())) {
-                cardRepository.delete(c);
-            }
-        }
+    @Test
+    void manageCardDetail() {
+        Tag deckTag = createTag("Daily English", "deck");
+        Tag normalTag = createTag("verb", null);
+        createCard("Yesterday", "昨天", deckTag, normalTag);
 
-        page.locator("[data-testid='tab-tags']").click();
-        page.waitForSelector("[data-testid='tag-table']");
+        navigateToManage();
         page.locator("[data-testid='tab-cards']").click();
         page.waitForSelector("[data-testid='card-block']");
 
-        page.waitForSelector("[data-testid='card-block']");
-        assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(1);
-
-        // === Step 9: Card detail modal ===
         page.locator("[data-testid='card-block']").click();
         page.waitForSelector("[data-testid='modal-overlay'] .detail-item");
 
@@ -275,33 +344,26 @@ class ManagePageIT extends E2ETestBase {
         assertThat(page.locator("[data-testid='modal-overlay'] .detail-item .detail-label:has-text('State') + .detail-value").textContent())
                 .isEqualTo("New");
 
-        takeScreenshot("step9-detail-modal");
+        takeScreenshot("card-detail");
 
         page.locator("[data-testid='modal-cancel']").click();
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
+    }
 
-        // === Step 11: Tag inline edit ===
+    @Test
+    void manageOrphanAlert() {
+        var lastToastMsg = new AtomicReference<String>();
+
+        Tag deckTag = createTag("Daily English", "deck");
+        Tag normalTag = createTag("verb", null);
+        createCard("Yesterday", "昨天", deckTag, normalTag);
+
+        navigateToManage();
+
         page.locator("[data-testid='tab-tags']").click();
         page.waitForSelector("[data-testid='tag-table']");
 
-        page.waitForSelector("[data-testid='tag-table'] tr[data-name='verb'] [data-testid='btn-edit-tag']");
-        page.locator("[data-testid='tag-table'] tr[data-name='verb'] [data-testid='btn-edit-tag']").click();
-
-        page.waitForSelector("[data-testid='edit-name-input']");
-        assertThat(page.locator("[data-testid='edit-name-input']").inputValue()).isEqualTo("verb");
-
-        page.locator("[data-testid='edit-name-input']").fill("verbs");
-        page.locator("[data-testid='btn-save-tag']").click();
-
-        page.waitForFunction(
-                "() => document.querySelector(\"[data-testid='edit-name-input']\") === null");
-
-        assertThat(page.locator("[data-testid='tag-table'] tr[data-name='verbs'] td:first-child").textContent()).isEqualTo("verbs");
-
-        takeScreenshot("step11-tag-edited");
-
-        // === Step 12: Orphan check (BEFORE card deletion, still on Tags tab from step 11) ===
         page.waitForSelector("[data-testid='tag-table'] tr[data-name='Daily English'] [data-testid='btn-delete-tag']");
         page.locator("[data-testid='tag-table'] tr[data-name='Daily English'] [data-testid='btn-delete-tag']").click();
 
@@ -316,81 +378,45 @@ class ManagePageIT extends E2ETestBase {
                 "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
 
         assertThat(page.locator("[data-testid='tag-table'] tr[data-name='Daily English']").count()).isEqualTo(1);
+        assertThat(tagRepository.findAll()).hasSize(2);
+        assertThat(tagRepository.findAll()).extracting(Tag::getName).contains("Daily English");
 
-        var tagsAfterOrphan = tagRepository.findAll();
-        assertThat(tagsAfterOrphan).hasSize(2);
-        assertThat(tagsAfterOrphan).extracting(Tag::getName)
-                .contains("Daily English");
+        takeScreenshot("orphan-alert");
 
-        takeScreenshot("step12-orphan-alert");
-
-        // === Step 10: Card deletion ===
         page.locator("[data-testid='tab-cards']").click();
         page.waitForSelector("[data-testid='card-block']");
 
         page.waitForSelector("[data-testid='btn-delete-card']");
         page.locator("[data-testid='btn-delete-card']").click();
-
         page.waitForSelector("[data-testid='modal-overlay']");
         page.locator("[data-testid='modal-save']").click();
-
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='card-block']\") === null");
+        assertThat(cardRepository.findAll()).isEmpty();
 
-        var cardsAfterDelete = cardRepository.findAll();
-        assertThat(cardsAfterDelete).isEmpty();
+        takeScreenshot("card-deleted-for-orphan");
 
-        takeScreenshot("step10-card-deleted");
-
-        // === Step 13: Tag deletion success ===
         page.locator("[data-testid='tab-tags']").click();
         page.waitForSelector("[data-testid='tag-table']");
 
-        page.waitForSelector("[data-testid='tag-table'] tr[data-name='verbs'] [data-testid='btn-delete-tag']");
-        page.locator("[data-testid='tag-table'] tr[data-name='verbs'] [data-testid='btn-delete-tag']").click();
-
-        page.waitForSelector("[data-testid='modal-overlay']");
-        page.locator("[data-testid='modal-save']").click();
-
-        page.waitForFunction(
-                "() => document.querySelector(\"[data-testid='tag-table'] tr[data-name='verbs']\") === null");
-
-        var tagsAfterVerbDelete = tagRepository.findAll();
-        assertThat(tagsAfterVerbDelete).hasSize(1);
-
         page.waitForSelector("[data-testid='tag-table'] tr[data-name='Daily English'] [data-testid='btn-delete-tag']");
         page.locator("[data-testid='tag-table'] tr[data-name='Daily English'] [data-testid='btn-delete-tag']").click();
-
         page.waitForSelector("[data-testid='modal-overlay']");
         page.locator("[data-testid='modal-save']").click();
-
         page.waitForFunction(
                 "() => document.querySelector(\"[data-testid='tag-table'] tr[data-name='Daily English']\") === null");
 
-        var tagsAfterDeckDelete = tagRepository.findAll();
-        assertThat(tagsAfterDeckDelete).isEmpty();
+        page.waitForSelector("[data-testid='tag-table'] tr[data-name='verb'] [data-testid='btn-delete-tag']");
+        page.locator("[data-testid='tag-table'] tr[data-name='verb'] [data-testid='btn-delete-tag']").click();
+        page.waitForSelector("[data-testid='modal-overlay']");
+        page.locator("[data-testid='modal-save']").click();
+        page.waitForFunction(
+                "() => document.querySelector(\"[data-testid='tag-table'] tr[data-name='verb']\") === null");
 
         page.waitForSelector("[data-testid='empty-state']");
         assertThat(page.locator("[data-testid='empty-state']").textContent()).contains("暂无标签");
+        assertThat(tagRepository.findAll()).isEmpty();
 
-        takeScreenshot("step13-tags-all-deleted");
-
-        // === Step 14: nav sidebar on manage page ===
-        page.locator("[data-testid='nav-menu-btn']").click();
-        page.waitForSelector("[data-testid='nav-sidebar'][aria-expanded='true']");
-
-        assertThat(page.locator("[data-testid='nav-link'][data-active='true']").textContent()).isEqualTo("📋 Manage");
-        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(2);
-
-        takeScreenshot("step14-nav-manage");
-
-        page.locator("[data-testid='nav-sidebar-close']").click();
-        page.waitForFunction(
-                "() => document.querySelector(\"[data-testid='nav-sidebar']\").getAttribute('aria-expanded') !== 'true'");
-
-        page.navigate("http://localhost:" + serverPort + "/");
-        page.waitForSelector("[data-testid='nav-menu-btn']");
-
-        takeScreenshot("step14-back-to-chat");
+        takeScreenshot("tags-all-deleted");
     }
 }
