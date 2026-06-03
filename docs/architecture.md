@@ -61,6 +61,7 @@
 | 47 | REST API 模式引入 | `FlashcardController` 为代码库首个 `@RestController`（`POST /api/cards/add` + `GET /api/tags`）。认证走 JSESSIONID cookie（与 WebSocket 一致），`/api/**` 不走 `permit-all-paths`（需要认证），CSRF 对 `/api/**` 在 `SecurityConfig` 中禁用。 |
 | 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。Phase 1：Header.tsx + CorrectionSidebar 迁入 React。Phase 2：WebSocket 服务层 + `useReducer + context` 集中状态管理。Phase 3：MessageList + ChatInput + Footer 迁入 React，`useChatWebSocket` 移除。**Phase 4 完成**：StatusBar、ReportModal、DebugPanel、FlashcardPanel 全部迁入 React；`app.js`、`flashcard.js`、`style.css` 及 manage 页面 vanilla JS 文件全部删除；Chat 页面单根渲染（无 Portal）；`ChatProvider` 直接处理所有 WS 消息（无 vanilla bridge）。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试，E2E 测试使用 `data-testid` 属性选择器。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
 | 49 | Chat 页面 React 集中状态管理 | 四期路线图：Phase 1（CorrectionSidebar 独立模块）→ Phase 2（WebSocket 服务层 + `useReducer + context`）→ Phase 3（MessageList + ChatInput + Footer）→ **Phase 4 完成**（StatusBar + ReportModal + DebugPanel + FlashcardPanel）。Phase 4 成果：`app.js` 完全删除，Chat 页面单根 `ChatPage` 组件渲染；`ChatProvider` 统一处理所有 WS 消息类型（SESSION_REPORT, ERROR, TOKEN_WARNING, STATE_UPDATE, WS_CLOSED 全部通过 `dispatch(action)` 进入 reducer）；`appStatus` 替代 `sessionStatus`，覆盖完整生命周期（Connecting→Connected→UserTurn→Processing→Warning→Error→Disconnected）；组件依赖关系完全通过 `useChatContext()`。详见 ADR `centralized-chat-state.md`。 |
+| 50 | CSV 批量导入导出设计决策 | 选择 Apache Commons CSV（RFC 4180 兼容、流式解析、轻量依赖）作为 CSV 解析库。限定单 deck tag 导入/导出（简化数据模型，CSV 不含 tags 列避免多对多序列化复杂度）。导入采用"前置全量校验 + 整体事务"策略：tagId 校验 → 逐行校验 → 内存去重 → SQL 查重全部在内存完成，全部通过后才 @Transactional 批量插入。cardState 使用文本映射（New/Learning/Review/Relearning）保证 CSV 跨系统可读性。parser 按名称匹配列（非列序号），缺失列自动留空、多余列忽略——兼容各种编辑器生成或手动调整的 CSV。新增 BatchOperationLog 表记录所有批量操作历史（审计追溯）。前端工具栏重构：排序和批量操作合并为两个 DropdownMenu 按钮，BatchOperationModal 共享导入/导出两种模式。 |
 
 ---
 
@@ -563,7 +564,7 @@ chat-agent/
 │   │   └── AleaPrng.java                  // Alea PRNG（Johannes Baagøe 算法，替代 java.util.Random 用于确定性 fuzz）
 │   │
 │   ├── controller/                         // REST API（首次引入 @RestController）
-│   │   └── FlashcardController.java       // POST /api/cards/add + GET /api/tags
+│   │   └── FlashcardController.java       // POST /api/cards/add + GET /api/tags + POST /api/cards/import + GET /api/cards/export
 │   │
 │   ├── agent/                              // Agent 调用封装
 │   │   ├── common/                         // 横切关注点：TaskRunner 公共模块
@@ -586,7 +587,9 @@ chat-agent/
 │   │   ├── CorrectionData.java           // 纠错结果序列化
 │   │   ├── AddCardRequest.java           // 闪卡创建请求 (front, back, tags)
 │   │   ├── AddCardResponse.java          // 闪卡创建响应 (id, front, back, tags, due)
-│   │   └── TagResponse.java              // 标签响应 (name, type)
+│   │   ├── TagResponse.java              // 标签响应 (name, type)
+│   │   ├── ImportResult.java             // 导入结果 (totalRows, successCount, errors)
+│   │   └── ImportError.java              // 导入错误 (row, front, reason)
 │   │
 │   ├── websocket/
 │   │   ├── ChatWebSocketHandler.java      // WS 端点 (TextWebSocketHandler)
@@ -612,6 +615,9 @@ chat-agent/
 │   │   ├── UserLearningProfile.java                 // 跨会话记忆（Topic Memory + Learning Profile，含 sessionId 追溯）
 │   │   ├── MemoryCue.java                  // 结构化话题记忆（topic/summary，含状态追踪）
 │   │   ├── LlmCallLog.java                 // LLM API 调用日志（prompt/response/tokens/duration/status）
+│   │   ├── BatchOperationLog.java          // 批量操作日志（导入/导出审计）
+│   │   ├── BatchOperationType.java         // 枚举: IMPORT / EXPORT
+│   │   ├── BatchOperationStatus.java       // 枚举: SUCCESS / PARTIAL / FAILED
 │   │   ├── MemoryCueStatus.java            // 枚举: COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
@@ -622,7 +628,8 @@ chat-agent/
 │   │   ├── UserRepository.java             // findByUsername
 │   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
-│   │   ├── CardRepository.java             // 闪卡 CRUD
+│   │   ├── CardRepository.java             // 闪卡 CRUD + findExistingFronts 批量查重
+│   │   ├── BatchOperationLogRepository.java // 批量操作日志 CRUD
 │   │   ├── TagRepository.java              // findByNameAndUserId + findByUserId
 │   │   ├── ErrorRecordRepository.java
 │   │   ├── SessionReportRepository.java
@@ -644,6 +651,9 @@ chat-agent/
 │   │   ├── SessionCleanupLogoutHandler.java // 登出时清理 activeStates
 │   │   ├── EntityMapper.java              // 运行时数据 → JPA 实体转换
 │   │   └── TokenTracker.java               // 按 AgentType 分计 token
+│   │   └── card/                           // 闪卡批量操作
+│   │       ├── CardCsvParser.java           // CSV 解析器（按名称匹配列，BOM 兼容，cardState 文本映射）
+│   │       └── CardBatchService.java        // 批量导入/导出编排（校验 + 事务 + CSV 生成）
 │   │
 │   └── config/                             // 配置类
 │       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel + OpenAiStreamingChatModel) Bean 配置

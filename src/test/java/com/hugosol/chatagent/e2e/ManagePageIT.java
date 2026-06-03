@@ -236,28 +236,34 @@ class ManagePageIT extends E2ETestBase {
     @Test
     void manageSort() {
         createCard("hello", "你好");
+        createCard("apple", "苹果");
 
         navigateToManage();
         page.locator("[data-testid='tab-cards']").click();
         page.waitForSelector("[data-testid='card-search']");
 
-        page.locator("[data-testid='sort-btn-name']").click();
-        page.waitForFunction(
-                "() => document.querySelector(\"[data-testid='sort-btn-name'][data-active='true']\") !== null");
-        assertThat(page.locator("[data-testid='sort-btn-name'][data-active='true']").count()).isEqualTo(1);
+        assertThat(page.locator("[data-testid='sort-dropdown-btn']").textContent()).contains("Aa ↑");
 
-        page.locator("[data-testid='sort-btn-name']").click();
-        page.waitForTimeout(200);
+        page.locator("[data-testid='sort-dropdown-btn']").click();
+        page.waitForSelector("[data-testid='sort-option']");
 
-        page.locator("[data-testid='sort-btn-time']").click();
-        page.waitForFunction(
-                "() => document.querySelector(\"[data-testid='sort-btn-time'][data-active='true']\") !== null");
+        var sortOptions = page.locator("[data-testid='sort-option']");
+        assertThat(sortOptions.count()).isEqualTo(4);
 
-        page.locator("[data-testid='sort-btn-time']").click();
-        page.waitForTimeout(200);
+        sortOptions.filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("Aa ↑")).click();
+        page.waitForTimeout(400);
 
-        page.locator("[data-testid='sort-btn-name']").click();
-        page.waitForTimeout(200);
+        var cardFronts = page.locator("[data-testid='card-front']");
+        if (cardFronts.count() >= 2) {
+            assertThat(cardFronts.nth(0).textContent()).contains("apple");
+            assertThat(cardFronts.nth(1).textContent()).contains("hello");
+        }
+
+        page.locator("[data-testid='sort-dropdown-btn']").click();
+        page.waitForSelector("[data-testid='sort-option']");
+        page.locator("[data-testid='sort-option']").filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("T ↓")).click();
+        page.waitForTimeout(400);
+        assertThat(page.locator("[data-testid='sort-dropdown-btn']").textContent()).contains("T ↓");
 
         takeScreenshot("sort");
     }

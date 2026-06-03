@@ -638,7 +638,39 @@ showToast("加载卡片失败");  // 默认 2100ms 自动消失
 
 ---
 
-## 十、修订记录
+## 十、实现模式
+
+### 10.1 DropdownMenu 通用下拉菜单按钮模式
+
+**Props 约定**：`label`（按钮当前显示文字）、`items`（选项列表含 label/value/onClick）、`selectedValue`（当前选中值，选中项高亮）。
+
+**交互**：点击按钮展开纵向绝对定位菜单 → 点击菜单项触发回调+关闭菜单 → 点击外部关闭（`document.addEventListener("mousedown", ...)`）。
+
+**使用场景**：排序选择器（4 选项：Aa ↑/Aa ↓/T ↑/T ↓）、批量操作选择器（导出/导入 2 选项）。
+
+**移动端注意**：菜单 position 需考虑视口边界，避免溢出。当前实现为 `top: 100%; left: 0`。
+
+### 10.2 BatchOperationModal 三阶段状态机模式
+
+**状态**：`select-tag` → `ready` → `loading` → `result`。
+
+**导入模式**走全流程（4 个状态），**导出模式**走 select-tag → ready → 直接触发下载（跳过 loading/result）。
+
+**选 tag**：使用 `<select>` 下拉框（`/api/tags?type=deck` 数据源），未选中时操作按钮 `disabled`。
+
+**导入 result**：展示成功数 + 跳过行清单表格（行号、front、失败原因），`data-testid="batch-error-list"`。
+
+### 10.3 文件上传/下载模式（代码库首次）
+
+**上传**：`<input type="file" accept=".csv">` → `new FormData()` → `fetch(url, { method: "POST", body: formData, credentials: "same-origin" })` → 解析 JSON 响应展示结果。
+
+**下载**：`fetch(url, { credentials: "same-origin" })` → `response.blob()` → `URL.createObjectURL(blob)` → 创建隐藏 `<a>` 元素 → `a.click()` → `URL.revokeObjectURL()`。
+
+**CSRF**：已对 `/api/**` 禁用，仅需 JSESSIONID cookie（`credentials: "same-origin"`）。
+
+---
+
+## 十一、修订记录
 
 | 日期 | 内容 |
 |------|------|

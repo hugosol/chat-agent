@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { Tag } from "../../shared/types";
+import { DropdownMenu } from "./DropdownMenu";
+import type { DropdownItem } from "./DropdownMenu";
 import styles from "./CardToolbar.module.css";
 
 interface CardToolbarProps {
@@ -11,7 +13,20 @@ interface CardToolbarProps {
   onSortChange: (sort: string) => void;
   onDeckChange: (deckId: string | null) => void;
   onCreate: () => void;
+  onBatchOpen: (mode: "import" | "export") => void;
 }
+
+const SORT_ITEMS: DropdownItem[] = [
+  { label: "Aa ↑", value: "front,asc", onClick: () => {} },
+  { label: "Aa ↓", value: "front,desc", onClick: () => {} },
+  { label: "T ↑", value: "createTime,asc", onClick: () => {} },
+  { label: "T ↓", value: "createTime,desc", onClick: () => {} },
+];
+
+const BATCH_ITEMS: DropdownItem[] = [
+  { label: "导出", value: "export", onClick: () => {} },
+  { label: "导入", value: "import", onClick: () => {} },
+];
 
 function CardToolbar({
   search,
@@ -22,6 +37,7 @@ function CardToolbar({
   onSortChange,
   onDeckChange,
   onCreate,
+  onBatchOpen,
 }: CardToolbarProps): JSX.Element {
   const [localSearch, setLocalSearch] = useState(search);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,20 +58,19 @@ function CardToolbar({
     [onSearchChange]
   );
 
-  const handleSortClick = useCallback(
-    (field: string) => {
-      if (sort.startsWith(field)) {
-        const dir = sort.endsWith(",asc") ? ",desc" : ",asc";
-        onSortChange(field + dir);
-      } else {
-        onSortChange(field + (field === "front" ? ",asc" : ",desc"));
-      }
+  const handleSortSelect = useCallback(
+    (value: string) => {
+      onSortChange(value);
     },
-    [sort, onSortChange]
+    [onSortChange]
   );
 
-  const nameArrow = sort.startsWith("front") ? (sort.endsWith(",asc") ? " ↑" : " ↓") : "";
-  const timeArrow = sort.startsWith("createTime") ? (sort.endsWith(",asc") ? " ↑" : " ↓") : "";
+  const handleBatchSelect = useCallback(
+    (value: string) => {
+      onBatchOpen(value as "import" | "export");
+    },
+    [onBatchOpen]
+  );
 
   const hasDecks = decks.length > 0;
 
@@ -94,24 +109,26 @@ function CardToolbar({
           onChange={handleSearchChange}
         />
         <div className={styles.actions}>
-          <div className={styles.sortBtns}>
-            <button
-              className={`${styles.sortBtn}${sort.startsWith("front") ? " " + styles.activeSort : ""}`}
-              data-testid="sort-btn-name"
-              data-active={sort.startsWith("front") ? "true" : "false"}
-              onClick={() => handleSortClick("front")}
-            >
-              Aa{nameArrow}
-            </button>
-            <button
-              className={`${styles.sortBtn}${sort.startsWith("createTime") ? " " + styles.activeSort : ""}`}
-              data-testid="sort-btn-time"
-              data-active={sort.startsWith("createTime") ? "true" : "false"}
-              onClick={() => handleSortClick("createTime")}
-            >
-              T{timeArrow}
-            </button>
-          </div>
+          <DropdownMenu
+            label="Aa ↑"
+            items={SORT_ITEMS.map((item) => ({
+              ...item,
+              onClick: handleSortSelect,
+            }))}
+            selectedValue={sort}
+            testId="sort-dropdown-btn"
+            optionTestId="sort-option"
+          />
+          <DropdownMenu
+            label="📄"
+            items={BATCH_ITEMS.map((item) => ({
+              ...item,
+              onClick: handleBatchSelect,
+            }))}
+            selectedValue=""
+            testId="batch-dropdown-btn"
+            optionTestId="batch-option"
+          />
           <button className={styles.createBtn} onClick={onCreate}>
             +
           </button>

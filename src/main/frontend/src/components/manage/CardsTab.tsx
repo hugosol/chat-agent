@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Card, Tag, PageResponse } from "../../shared/types";
 import { CardToolbar } from "./CardToolbar";
 import { CardList } from "./CardList";
+import { BatchOperationModal } from "./BatchOperationModal";
 import { Modal } from "../../shared/Modal";
 import { InlineChipInput } from "../../shared/InlineChipInput";
 import { showToast } from "../../shared/Toast";
@@ -12,6 +13,7 @@ type ModalState =
   | { type: "detail"; card: Card }
   | { type: "create" | "edit"; card?: Card }
   | { type: "confirm-delete"; card: Card }
+  | { type: "batch"; mode: "import" | "export" }
   | null;
 
 const CARD_STATE_LABELS = ["New", "Learning", "Review", "Relearning"];
@@ -175,6 +177,10 @@ function CardsTab(): JSX.Element {
     if (eng) speakText(eng);
   }, []);
 
+  const handleBatchOpen = useCallback((mode: "import" | "export") => {
+    setModal({ type: "batch", mode });
+  }, []);
+
   const toolbar = (
     <CardToolbar
       search={search}
@@ -185,6 +191,7 @@ function CardsTab(): JSX.Element {
       onSortChange={(s) => { setSort(s); setPage(0); }}
       onDeckChange={(id) => { setDeckId(id); setPage(0); }}
       onCreate={handleOpenCreate}
+      onBatchOpen={handleBatchOpen}
     />
   );
 
@@ -310,6 +317,17 @@ function CardsTab(): JSX.Element {
         >
           <p>确定要删除卡片 "{modal.card.front}" 吗？</p>
         </Modal>
+      )}
+
+      {modal?.type === "batch" && (
+        <BatchOperationModal
+          mode={modal.mode}
+          onClose={handleCloseModal}
+          onComplete={() => {
+            fetchCards();
+            fetchDecks();
+          }}
+        />
       )}
     </div>
   );

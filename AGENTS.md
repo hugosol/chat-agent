@@ -83,18 +83,20 @@ com.hugosol.chatagent/
 �?  └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName, TaskContext, ErrorStrategy
 ├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
-├── controller/      # FlashcardController �?REST API (Cards CRUD + Tags CRUD, 8 endpoints)
+├── controller/      # FlashcardController �?REST API (Cards CRUD + Tags CRUD + Import/Export, 10 endpoints)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 �?                   # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
 �?                   # FlashcardService (createCard with FSRS init + Tag upsert),
 �?                   # LearningProfileService, MemoryCueService,
 �?                   # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
+�?  └── card/          # CardCsvParser (CSV解析器), CardBatchService (批量导入/导出编排)
 ├── model/           # JPA entities + enums: User, Session, Message, Card, Tag, ErrorRecord, SessionReport,
-�?                   # UserProgress, UserLearningProfile, MemoryCue, AgentMode, MemoryCueStatus, TimeLabel, ...
-├── repository/      # Spring Data JPA repos (10: User, Session, Message, Card, Tag, ErrorRecord, SessionReport,
-�?                   # UserProgress, UserLearningProfile, MemoryCue, LlmCallLog)
-├── dto/             # Data transfer records: MessageData, CorrectionData, MemoryContent, CueMatch, AddCardRequest/Response, TagResponse
+�?                   # UserProgress, UserLearningProfile, MemoryCue, AgentMode, MemoryCueStatus, TimeLabel,
+�?                   # BatchOperationLog, BatchOperationType, BatchOperationStatus, ...
+├── repository/      # Spring Data JPA repos (11: User, Session, Message, Card, Tag, ErrorRecord, SessionReport,
+�?                   # UserProgress, UserLearningProfile, MemoryCue, LlmCallLog, BatchOperationLog)
+├── dto/             # Data transfer records: MessageData, CorrectionData, MemoryContent, CueMatch, AddCardRequest/Response, TagResponse, ImportResult, ImportError
 ├── config/          # LangChain4jConfig, SecurityConfig, WebSocketConfig, AsyncConfig,
 �?                   # AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader
 └── speech/          # (vacant �?V2 will add STT/TTS adapters when needed)
@@ -106,7 +108,7 @@ src/test/java/com/hugosol/chatagent/e2e/
 ├── DailyTalkIT.java           # DAILY_TALK mode �?teaching-style corrections
 ├── ChatAgentMemoryCueIT.java  # Session end �?MemoryCue structured generation verification
 ├── ManagePageIT.java          # Manage page: tag/card CRUD, search, sort, deck chip filtering, pagination, detail modal, TTS
-├── FlashcardIT.java           # 闪卡录入：两阶段面板 �?标签创建 �?保存 �?H2 数据验证（不依赖 WireMock，闪卡不�?LLM�?
+├── FlashcardIT.java           # 闪卡录入：两阶段面板 �?标签创建 �?保存 �?H2 数据验证（不依赖 WireMock，闪卡不�?LLM�?br>├── FlashcardBatchIT.java      # 闪卡批量导入/导出：完整往返流程 �?导出 CSV �?删卡 �?导入 CSV �?FSRS 状态还原验证
 └── helper/
     ├── E2ETestBase.java          # @SpringBootTest base: WireMock (19090), Playwright, DOM waits, @ActiveProfiles("e2e")
     └── WireMockStubs.java        # Scenario state machine stubs (memory cue stubs included, JSON Path body matching)
@@ -172,6 +174,7 @@ Server �?Client:
 - **AleaPrng**: Custom Alea PRNG (Johannes Baagøe's algorithm) replacing `java.util.Random` for deterministic cross-implementation fuzz. Used via `DoubleSupplier` in `repeat()`.
 - **Two-stage UI**: Stage 1 — minimal panel (~60px) with front input + "继续" button. Stage 2 — expanded (~70vh max) with back textarea + chip tag input (autocomplete from `GET /api/tags`) + "保存" button. Implemented as React `FlashcardPanel` component. Panel and Debug panel mutually exclusive via `window.activePanel`.
 - **E2E**: `FlashcardIT` extends `E2ETestBase`. No WireMock stubs needed (flashcard doesn't call LLM). `E2ETestBase` autowires `CardRepository` + `TagRepository`.
+- **Batch import/export**: `CardBatchService` (standalone Service with import validation pipeline + `@Transactional` insert + export CSV generation), `CardCsvParser` (CSV parser with header-name-based column matching, BOM compatibility, cardState text mapping), `BatchOperationLog` (audit entity + Repository). New endpoints: `POST /api/cards/import` (multipart/form-data, returns `ImportResult` with `totalRows`/`successCount`/`errors`), `GET /api/cards/export?tagId=` (downloads UTF-8 CSV with full FSRS state). `Apache Commons CSV 1.11.0` dependency added. `spring.servlet.multipart.max-file-size=5MB`. Frontend: `DropdownMenu` (generic dropdown button component), `BatchOperationModal` (three-stage state machine for import/export), `CardToolbar` refactored to use dropdown menus for sort and batch operations.
 
 ## Logging
 
