@@ -8,8 +8,8 @@ const baseCard: Card = {
   front: "hello world",
   back: "你好世界\nThe greeting",
   tags: [
-    { id: 1, name: "greeting", type: null },
-    { id: 2, name: "basic", type: "deck" },
+    { id: "1", name: "greeting", type: null },
+    { id: "2", name: "basic", type: "deck" },
   ],
   due: "2025-01-15T00:00:00",
   cardState: 0,

@@ -4,8 +4,8 @@ import { TagsTab } from "../../components/manage/TagsTab";
 import type { Tag } from "../../shared/types";
 
 const mockTags: Tag[] = [
-  { id: 1, name: "Daily English", type: "deck" },
-  { id: 2, name: "verb", type: null },
+  { id: "1", name: "Daily English", type: "deck" },
+  { id: "2", name: "verb", type: null },
 ];
 
 function setupFetchMocks() {

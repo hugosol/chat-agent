@@ -4,8 +4,8 @@ import { CardToolbar } from "../../components/manage/CardToolbar";
 import type { Tag } from "../../shared/types";
 
 const sampleDecks: Tag[] = [
-  { id: 1, name: "Daily English", type: "deck" },
-  { id: 2, name: "Work", type: "deck" },
+  { id: "1", name: "Daily English", type: "deck" },
+  { id: "2", name: "Work", type: "deck" },
 ];
 
 describe("CardToolbar", () => {
@@ -76,7 +76,7 @@ describe("CardToolbar", () => {
       <CardToolbar
         search=""
         sort="front,asc"
-        deckId={1}
+        deckId={"1"}
         decks={sampleDecks}
         onSearchChange={vi.fn()}
         onSortChange={vi.fn()}

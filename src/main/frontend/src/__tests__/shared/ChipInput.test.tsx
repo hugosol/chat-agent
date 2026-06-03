@@ -5,13 +5,13 @@ import type { Tag } from "../../shared/useTagAutocomplete";
 
 describe("ChipInput", () => {
   const tags: Tag[] = [
-    { id: 1, name: "work", type: "deck" },
-    { id: 2, name: "vocab", type: null },
-    { id: 3, name: "hobby", type: null },
+    { id: "1", name: "work", type: "deck" },
+    { id: "2", name: "vocab", type: null },
+    { id: "3", name: "hobby", type: null },
   ];
 
   it("renders selected chips and input", () => {
-    const selected: Tag[] = [{ id: 1, name: "work", type: "deck" }];
+    const selected: Tag[] = [{ id: "1", name: "work", type: "deck" }];
     render(
       <ChipInput
         options={tags}
@@ -34,24 +34,24 @@ describe("ChipInput", () => {
     const suggestion = screen.getByText("vocab");
     fireEvent.click(suggestion);
 
-    expect(onChange).toHaveBeenCalledWith([{ id: 2, name: "vocab", type: null }]);
+    expect(onChange).toHaveBeenCalledWith([{ id: "2", name: "vocab", type: null }]);
   });
 
   it("removes chip when × is clicked", () => {
     const onChange = vi.fn();
     const selected: Tag[] = [
-      { id: 1, name: "work", type: "deck" },
-      { id: 2, name: "vocab", type: null },
+      { id: "1", name: "work", type: "deck" },
+      { id: "2", name: "vocab", type: null },
     ];
     render(<ChipInput options={tags} value={selected} onChange={onChange} />);
 
     fireEvent.click(screen.getAllByTestId("chip-remove")[0]);
-    expect(onChange).toHaveBeenCalledWith([{ id: 2, name: "vocab", type: null }]);
+    expect(onChange).toHaveBeenCalledWith([{ id: "2", name: "vocab", type: null }]);
   });
 
   it("removes last chip on backspace when input is empty", () => {
     const onChange = vi.fn();
-    const selected: Tag[] = [{ id: 1, name: "work", type: "deck" }];
+    const selected: Tag[] = [{ id: "1", name: "work", type: "deck" }];
     render(<ChipInput options={tags} value={selected} onChange={onChange} />);
 
     const input = screen.getByTestId("chip-input-field");
@@ -62,7 +62,7 @@ describe("ChipInput", () => {
 
   it("does not add duplicate tag", () => {
     const onChange = vi.fn();
-    const selected: Tag[] = [{ id: 2, name: "vocab", type: null }];
+    const selected: Tag[] = [{ id: "2", name: "vocab", type: null }];
     render(<ChipInput options={tags} value={selected} onChange={onChange} />);
 
     const input = screen.getByTestId("chip-input-field");

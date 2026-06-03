@@ -4,8 +4,8 @@ import { TagTable } from "../../components/manage/TagTable";
 import type { Tag } from "../../shared/types";
 
 const sampleTags: Tag[] = [
-  { id: 1, name: "Daily English", type: "deck" },
-  { id: 2, name: "verb", type: null },
+  { id: "1", name: "Daily English", type: "deck" },
+  { id: "2", name: "verb", type: null },
 ];
 
 describe("TagTable", () => {
@@ -82,7 +82,7 @@ describe("TagTable", () => {
     render(
       <TagTable
         tags={sampleTags}
-        editingId={1}
+        editingId={"1"}
         editName="Daily English"
         editIsDeck={true}
         onEdit={vi.fn()}
@@ -101,7 +101,7 @@ describe("TagTable", () => {
     render(
       <TagTable
         tags={sampleTags}
-        editingId={1}
+        editingId={"1"}
         editName="Daily English"
         editIsDeck={true}
         onEdit={vi.fn()}
@@ -119,7 +119,7 @@ describe("TagTable", () => {
     render(
       <TagTable
         tags={sampleTags}
-        editingId={1}
+        editingId={"1"}
         editName="Daily English"
         editIsDeck={false}
         onEdit={vi.fn()}

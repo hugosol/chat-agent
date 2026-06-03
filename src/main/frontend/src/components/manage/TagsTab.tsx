@@ -7,7 +7,7 @@ import { showToast } from "../../shared/Toast";
 function TagsTab(): JSX.Element {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editIsDeck, setEditIsDeck] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);

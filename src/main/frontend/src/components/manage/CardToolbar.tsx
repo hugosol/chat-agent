@@ -5,7 +5,7 @@ import styles from "./CardToolbar.module.css";
 interface CardToolbarProps {
   search: string;
   sort: string;
-  deckId: number | null;
+  deckId: string | null;
   decks: Tag[];
   onSearchChange: (search: string) => void;
   onSortChange: (sort: string) => void;
@@ -97,7 +97,7 @@ function CardToolbar({
               className={`${styles.deckChip}${deckId === deck.id ? " " + styles.activeDeck : ""}`}
               data-testid="deck-chip"
               data-active={deckId === deck.id ? "true" : "false"}
-              onClick={() => onDeckChange(deckId === deck.id ? null : String(deck.id))}
+              onClick={() => onDeckChange(deckId === deck.id ? null : deck.id)}
             >
               {deck.name}
             </span>

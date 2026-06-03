@@ -22,7 +22,7 @@ function CardsTab(): JSX.Element {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("front,asc");
-  const [deckId, setDeckId] = useState<number | null>(null);
+  const [deckId, setDeckId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ function CardsTab(): JSX.Element {
   const fetchCards = useCallback(() => {
     let params = `?page=${page}&size=10&sort=${encodeURIComponent(sort)}`;
     if (search) params += `&search=${encodeURIComponent(search)}`;
-    if (deckId) params += `&deckId=${encodeURIComponent(String(deckId))}`;
+    if (deckId) params += `&deckId=${encodeURIComponent(deckId)}`;
 
     fetch(`/api/cards${params}`, { credentials: "same-origin" })
       .then((r) => r.json())
@@ -188,7 +188,7 @@ function CardsTab(): JSX.Element {
         decks={decks}
         onSearchChange={(s) => { setSearch(s); setPage(0); }}
         onSortChange={(s) => { setSort(s); setPage(0); }}
-        onDeckChange={(id) => { setDeckId(id ? Number(id) : null); setPage(0); }}
+        onDeckChange={(id) => { setDeckId(id); setPage(0); }}
         onCreate={handleOpenCreate}
       />
       <CardList

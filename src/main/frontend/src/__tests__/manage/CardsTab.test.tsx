@@ -11,12 +11,12 @@ const mockCards: Card[] = [
 ];
 
 const mockDecks: Tag[] = [
-  { id: 1, name: "Daily", type: "deck" },
+  { id: "1", name: "Daily", type: "deck" },
 ];
 
 const mockAllTags: Tag[] = [
-  { id: 1, name: "Daily", type: "deck" },
-  { id: 2, name: "verb", type: null },
+  { id: "1", name: "Daily", type: "deck" },
+  { id: "2", name: "verb", type: null },
 ];
 
 function mockCardResponse(cards: Card[], totalPages = 1): PageResponse<Card> {

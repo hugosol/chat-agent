@@ -3,7 +3,7 @@ import styles from "./TagTable.module.css";
 
 interface TagTableProps {
   tags: Tag[];
-  editingId: number | null;
+  editingId: string | null;
   editName: string;
   editIsDeck: boolean;
   onEdit: (tag: Tag) => void;
