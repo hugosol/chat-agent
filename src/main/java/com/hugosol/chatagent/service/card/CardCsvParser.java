@@ -37,8 +37,8 @@ public class CardCsvParser {
         int rowNumber = 0;
         for (CSVRecord record : format.parse(reader)) {
             rowNumber++;
-            String front = getOrNull(record, "front");
-            String back = getOrNull(record, "back");
+            String front = unescapeNewlines(getOrNull(record, "front"));
+            String back = unescapeNewlines(getOrNull(record, "back"));
 
             FsrsFields fsrs = new FsrsFields(
                     parseDoubleOrNull(record, "stability"),
@@ -95,6 +95,29 @@ public class CardCsvParser {
             return null;
         }
         return CARD_STATE_MAP.get(value.trim());
+    }
+
+    private String unescapeNewlines(String s) {
+        if (s == null) return null;
+        var sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                char next = s.charAt(i + 1);
+                if (next == 'n') {
+                    sb.append('\n');
+                    i++;
+                    continue;
+                }
+                if (next == '\\') {
+                    sb.append('\\');
+                    i++;
+                    continue;
+                }
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 
     public record ParsedCardRow(int rowNumber, String front, String back, FsrsFields fsrs) {

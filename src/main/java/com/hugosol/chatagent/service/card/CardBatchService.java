@@ -24,9 +24,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class CardBatchService {
+
+    private static final Pattern STARTLINE_PATTERN = Pattern.compile("\\(startline (\\d+)\\)");
 
     private final CardRepository cardRepository;
     private final TagRepository tagRepository;
@@ -49,10 +53,11 @@ public class CardBatchService {
         try {
             rows = cardCsvParser.parse(new java.io.ByteArrayInputStream(fileBytes));
         } catch (Exception e) {
+            int row = extractStartLine(e.getMessage());
+            var error = new ImportError(row, "", "CSV解析失败: " + e.getMessage());
             saveLog(userId, null, tag, originalFilename, 0, 0, 0,
-                    List.of(new ImportError(0, "", "CSV解析失败: " + e.getMessage())),
-                    BatchOperationStatus.FAILED);
-            return new ImportResult(0, 0, List.of(new ImportError(0, "", "CSV解析失败: " + e.getMessage())));
+                    List.of(error), BatchOperationStatus.FAILED);
+            return new ImportResult(0, 0, List.of(error));
         }
 
         List<ImportError> errors = validateAll(rows, userId);
@@ -107,8 +112,8 @@ public class CardBatchService {
         var sw = new java.io.StringWriter();
         try (var printer = new org.apache.commons.csv.CSVPrinter(sw, csvFormat)) {
             for (Card card : cards) {
-                printer.print(card.getFront());
-                printer.print(card.getBack());
+                printer.print(escapeNewlines(card.getFront()));
+                printer.print(escapeNewlines(card.getBack()));
                 printer.print(formatDouble(card.getStability()));
                 printer.print(formatDouble(card.getDifficulty()));
                 printer.print(mapCardStateToText(card.getCardState()));
@@ -122,7 +127,17 @@ public class CardBatchService {
             throw new RuntimeException("CSV生成失败", e);
         }
 
-        return sw.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        var csvBytes = sw.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var result = new byte[bom.length + csvBytes.length];
+        System.arraycopy(bom, 0, result, 0, bom.length);
+        System.arraycopy(csvBytes, 0, result, bom.length, csvBytes.length);
+        return result;
+    }
+
+    private String escapeNewlines(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\n", "\\n");
     }
 
     private String formatDouble(double value) {
@@ -294,5 +309,17 @@ public class CardBatchService {
     private String escapeJson(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private int extractStartLine(String message) {
+        if (message == null) return 0;
+        Matcher m = STARTLINE_PATTERN.matcher(message);
+        if (m.find()) {
+            try {
+                return Integer.parseInt(m.group(1));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return 0;
     }
 }

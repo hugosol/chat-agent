@@ -332,7 +332,12 @@ class CardBatchServiceTest {
         assertThat(data.fileName()).startsWith("My Deck_");
         assertThat(data.fileName()).endsWith(".csv");
 
-        String csv = new String(data.csvBytes(), StandardCharsets.UTF_8);
+        byte[] bytes = data.csvBytes();
+        assertThat(bytes[0]).isEqualTo((byte) 0xEF);
+        assertThat(bytes[1]).isEqualTo((byte) 0xBB);
+        assertThat(bytes[2]).isEqualTo((byte) 0xBF);
+
+        String csv = new String(bytes, StandardCharsets.UTF_8);
         assertThat(csv).contains("front,back,stability,difficulty,cardState");
         assertThat(csv).contains("hello,world,3,0.3,Review");
         assertThat(csv).contains("goodbye,再见,2.5,0.1,New");
@@ -384,5 +389,41 @@ class CardBatchServiceTest {
         card.setLapses(2);
         card.setLastReview(java.time.Instant.parse("2024-05-01T10:00:00Z"));
         return card;
+    }
+
+    @Test
+    void roundtrip_newlinesInFrontAndBack_preserved() {
+        var service = new CardBatchService(cardRepository, tagRepository, batchOperationLogRepository, cardCsvParser);
+
+        Tag deckTag = createDeckTag("deck-1", "My Deck", "user-1");
+
+        Card card = new Card("user-1", "line1\nline2", "中文\n多行\n换行");
+        card.setStability(3.0);
+        card.setDifficulty(0.3);
+        card.setCardState(2);
+        card.setDue(java.time.Instant.parse("2024-06-01T10:00:00Z"));
+        card.setReps(5);
+        card.setLapses(1);
+        card.setTags(java.util.Set.of(deckTag));
+
+        when(tagRepository.findById("deck-1")).thenReturn(java.util.Optional.of(deckTag));
+        when(cardRepository.findAllByTagsContaining(deckTag)).thenReturn(java.util.List.of(card));
+
+        byte[] csvBytes = service.exportCards("deck-1", "user-1").csvBytes();
+
+        String csvContent = new String(csvBytes, StandardCharsets.UTF_8);
+        assertThat(csvContent).doesNotContain("line1\nline2");
+        assertThat(csvContent).contains("line1\\nline2");
+        assertThat(csvContent).contains("中文\\n多行\\n换行");
+
+        when(tagRepository.findById("deck-1")).thenReturn(java.util.Optional.of(deckTag));
+        when(cardRepository.findExistingFronts(java.util.List.of("line1\nline2"), "user-1"))
+                .thenReturn(java.util.List.of());
+        when(cardRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        ImportResult result = service.importCards(csvBytes, "export.csv", "deck-1", "user-1");
+
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.errors()).isEmpty();
     }
 }

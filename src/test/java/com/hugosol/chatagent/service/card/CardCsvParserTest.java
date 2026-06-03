@@ -242,6 +242,28 @@ class CardCsvParserTest {
         assertThat(fsrs.lastReview()).isNull();
     }
 
+    @Test
+    void parse_escapedNewlineInFront_restoresRealNewline() throws Exception {
+        String csv = "front,back\n"
+                + "line1\\nline2,hello\n";
+
+        List<CardCsvParser.ParsedCardRow> rows = parser.parse(toStream(csv));
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).front()).isEqualTo("line1\nline2");
+    }
+
+    @Test
+    void parse_escapedBackslash_restoresSingleBackslash() throws Exception {
+        String csv = "front,back\n"
+                + "C:\\\\path\\\\to\\\\file,hello\n";
+
+        List<CardCsvParser.ParsedCardRow> rows = parser.parse(toStream(csv));
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).front()).isEqualTo("C:\\path\\to\\file");
+    }
+
     private InputStream toStream(String content) {
         return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
     }
