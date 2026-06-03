@@ -22,7 +22,7 @@
 | 8 | 纠错机制 | Agent 口头自然纠正（融入对话不打断） |
 | 9 | LangGraph 深度 | 深度：HITL + Checkpoint + 持久化 |
 | 10 | Agent 架构 | 五 Agent 协作：Conversation + Correction + Report + Learning + MemoryCue，同步 Agent 统一委托 TaskRunner |
-| 11 | 前端技术 | 原生 HTML + Vanilla JS → React + TypeScript 渐进迁移中（ADR: frontend-react-migration） |
+| 11 | 前端技术 | 原生 HTML + Vanilla JS → React + TypeScript 全面迁移完成（Phase 4，ADR: frontend-react-migration） |
 | 12 | 通信协议 | WebSocket |
 | 13 | 数据库 | H2 文件模式 |
 | 14 | 构建工具 | Maven + Java 17 |
@@ -56,11 +56,11 @@
 | 42 | TimeLabel 时间感知增强 | `TimeLabel` 计算逻辑从 Duration 桶遍历改为日期+时段判断。≤5分钟 "just now"，≤1小时 "a few minutes ago"，其余按日期分段：今天按时段（last night / this morning / this afternoon / this evening / tonight），昨天同样按时段（last night / yesterday morning / yesterday afternoon / yesterday evening / last night），2天以上保持 "a few days ago" 等模糊标签。`computeLabel(LocalDateTime, LocalDateTime)` API 签名不变。 |
 | 43 | LLM max output tokens 按 Agent 配置 | 新增 `app.llm.max-output-tokens` 配置，支持按 Agent 类型独立设置最大输出 token 数。默认 2048，ReportAgent 使用 4096（报告需更长输出）。`LangChain4jConfig` 创建独立的 `ChatLanguageModel` bean（default / report），`TaskRunner` 按 `TaskName.REPORT` 路由到对应模型。`MaxOutputTokens` 通过 `@ConfigurationProperties` 绑定，未配置的 Agent 自动回退到 default。 |
 | 44 | MemoryCueQueue LRU 淘汰设计 | `MemoryCueQueue` 为有容量上限的 LRU 有序集合（capacity = topK+1），跨 Turn 存活于 ChatState。首次加载（队列空）search topK+1 条，后续 search topK 条。push 时去重：同 cueId 刷新到队头；满容时淘汰队尾（最久未访问）。fallback anchor（最新 completed session 的 last cue）生命周期约 1 轮——下一轮被 RAG 结果替代。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。 |
-| 45 | 闪卡模块解耦 | 独立 JPA 实体 (Card, Tag) + REST API (`FlashcardController`) + 前端 `flashcard.js`。闪卡模块与现有聊天功能完全解耦——不依赖 WebSocket，不依赖 Practice session。Tag 有可空 `type` 字段，为未来 Deck 概念预留。 |
+| 45 | 闪卡模块解耦 | 独立 JPA 实体 (Card, Tag) + REST API (`FlashcardController`) + React 前端 `FlashcardPanel.tsx`。闪卡模块与现有聊天功能完全解耦——不依赖 WebSocket，不依赖 Practice session。Tag 有可空 `type` 字段，为未来 Deck 概念预留。 |
 | 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~300 行），无 JNI 依赖。`FsrsScheduler` 为无状态纯函数——`initNewCard()` 返回 py-fsrs 兼容初始态（用于测试验证），`createInitState()` 返回 PRD 默认值（用于 Card 实体初始化）。12 个单元测试：8 个来自 PRD 测试向量 + 4 个来自 ts-fsrs（首次复习值、retrievability）。Fuzz 使用自研 `AleaPrng`（Johannes Baagøe 算法 Java 端口）替代 `java.util.Random`——seed(42)→12 天、seed(12345)→11 天，精准匹配 PRD 预期值。 |
 | 47 | REST API 模式引入 | `FlashcardController` 为代码库首个 `@RestController`（`POST /api/cards/add` + `GET /api/tags`）。认证走 JSESSIONID cookie（与 WebSocket 一致），`/api/**` 不走 `permit-all-paths`（需要认证），CSRF 对 `/api/**` 在 `SecurityConfig` 中禁用。 |
-| 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。Phase 1：Header.tsx + CorrectionSidebar 迁入 React。Phase 2：WebSocket 服务层 + `useReducer + context` 集中状态管理（ChatProvider + chatReducer + useChatWebSocket Hook）。Phase 3 已完成：MessageList + ChatInput + Footer 迁入 React（Portal 挂载），`useChatWebSocket` 移除（WS 生命周期内联进 ChatProvider），`ChatAgent.send()` 移除（发送全部走 `useChatContext().send`），vanilla 桥接窄化为仅 5 种非 React 消息类型，`app.js` 裁剪至 Report Modal + Status Bar + Debug Panel。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试，E2E 测试使用 `data-testid` 属性选择器。共享代码采用内联策略。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
-| 49 | Chat 页面 React 集中状态管理 | 三期路线图：Phase 1（CorrectionSidebar 独立模块，命令式 API 桥接）→ Phase 2（WebSocket 服务层 + `useReducer + context` 集中状态管理）→ **Phase 3 已完成**（MessageList + ChatInput + Footer 迁入 React）。Phase 3 成果：`ChatState` 新增 `sessionStatus` 字段 + `USER_MESSAGE_SENT`/`SESSION_REPORT` 两个 Action；`useChatWebSocket` 移除（WS 生命周期内联进 `ChatProvider`）；`send` 加入 context value；vanilla 桥接窄化为仅对 5 种消息类型触发；`ChatAgent.send()` 全局挂载已移除；`app.js` 裁剪至 125 行（仅保留 Report Modal + Status Bar + Debug Panel + visibilitychange 监听）。所有 WS 发送统一通过 `useChatContext().send`。详见 ADR `centralized-chat-state.md`。 |
+| 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。Phase 1：Header.tsx + CorrectionSidebar 迁入 React。Phase 2：WebSocket 服务层 + `useReducer + context` 集中状态管理。Phase 3：MessageList + ChatInput + Footer 迁入 React，`useChatWebSocket` 移除。**Phase 4 完成**：StatusBar、ReportModal、DebugPanel、FlashcardPanel 全部迁入 React；`app.js`、`flashcard.js`、`style.css` 及 manage 页面 vanilla JS 文件全部删除；Chat 页面单根渲染（无 Portal）；`ChatProvider` 直接处理所有 WS 消息（无 vanilla bridge）。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试，E2E 测试使用 `data-testid` 属性选择器。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
+| 49 | Chat 页面 React 集中状态管理 | 四期路线图：Phase 1（CorrectionSidebar 独立模块）→ Phase 2（WebSocket 服务层 + `useReducer + context`）→ Phase 3（MessageList + ChatInput + Footer）→ **Phase 4 完成**（StatusBar + ReportModal + DebugPanel + FlashcardPanel）。Phase 4 成果：`app.js` 完全删除，Chat 页面单根 `ChatPage` 组件渲染；`ChatProvider` 统一处理所有 WS 消息类型（SESSION_REPORT, ERROR, TOKEN_WARNING, STATE_UPDATE, WS_CLOSED 全部通过 `dispatch(action)` 进入 reducer）；`appStatus` 替代 `sessionStatus`，覆盖完整生命周期（Connecting→Connected→UserTurn→Processing→Warning→Error→Disconnected）；组件依赖关系完全通过 `useChatContext()`。详见 ADR `centralized-chat-state.md`。 |
 
 ---
 
@@ -77,7 +77,7 @@
 | TTS | 浏览器 SpeechSynthesis | 通过消息气泡 🔊 按钮用户手势触发播放（规避 iOS Safari 自动播放限制） |
 | 通信 | WebSocket | Spring WebSocketHandler |
 | 数据库 | H2 File | Spring Data JPA |
-| 前端 | React 18 + TypeScript (Vite) + Vanilla JS（渐进迁移）| 多页面（Library Mode bundle 共用）|
+| 前端 | React 18 + TypeScript (Vite Library Mode), CSS Modules | 多页面（IIFE bundle 共用），无路由库 |
 
 ### 关键 Maven 依赖
 
@@ -680,22 +680,20 @@ chat-agent/
     │   ├── main.html                       // 登录表单 + 暗色主题
     │   ├── main.js                         // ?error 参数检测
     │   └── main.css                        // 暗色主题卡片样式
-    ├── manage/                             // Manage 页面 (Cards + Tags 管理)
-    │   ├── index.html                      // 双 tab 布局（Cards / Tags) + tab 切换逻辑
-    │   ├── card.js                         // Card 列表、CRUD modal、搜索、排序、deck 筛选、分页、TTS
-    │   ├── tag.js                          // Tag 表格、CRUD modal、deck checkbox、内联编辑
-    │   ├── modal.js                        // 通用 Modal 组件（open/close/save）
-    │   └── manage.css                      // Manage 页面专用样式
+    ├── manage/                             // Manage 页面 (Cards + Tags 管理，100% React)
+    │   ├── index.html                      // 页面骨架 + React mount 脚本
+    │   └── manage.css                      // Manage 页面全局样式（.manage-layout, .pagination 等）
     ├── shared/                             // 跨页面共享资源
-    │   ├── header-bundle.js                // React Header IIFE bundle（替代原 nav.js）
+    │   ├── chat-bundle.js                  // React Chat 页面 IIFE bundle
+    │   ├── chat-bundle.css                 // React Chat 页面样式（CSS Modules）
+    │   ├── manage-bundle.js                // React Manage 页面 IIFE bundle
+    │   ├── manage-bundle.css               // React Manage 页面样式（CSS Modules）
+    │   ├── header-bundle.js                // React Header IIFE bundle
     │   ├── header-bundle.css               // React Header 样式（CSS Modules）
-    │   ├── react.production.min.js          // React 18 UMD（本地托管）
-    │   ├── react-dom.production.min.js      // ReactDOM 18 UMD（本地托管）
+    │   ├── react.production.min.js         // React 18 UMD（本地托管）
+    │   ├── react-dom.production.min.js     // ReactDOM 18 UMD（本地托管）
     │   └── base.css                        // 共享基础样式（btn-primary, scrollbar, toast 等）
-    ├── index.html                          // 聊天页（认证后访问，header 含 Logout + 闪卡按钮）
-    ├── app.js                              // WebSocket 客户端 + Visibility API 自动 resume + window.activePanel
-    ├── flashcard.js                        // 闪卡面板（两阶段录入 + chip 标签 + 保存 + debug 面板互斥）
-    └── style.css                           // 深色主题 + 闪卡面板样式 + toast 动画
+    └── index.html                          // 聊天页（认证后访问，100% React）
 ```
 
 ### 前端源码目录 (`src/main/frontend/`)
@@ -704,31 +702,78 @@ chat-agent/
 src/main/frontend/
 ├── package.json
 ├── vite.config.ts
+├── vite.config.chat.ts
+├── vite.config.manage.ts
 ├── tsconfig.json
+├── index.html (Vite dev server entry)
 └── src/
     ├── shared/                              // 共享工具 + 通用 React 组件
-    │   ├── utils.ts                         (escapeHtml, formatDate, truncate, englishOnly)
+    │   ├── types.ts                         (ErrorType, CorrectionData, Tag, Card, PageResponse)
+    │   ├── utils.ts                         (formatDate, truncate, englishOnly)
     │   ├── tts.ts                           (speakText)
-    │   ├── Modal.tsx                        (声明式 <Modal>)
-    │   ├── Toast.tsx                        (command 式 showToast + 内部 <Toast>)
+    │   ├── debugLog.ts                      (debug log reporter)
+    │   ├── Modal.tsx                        (声明式 <Modal> + 通用按钮)
+    │   ├── Toast.tsx                        (命令式 showToast + 内部 <Toast>)
     │   ├── ChipInput.tsx                    (受控 <ChipInput>)
-    │   └── useTagAutocomplete.ts            (Hook：封装 GET /api/tags + 客户端过滤)
+    │   ├── Pagination.tsx                   (分页导航)
+    │   └── useTagAutocomplete.ts            (Hook: GET /api/tags + 客户端过滤)
     ├── components/
-    │   └── Header/
-    │       ├── Header.tsx
-    │       └── Header.module.css
-    ├── entry/
-    │   └── header-entry.tsx
-    └── __tests__/                           // 按功能领域组织
-        ├── shared/
-        │   ├── utils.test.ts
-        │   ├── tts.test.ts
-        │   ├── Modal.test.tsx
-        │   ├── Toast.test.tsx
-        │   ├── ChipInput.test.tsx
-        │   └── useTagAutocomplete.test.ts
-        └── header/
-            └── Header.test.tsx
+    │   ├── Header/                          // 导航栏 + Token 进度条 + Menu 侧边栏
+    │   │   ├── Header.tsx
+    │   │   └── Header.module.css
+    │   ├── ChatInput/                       // 消息输入框 + Send 按钮
+    │   │   ├── ChatInput.tsx
+    │   │   └── ChatInput.module.css
+    │   ├── MessageList/                     // 消息气泡列表（含纠错气泡插值）
+    │   │   ├── MessageList.tsx
+    │   │   └── MessageList.module.css
+    │   ├── Footer/                          // Mode 选择 + Start/End 按钮
+    │   │   ├── Footer.tsx
+    │   │   └── Footer.module.css
+    │   ├── StatusBar/                       // 状态指示条
+    │   │   ├── StatusBar.tsx
+    │   │   └── StatusBar.module.css
+    │   ├── ReportModal/                     // 会话报告弹窗
+    │   │   ├── ReportModal.tsx
+    │   │   └── ReportModal.module.css
+    │   ├── CorrectionSidebar/               // 纠错侧边栏（绝对定位浮层）
+    │   │   ├── CorrectionSidebar.tsx
+    │   │   └── CorrectionSidebar.module.css
+    │   ├── DebugPanel/                      // WS 调试日志面板（底部半透明）
+    │   │   ├── DebugPanel.tsx
+    │   │   └── DebugPanel.module.css
+    │   ├── FlashcardPanel/                  // 闪卡两阶段录入面板
+    │   │   ├── FlashcardPanel.tsx
+    │   │   └── FlashcardPanel.module.css
+    │   └── manage/                          // Manage 页面组件
+    │       ├── ManageApp.tsx                // Tab 切换容器
+    │       ├── ManageApp.module.css
+    │       ├── CardsTab.tsx                 // Cards 列表页（搜索/排序/牌组筛选/分页/CRUD modal）
+    │       ├── CardToolbar.tsx              // 搜索栏 + 排序按钮 + 牌组 chip 筛选 + 创建按钮
+    │       ├── CardToolbar.module.css
+    │       ├── CardList.tsx                 // 卡片分页列表
+    │       ├── CardBlock.tsx                // 单张卡片展示 + 编辑/删除按钮
+    │       ├── CardBlock.module.css
+    │       ├── TagsTab.tsx                  // Tags 管理页（CRUD 表格）
+    │       ├── TagTable.tsx                 // Tag 表格 + 内联编辑 + 删除
+    │       ├── TagTable.module.css
+    │       ├── TabBar.tsx                   // Cards / Tags 切换 Tab
+    │       └── TabBar.module.css
+    ├── state/                               // React 状态管理
+    │   ├── chatState.ts                     (ChatState, Message, AppStatus, Action, initialState)
+    │   ├── chatReducer.ts                   (纯函数 reducer，11 种 Action)
+    │   └── ChatContext.tsx                  (ChatProvider + useChatContext + WS 生命周期)
+    ├── entry/                               // Vite Library Mode 入口
+    │   ├── header-entry.tsx                 (挂载到 window.ChatAgent.mountHeader)
+    │   ├── chat-entry.tsx                   (挂载到 window.ChatAgent.mountChatAgent)
+    │   └── manage-entry.tsx                 (挂载到 window.ChatAgent.mountManageApp)
+    └── __tests__/                           // Vitest 单元测试（195 tests）
+        ├── chat/                            (ChatInput, MessageList, Footer, StatusBar, ReportModal, DebugPanel, FlashcardPanel)
+        ├── manage/                          (ManageApp, CardsTab, TagsTab, CardList, CardBlock, CardToolbar, TagTable, TabBar)
+        ├── shared/                          (Modal, Toast, ChipInput, Pagination, utils, tts, useTagAutocomplete)
+        ├── state/                           (chatReducer)
+        ├── header/                          (Header)
+        └── correction-sidebar/              (CorrectionSidebar)
 ```
 
 > **图结构简化**: `ConversationNode` 和 `MergeResponseNode` 已移除。对话流式生成由 `TurnProcessor` 直接调用 `ConversationAgent`，token 计数由 `TokenTracker` 封装在 `SessionStateStore` 中管理。
