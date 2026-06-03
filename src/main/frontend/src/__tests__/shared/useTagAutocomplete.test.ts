@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { useTagAutocomplete } from "../../shared/useTagAutocomplete";
 
 interface Tag {
-  id: number;
+  id: string;
   name: string;
   type: string | null;
 }
@@ -11,8 +11,8 @@ interface Tag {
 describe("useTagAutocomplete", () => {
   beforeEach(() => {
     const mockTags: Tag[] = [
-      { id: 1, name: "work", type: "deck" },
-      { id: 2, name: "vocab", type: null },
+      { id: "1", name: "work", type: "deck" },
+      { id: "2", name: "vocab", type: null },
     ];
     (globalThis as Record<string, unknown>).fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -59,7 +59,7 @@ describe("useTagAutocomplete", () => {
 
   it("setSelected updates the selected chips", () => {
     const { result } = renderHook(() => useTagAutocomplete("/api/tags"));
-    const tag: Tag = { id: 1, name: "work", type: "deck" };
+    const tag: Tag = { id: "1", name: "work", type: "deck" };
     act(() => {
       result.current.setSelected([tag]);
     });

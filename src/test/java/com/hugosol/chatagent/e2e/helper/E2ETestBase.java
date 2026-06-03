@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -66,6 +67,7 @@ public abstract class E2ETestBase {
     protected TagRepository tagRepository;
 
     private int turnNumber = 0;
+    private String currentTestMethodName;
 
     static {
         wireMockServer = new WireMockServer(WireMockConfiguration.options().port(WIREMOCK_PORT));
@@ -98,7 +100,10 @@ public abstract class E2ETestBase {
     }
 
     @BeforeEach
-    void setUp() {
+    void setUp(TestInfo testInfo) {
+        currentTestMethodName = testInfo.getTestMethod()
+                .map(method -> method.getName())
+                .orElse("unknown");
         turnNumber = 0;
         context = browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(390, 844)
@@ -123,10 +128,11 @@ public abstract class E2ETestBase {
     protected void takeScreenshot(String name) {
         if (page == null) return;
         try {
-            Path dir = Paths.get("target/e2e-screenshots", runTimestamp);
+            String className = this.getClass().getSimpleName();
+            Path dir = Paths.get("target/e2e-screenshots", runTimestamp, className);
             Files.createDirectories(dir);
             page.screenshot(new Page.ScreenshotOptions()
-                    .setPath(dir.resolve(name + ".png")));
+                    .setPath(dir.resolve(currentTestMethodName + "-" + name + ".png")));
         } catch (Exception ignored) {
         }
     }

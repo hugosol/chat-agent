@@ -6,9 +6,10 @@ interface ModalProps {
   children: ReactNode;
   onClose: () => void;
   onSave?: () => void;
+  saveLabel?: string;
 }
 
-function Modal({ open, title, children, onClose, onSave }: ModalProps): JSX.Element | null {
+function Modal({ open, title, children, onClose, onSave, saveLabel = "Save" }: ModalProps): JSX.Element | null {
   if (!open) return null;
 
   return (
@@ -22,7 +23,7 @@ function Modal({ open, title, children, onClose, onSave }: ModalProps): JSX.Elem
           </button>
           {onSave && (
             <button className="btn btn-primary btn-save" data-testid="modal-save" onClick={onSave}>
-              Save
+              {saveLabel}
             </button>
           )}
         </div>

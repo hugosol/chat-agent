@@ -4,8 +4,8 @@ import React from "react";
 import { FlashcardPanel } from "../../components/FlashcardPanel/FlashcardPanel";
 
 const TAGS_FIXTURE = [
-  { id: 1, name: "vocabulary", type: "deck" },
-  { id: 2, name: "grammar", type: "topic" },
+  { id: "1", name: "vocabulary", type: "deck" },
+  { id: "2", name: "grammar", type: "topic" },
 ];
 
 describe("FlashcardPanel", () => {

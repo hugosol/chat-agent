@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import styles from "./FlashcardPanel.module.css";
 
 interface Tag {
-  id: number;
+  id: string;
   name: string;
   type: string | null;
 }

@@ -1,0 +1,300 @@
+import { useState, useEffect, useCallback } from "react";
+import type { Card, Tag, PageResponse } from "../../shared/types";
+import { CardToolbar } from "./CardToolbar";
+import { CardList } from "./CardList";
+import { Modal } from "../../shared/Modal";
+import { ChipInput } from "../../shared/ChipInput";
+import { showToast } from "../../shared/Toast";
+import { speakText } from "../../shared/tts";
+import { formatDate, englishOnly } from "../../shared/utils";
+
+type ModalState =
+  | { type: "detail"; card: Card }
+  | { type: "create" | "edit"; card?: Card }
+  | { type: "confirm-delete"; card: Card }
+  | null;
+
+const CARD_STATE_LABELS = ["New", "Learning", "Review", "Relearning"];
+
+function CardsTab(): JSX.Element {
+  const [cards, setCards] = useState<Card[]>([]);
+  const [decks, setDecks] = useState<Tag[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("front,asc");
+  const [deckId, setDeckId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<ModalState>(null);
+
+  const [formFront, setFormFront] = useState("");
+  const [formBack, setFormBack] = useState("");
+  const [formTags, setFormTags] = useState<Tag[]>([]);
+
+  const fetchCards = useCallback(() => {
+    let params = `?page=${page}&size=10&sort=${encodeURIComponent(sort)}`;
+    if (search) params += `&search=${encodeURIComponent(search)}`;
+    if (deckId) params += `&deckId=${encodeURIComponent(deckId)}`;
+
+    fetch(`/api/cards${params}`, { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((data: PageResponse<Card>) => {
+        setCards(data.content);
+        setTotalPages(data.totalPages);
+      })
+      .catch(() => {
+        showToast("加载卡片失败");
+      })
+      .finally(() => setLoading(false));
+  }, [page, sort, search, deckId]);
+
+  const fetchDecks = useCallback(() => {
+    fetch("/api/tags?type=deck", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((tags: Tag[]) => setDecks(tags))
+      .catch(() => {});
+  }, []);
+
+  const fetchAllTags = useCallback(() => {
+    fetch("/api/tags", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((tags: Tag[]) => setAllTags(tags))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchCards();
+    fetchDecks();
+  }, [fetchCards, fetchDecks]);
+
+  const handleOpenDetail = useCallback((card: Card) => {
+    setModal({ type: "detail", card });
+  }, []);
+
+  const handleOpenCreate = useCallback(() => {
+    fetchAllTags();
+    setFormFront("");
+    setFormBack("");
+    setFormTags([]);
+    setModal({ type: "create" });
+  }, [fetchAllTags]);
+
+  const handleOpenEdit = useCallback((card: Card) => {
+    fetchAllTags();
+    setFormFront(card.front);
+    setFormBack(card.back);
+    setFormTags(card.tags);
+    setModal({ type: "edit", card });
+  }, [fetchAllTags]);
+
+  const handleOpenDelete = useCallback((card: Card) => {
+    setModal({ type: "confirm-delete", card });
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setModal(null);
+  }, []);
+
+  const handleCreateSave = useCallback(() => {
+    if (!formFront.trim() || !formBack.trim()) {
+      showToast("Front and back are required");
+      return;
+    }
+    const tagIds = formTags.map((t) => t.id);
+    fetch("/api/cards/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ front: formFront.trim(), back: formBack.trim(), tagIds }),
+      credentials: "same-origin",
+    })
+      .then((resp) => {
+        if (resp.ok) {
+          setModal(null);
+          fetchCards();
+          fetchDecks();
+          return;
+        }
+        return resp.json().then((body) => {
+          throw { message: body.message, status: resp.status };
+        });
+      })
+      .catch((err: any) => {
+        if (err.status === 422) showToast(err.message);
+        else showToast("创建失败");
+      });
+  }, [formFront, formBack, formTags, fetchCards, fetchDecks]);
+
+  const handleEditSave = useCallback(() => {
+    if (!formFront.trim() || !formBack.trim()) {
+      showToast("Front and back are required");
+      return;
+    }
+    const cardId = modal?.type === "edit" ? modal.card?.id : undefined;
+    if (!cardId) return;
+    const tagIds = formTags.map((t) => t.id);
+    fetch(`/api/cards/${cardId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ front: formFront.trim(), back: formBack.trim(), tagIds }),
+      credentials: "same-origin",
+    })
+      .then((resp) => {
+        if (resp.ok) {
+          setModal(null);
+          fetchCards();
+          return;
+        }
+        return resp.json().then((body) => {
+          throw { message: body.message, status: resp.status };
+        });
+      })
+      .catch((err: any) => {
+        if (err.status === 422) showToast(err.message);
+        else showToast("保存失败");
+      });
+  }, [formFront, formBack, formTags, modal, fetchCards]);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (modal?.type !== "confirm-delete") return;
+    const cardId = modal.card.id;
+    fetch(`/api/cards/${cardId}`, { method: "DELETE", credentials: "same-origin" })
+      .then((resp) => {
+        if (resp.ok) {
+          setModal(null);
+          fetchCards();
+          return;
+        }
+        showToast("删除失败");
+      })
+      .catch(() => showToast("删除失败"));
+  }, [modal, fetchCards]);
+
+  const handleSpeak = useCallback((text: string) => {
+    const eng = englishOnly(text);
+    if (eng) speakText(eng);
+  }, []);
+
+  if (loading) {
+    return <div className="empty-state">加载中...</div>;
+  }
+
+  return (
+    <div>
+      <CardToolbar
+        search={search}
+        sort={sort}
+        deckId={deckId}
+        decks={decks}
+        onSearchChange={(s) => { setSearch(s); setPage(0); }}
+        onSortChange={(s) => { setSort(s); setPage(0); }}
+        onDeckChange={(id) => { setDeckId(id); setPage(0); }}
+        onCreate={handleOpenCreate}
+      />
+      <CardList
+        cards={cards}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        onCardClick={handleOpenDetail}
+        onCardEdit={handleOpenEdit}
+        onCardDelete={handleOpenDelete}
+      />
+
+      {modal?.type === "detail" && (
+        <Modal open={true} title="Card Detail" onClose={handleCloseModal}>
+          <div className="detail-item">
+            <div className="detail-label">Front</div>
+            <div className="detail-value">
+              {modal.card.front}
+              {englishOnly(modal.card.front) && (
+                <span className="card-tts-btn" onClick={() => handleSpeak(modal.card.front)}>🔊</span>
+              )}
+            </div>
+          </div>
+          <div className="detail-item">
+            <div className="detail-label">Back</div>
+            <div className="detail-value">
+              {modal.card.back.split("\n").map((line, i) => (
+                <span key={i}>{line}{i < modal.card.back.split("\n").length - 1 && <br />}</span>
+              ))}
+              {englishOnly(modal.card.back) && (
+                <span className="card-tts-btn" onClick={() => handleSpeak(modal.card.back)}>🔊</span>
+              )}
+            </div>
+          </div>
+          <div className="detail-item">
+            <div className="detail-label">Tags</div>
+            <div className="detail-value">
+              {modal.card.tags.length > 0
+                ? modal.card.tags.map((t) => (
+                    <span key={t.id} className="chip">{t.name}{t.type === "deck" ? " [D]" : ""}</span>
+                  ))
+                : "None"}
+            </div>
+          </div>
+          <div className="detail-item">
+            <div className="detail-label">State</div>
+            <div className="detail-value">{CARD_STATE_LABELS[modal.card.cardState] ?? modal.card.cardState}</div>
+          </div>
+          <div className="detail-item">
+            <div className="detail-label">Due</div>
+            <div className="detail-value">{modal.card.due ? formatDate(modal.card.due) : "-"}</div>
+          </div>
+          <div className="detail-item">
+            <div className="detail-label">Created</div>
+            <div className="detail-value">{modal.card.createTime ? formatDate(modal.card.createTime) : "-"}</div>
+          </div>
+        </Modal>
+      )}
+
+      {(modal?.type === "create" || modal?.type === "edit") && (
+        <Modal
+          open={true}
+          title={modal.type === "create" ? "Create Card" : "Edit Card"}
+          onClose={handleCloseModal}
+          onSave={modal.type === "create" ? handleCreateSave : handleEditSave}
+        >
+          <input
+            type="text"
+            className="create-front"
+            data-testid="card-form-front"
+            placeholder="单词或表达..."
+            value={formFront}
+            onChange={(e) => setFormFront(e.target.value)}
+          />
+          <textarea
+            className="create-back"
+            data-testid="card-form-back"
+            placeholder="释义..."
+            rows={2}
+            value={formBack}
+            onChange={(e) => setFormBack(e.target.value)}
+          />
+          <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
+            <ChipInput
+              options={allTags}
+              value={formTags}
+              onChange={setFormTags}
+              placeholder="搜索标签..."
+            />
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === "confirm-delete" && (
+        <Modal
+          open={true}
+          title="确认删除"
+          onClose={handleCloseModal}
+          onSave={handleDeleteConfirm}
+          saveLabel="Delete"
+        >
+          <p>确定要删除卡片 "{modal.card.front}" 吗？</p>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+export { CardsTab };

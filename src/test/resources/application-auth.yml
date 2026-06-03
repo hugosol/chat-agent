@@ -1,0 +1,39 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:authdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+langchain4j:
+  openai:
+    chat-model:
+      base-url: http://localhost:19090
+      api-key: test-key
+      timeout: 10s
+      log-requests: false
+      log-responses: false
+
+app:
+  initial-users:
+    - username: admin
+      password: admin123
+  token-limit: 128000
+  token-limit-ratio: 0.8
+  prompt-directory: classpath:prompts
+  memory:
+    async: false
+    store-path: target/embedding-store-auth.json
+  security:
+    permit-all-paths:
+      - /login/**
+      - /shared/**

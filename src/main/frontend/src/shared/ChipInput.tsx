@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { Tag } from "./useTagAutocomplete";
+import type { Tag } from "./types";
 
 interface ChipInputProps {
   options: Tag[];
