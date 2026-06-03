@@ -135,6 +135,48 @@ Playwright E2E 测试使用 **Mobile Safari 390×844** 视口 + `setIsMobile(tru
 
 ---
 
+### 2.5 iOS Safari 的 100vh 陷阱
+
+**问题：** iOS Safari 中 `100vh` 包含地址栏区域，导致容器高度 > 实际可见区域。当 `#app` 容器使用 `height: 100vh` 时，页面底部内容（Footer、DebugPanel）被推到屏幕下方不可见区域。点击输入框触发键盘弹起后，视口重新计算，布局暂时恢复正常。
+
+**四轮尝试与最终方案：**
+
+| 轮次 | 方案 | 失败原因 |
+|------|------|---------|
+| 1 | CSS `100dvh` | Safari 15.4 以下不支持，降级回 `100vh` 依然错误 |
+| 2 | `-webkit-fill-available` + `min-height` | `min-height` 不约束容器上限，内容撑出视口 |
+| 3 | `visualViewport.height` + JS `resize` 事件监听 | 键盘弹出时 `resize` 触发，JS 将容器缩到键盘上方，flex 布局压缩崩溃 |
+| **4** | `position: fixed; inset: 0` | ✅ 最终方案 — 无 JS，纯 CSS 原生行为 |
+
+**原理：** iOS Safari 中有两套视口坐标系：
+
+| | `100vh` | `position: fixed; inset: 0` |
+|---|---|---|
+| 参照的是什么 | CSS 规范定义的视口高度（含地址栏区域） | 渲染引擎的实际可见像素区域 |
+| 地址栏展开时 | 高度值超出屏幕，内容被挤到下方不可见 | 始终填满可见区域 |
+| 键盘弹出时 | 视口缩小，flex 布局被动压缩 | 浏览器自动调整 fixed 元素的包含块 |
+| JS 依赖 | 无（但结果错误） | 无 |
+
+**最终代码**（`ChatPage.module.css`）：
+```css
+.app {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+```
+
+**关键教训：** `position: fixed` 的 `inset` 参照的是浏览器渲染引擎内部的"布局视口"——实际绘制像素区域，不含地址栏、不被键盘影响。所有 CSS 视口单位（`vh`、`dvh`、`svh`、`lvh`）都是 CSS 规范层的抽象值，与渲染引擎的真实视口是两套独立的坐标系。在 iOS Safari 这类地址栏动态变化的浏览器中，只有 `position: fixed` 能可靠地获取真实可见区域。
+
+---
+
 ## 三、CSS 约定
 
 ### 3.1 CSS Modules
@@ -213,7 +255,41 @@ import styles from "./ComponentName.module.css";
 
 ---
 
-### 3.4 Token 进度条颜色代码
+### 3.4 面板定位策略（fixed vs flow）
+
+面板组件的定位方式选择原则：
+
+| 面板类型 | 定位方式 | 原因 |
+|---------|---------|------|
+| **浮层面板**（需覆盖在聊天内容之上） | `position: fixed` | FlashcardPanel 的两阶段录入面板需浮于消息列表上方 |
+| **辅助面板**（不遮挡主内容，属于页面布局的一部分） | 流式布局 | DebugPanel 放在 Footer 之后，自然跟随页面流 |
+
+**DebugPanel 从 fixed 改为流式：**
+
+| | 改前 | 改后 |
+|---|---|---|
+| 定位 | `position: fixed; bottom: 0; z-index: 500` | 普通文档流，`flex-shrink: 0` |
+| 在页面中的位置 | 固定在视口底部，覆盖 Footer | 排在 Footer 之后，自然位于页面底部 |
+| 与 Footer 的关系 | z-index 堆叠，iOS Safari 上被 body 的 `100vh` 误差推离视口 | 同一父组件（`#app`）内的兄弟元素，不存在覆盖关系 |
+
+改为流式布局不产生新耦合——DebugPanel 和 Footer 在 `chat-entry.tsx` 中已是同一 `AppContent` 组件内的兄弟元素，无论 fixed 还是 flow 都是这个关系。
+
+**代码**（`DebugPanel.module.css`）：
+```css
+.debugPanel {
+  /* 删除了 position: fixed / bottom / left / right / z-index */
+  background: rgba(0, 0, 0, 0.92);
+  border-top: 1px solid #333;
+  max-height: 35vh;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+```
+
+---
+
+### 3.5 Token 进度条颜色代码
 
 Token 进度条的颜色阈值在 `Header.tsx` 中计算，不通过 CSS 表达：
 
@@ -224,6 +300,26 @@ function getColor(percent: number): string {
   return "rgb(39, 174, 96)";                       // 绿色
 }
 ```
+
+---
+
+### 3.6 base.css 的 #app 规则分离
+
+**问题：** `base.css` 中的 `#app` 使用 ID 选择器（specificity 0-1-0-0），而 `ChatPage.module.css` 中的 `.app` 使用 CSS Module class（0-0-1-0）。在 CSS 层叠规则中，ID 选择器永远优先于 class 选择器——chat 页面无法通过 `.app` 覆盖 `#app` 中的 `height` 或 `position` 属性。使用 `!important` 不是可持续的方案。
+
+**方案：** 将 `#app` 容器规则从共享的 `base.css` 中移除，各页面自行管理容器布局：
+
+| 页面 | 容器规则位置 | 布局方式 |
+|------|------------|---------|
+| Chat 页面 | `ChatPage.module.css` 的 `.app` class（CSS Module） | `position: fixed; inset: 0`（见 §2.5） |
+| Manage 页面 | `manage.css` 的 `#app` ID 选择器 | `height: calc(100vh - env(safe-area-inset-top))`（传统 flow 布局） |
+| Login 页面 | 无独立容器规则（使用 `body` 的默认布局） | — |
+
+**设计原则：** 容器级别的布局规则（`height`、`position`）属于页面级决策，不属于共享基础样式。`base.css` 只应包含：
+- 全局重置（`* { box-sizing }`）
+- 元素默认样式（`body`、`input`、`select`）
+- 通用组件 class（`.btn`、`.modal`、`.chip`）
+- 工具 class（`.hidden`）
 
 ---
 
@@ -542,4 +638,5 @@ showToast("加载卡片失败");  // 默认 2100ms 自动消失
 
 | 日期 | 内容 |
 |------|------|
+| 2026-06-03 | 新增 §2.5（iOS Safari 100vh 陷阱）、§3.4（面板定位策略）、§3.6（base.css #app 规则分离）；更新 §2.2 CSS 示例代码；Chat 页面组件从扁平 `chat/` 目录迁移至独立子目录 |
 | 2026-06-03 | 初始版本：浏览器兼容性（iOS sticky hover / safe-area / TTS）、CSS 约定、组件架构、状态管理、构建配置、vanilla bridge、测试约定、错误处理 |
