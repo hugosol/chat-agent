@@ -175,43 +175,29 @@ function CardsTab(): JSX.Element {
     if (eng) speakText(eng);
   }, []);
 
-  if (loading) {
-    return <div className="empty-state">加载中...</div>;
-  }
+  const toolbar = (
+    <CardToolbar
+      search={search}
+      sort={sort}
+      deckId={deckId}
+      decks={decks}
+      onSearchChange={(s) => { setSearch(s); setPage(0); }}
+      onSortChange={(s) => { setSort(s); setPage(0); }}
+      onDeckChange={(id) => { setDeckId(id); setPage(0); }}
+      onCreate={handleOpenCreate}
+    />
+  );
 
-  if (cards.length === 0) {
+  let content: JSX.Element;
+  if (loading) {
+    content = <div className="empty-state">加载中...</div>;
+  } else if (cards.length === 0) {
     const emptyText = decks.length === 0
       ? "暂无牌组，请先在 Tags 页面创建牌组"
       : "暂无卡片，点击 + 创建";
-    return (
-      <div>
-        <CardToolbar
-          search={search}
-          sort={sort}
-          deckId={deckId}
-          decks={decks}
-          onSearchChange={(s) => { setSearch(s); setPage(0); }}
-          onSortChange={(s) => { setSort(s); setPage(0); }}
-          onDeckChange={(id) => { setDeckId(id); setPage(0); }}
-          onCreate={handleOpenCreate}
-        />
-        <div className="empty-state" data-testid="empty-state">{emptyText}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <CardToolbar
-        search={search}
-        sort={sort}
-        deckId={deckId}
-        decks={decks}
-        onSearchChange={(s) => { setSearch(s); setPage(0); }}
-        onSortChange={(s) => { setSort(s); setPage(0); }}
-        onDeckChange={(id) => { setDeckId(id); setPage(0); }}
-        onCreate={handleOpenCreate}
-      />
+    content = <div className="empty-state" data-testid="empty-state">{emptyText}</div>;
+  } else {
+    content = (
       <CardList
         cards={cards}
         page={page}
@@ -221,6 +207,13 @@ function CardsTab(): JSX.Element {
         onCardEdit={handleOpenEdit}
         onCardDelete={handleOpenDelete}
       />
+    );
+  }
+
+  return (
+    <div>
+      {!loading && toolbar}
+      {content}
 
       {modal?.type === "detail" && (
         <Modal open={true} title="Card Detail" onClose={handleCloseModal}>
