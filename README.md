@@ -46,6 +46,7 @@ mvn spring-boot:run
 | 6 | Correction summary appears below your message in chat; tap the **⚠️ N ◂** floating badge at screen center-right to expand the correction sidebar with detailed items |
 | 7 | Click **🔊** on any Agent message to hear TTS playback |
 | 8 | Click **End & Report** to get a fluency score + error summary |
+| — | In Manage page Cards tab, click 📄 button in toolbar → "导出" to download a deck's CSV backup, or "导入" to upload CSV for bulk card entry (including FSRS review progress) |
 | 9 | Click **Logout** in header to sign out |
 
 > **iOS tip**: The keyboard microphone (🎤) can be used for system-level dictation — the recognized text appears in the input field, then press Send.
@@ -81,6 +82,7 @@ E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari view
 | `ChatAgentMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
 | `ManagePageIT` | Manage page full flow: nav sidebar → tag CRUD → card CRUD → search → sort → deck chip filtering → pagination → detail modal → orphan alert → delete cascade |
 | `FlashcardIT` | 闪卡录入：两阶段面板 → chip 标签创建 → 保存 → H2 数据验证（不依赖 WireMock，闪卡不调 LLM） |
+| `FlashcardBatchIT` | 闪卡批量导入/导出：完整往返流程 → 导出 CSV → 删卡 → 导入 CSV → FSRS 状态还原 → H2 数据验证（不依赖 WireMock） |
 
 Test resources: `src/test/resources/wiremock/` (mock response files for conversation, correction, report, memory merge, and memory cue), `src/test/resources/application-e2e.yml` (in-memory H2, permit all paths).
 
@@ -205,7 +207,9 @@ chat-agent/
 │   │   ├── MessageData.java
 │   │   ├── CorrectionData.java
 │   │   ├── MemoryContent.java
-│   │   └── CueMatch.java
+│   │   ├── CueMatch.java
+│   │   ├── ImportResult.java
+│   │   └── ImportError.java
 │   ├── agent/
 │   │   ├── ConversationAgent.java
 │   │   ├── CorrectionAgent.java
@@ -221,9 +225,10 @@ chat-agent/
 │   │   ├── MessageHandler.java
 │   │   └── ProtocolDispatcher.java
 │   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserLearningProfile, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, TimeLabel, ...)
-│   ├── repository/     (Spring Data JPA)
+│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserLearningProfile, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, TimeLabel, BatchOperationLog, BatchOperationType, BatchOperationStatus, ...)
+│   ├── repository/     (Spring Data JPA: BatchOperationLogRepository, ...)
 │   ├── service/        (SessionService, TurnProcessor, SessionDbStore, LearningProfileService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
+│   │   └── card/       (CardCsvParser, CardBatchService)
 │   └── config/         (LangChain4jConfig, LoggableChatModel, SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
 ├── src/main/resources/
 │   ├── application.yml
@@ -253,7 +258,7 @@ chat-agent/
 │   ├── shared/
 │   │   ├── chat-bundle.js             // React Chat page IIFE bundle (chat-page components)
 │   │   ├── chat-bundle.css            // React Chat page styles (CSS Modules)
-│   │   ├── manage-bundle.js           // React Manage page IIFE bundle (CardsTab + TagsTab)
+│   │   ├── manage-bundle.js           // React Manage page IIFE bundle (CardsTab + TagsTab + DropdownMenu + BatchOperationModal)
 │   │   ├── manage-bundle.css          // React Manage page styles (CSS Modules)
 │   │   ├── header-bundle.js           // React Header IIFE bundle (nav + token bar)
 │   │   ├── header-bundle.css          // React Header styles (CSS Modules)
@@ -321,6 +326,7 @@ App-level configuration in `application.yml`:
 - [x] Structured MemoryCue (topic segmentation + tagged memory entries, write-only in v1)
 - [x] RAG-based MemoryCue retrieval (ONNX vector embeddings, semantic similarity search)
 - [x] 闪卡录入模块（FSRS-6 初始化 + 两阶段面板 + chip 标签 + REST API）
+- [x] 闪卡批量导入导出（CSV）
 - [ ] 闪卡复习功能（FSRS-6 repeat + 评分按钮 Again/Hard/Good/Easy + 每日复习队列）
 - [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario

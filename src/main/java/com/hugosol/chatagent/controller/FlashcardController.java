@@ -3,10 +3,12 @@ package com.hugosol.chatagent.controller;
 import com.hugosol.chatagent.dto.AddCardRequest;
 import com.hugosol.chatagent.dto.AddCardResponse;
 import com.hugosol.chatagent.dto.CreateTagRequest;
+import com.hugosol.chatagent.dto.ImportResult;
 import com.hugosol.chatagent.dto.TagResponse;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.service.FlashcardService;
+import com.hugosol.chatagent.service.card.CardBatchService;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,9 +23,15 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.hugosol.chatagent.service.card.CardBatchService.ExportData;
+
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +41,11 @@ import java.util.Map;
 public class FlashcardController {
 
     private final FlashcardService flashcardService;
+    private final CardBatchService cardBatchService;
 
-    public FlashcardController(FlashcardService flashcardService) {
+    public FlashcardController(FlashcardService flashcardService, CardBatchService cardBatchService) {
         this.flashcardService = flashcardService;
+        this.cardBatchService = cardBatchService;
     }
 
     @PostMapping("/cards/add")
@@ -119,6 +129,32 @@ public class FlashcardController {
         String userId = getUserId();
         flashcardService.deleteCard(userId, id);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/cards/import")
+    public ResponseEntity<ImportResult> importCards(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("tagId") String tagId) {
+        String userId = getUserId();
+        try {
+            ImportResult result = cardBatchService.importCards(
+                    file.getBytes(), file.getOriginalFilename(), tagId, userId);
+            return ResponseEntity.ok(result);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/cards/export")
+    public void exportCards(@RequestParam("tagId") String tagId, HttpServletResponse response) throws IOException {
+        String userId = getUserId();
+        ExportData data = cardBatchService.exportCards(tagId, userId);
+
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition",
+                "attachment; filename=\"" + java.net.URLEncoder.encode(data.fileName(), "UTF-8") + "\"");
+        response.getOutputStream().write(data.csvBytes());
+        response.getOutputStream().flush();
     }
 
     private String getUserId() {

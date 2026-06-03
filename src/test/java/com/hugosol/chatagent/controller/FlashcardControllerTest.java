@@ -3,6 +3,7 @@ package com.hugosol.chatagent.controller;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.service.FlashcardService;
+import com.hugosol.chatagent.service.card.CardBatchService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class FlashcardControllerTest {
 
     @MockBean
     private FlashcardService flashcardService;
+
+    @MockBean
+    private CardBatchService cardBatchService;
 
     @BeforeEach
     void setUp() {
