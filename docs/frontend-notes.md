@@ -336,7 +336,8 @@ src/main/frontend/src/
 │   ├── debugLog.ts     # 调试日志报告器
 │   ├── Modal.tsx
 │   ├── Toast.tsx
-│   ├── ChipInput.tsx
+│   ├── InlineChipInput.tsx   # 邮箱风格内联标签输入（Manage 弹窗 + FlashcardPanel 共用）
+│   ├── InlineChipInput.module.css
 │   └── Pagination.tsx
 ├── components/
 │   ├── Header/         # 导航栏（nav links + token bar + sidebar menu）
@@ -450,15 +451,18 @@ const [tags, setTags] = useState<Tag[]>([]);
 // ...
 ```
 
-### 5.3 FlashcardPanel：本地状态
+### 5.3 FlashcardPanel：本地状态 + InlineChipInput
 
 ```typescript
 const [stage, setStage] = useState<1 | 2>(1);
 const [front, setFront] = useState("");
 const [back, setBack] = useState("");
 const [chips, setChips] = useState<Tag[]>([]);
+const [allTags, setAllTags] = useState<Tag[]>([]);
 const [saving, setSaving] = useState(false);
 ```
+
+标签输入通过共享组件 `InlineChipInput` 管理（`options={allTags} value={chips} onChange={setChips}`），FlashcardPanel 自身不再维护 `tagInput` 和 `showSuggestions` 状态。
 
 Flashcard 和 Debug 面板通过 `Header` 组件的 `activePanel`/`onTogglePanel` props 实现互斥（`null | 'debug' | 'flashcard'`）。
 
@@ -559,7 +563,7 @@ Header 组件支持两种集成模式：
 src/__tests__/
 ├── chat/              # ChatInput, MessageList, Footer, StatusBar, ReportModal, DebugPanel, FlashcardPanel
 ├── manage/            # ManageApp, CardsTab, TagsTab, CardList, CardBlock, CardToolbar, TagTable, TabBar
-├── shared/            # Modal, Toast, ChipInput, Pagination, utils, tts, useTagAutocomplete
+├── shared/            # Modal, Toast, InlineChipInput, Pagination, utils, tts, useTagAutocomplete
 ├── state/             # chatReducer
 ├── header/            # Header
 └── correction-sidebar/ # CorrectionSidebar
@@ -606,7 +610,7 @@ function renderWithContext(ui: JSX.Element, ctxValue: ChatContextValue) {
 - `vi.useFakeTimers()` — 用于 Toast auto-dismiss 定时器测试
 - 不使用 `userEvent`，统一使用 `fireEvent`
 
-### 8.5 测试数量（当前：199 tests, 25 files）
+### 8.5 测试数量（当前：203 tests, 25 files）
 
 ---
 
