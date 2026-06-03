@@ -37,7 +37,7 @@ function CardToolbar({
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         onSearchChange(value);
-      }, 300);
+      }, 1000);
     },
     [onSearchChange]
   );
@@ -57,9 +57,34 @@ function CardToolbar({
   const nameArrow = sort.startsWith("front") ? (sort.endsWith(",asc") ? " ↑" : " ↓") : "";
   const timeArrow = sort.startsWith("createTime") ? (sort.endsWith(",asc") ? " ↑" : " ↓") : "";
 
+  const hasDecks = decks.length > 0;
+
   return (
     <div className={styles.toolbar}>
-      <div className={styles.searchRow}>
+      {hasDecks && (
+        <div className={styles.deckTabs}>
+          <span
+            className={`${styles.deckTab}${deckId === null ? " " + styles.activeTab : ""}`}
+            data-testid="deck-tab"
+            data-active={deckId === null ? "true" : "false"}
+            onClick={() => onDeckChange(null)}
+          >
+            全部
+          </span>
+          {decks.map((deck) => (
+            <span
+              key={deck.id}
+              className={`${styles.deckTab}${deckId === deck.id ? " " + styles.activeTab : ""}`}
+              data-testid="deck-tab"
+              data-active={deckId === deck.id ? "true" : "false"}
+              onClick={() => onDeckChange(deck.id)}
+            >
+              {deck.name}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className={styles.toolbarRow}>
         <input
           type="text"
           className={styles.searchInput}
@@ -68,45 +93,30 @@ function CardToolbar({
           value={localSearch}
           onChange={handleSearchChange}
         />
-        <div className={styles.sortBtns}>
-          <button
-            className={`${styles.sortBtn}${sort.startsWith("front") ? " " + styles.activeSort : ""}`}
-            data-testid="sort-btn-name"
-            data-active={sort.startsWith("front") ? "true" : "false"}
-            onClick={() => handleSortClick("front")}
-          >
-            A&rarr;Z{nameArrow}
-          </button>
-          <button
-            className={`${styles.sortBtn}${sort.startsWith("createTime") ? " " + styles.activeSort : ""}`}
-            data-testid="sort-btn-time"
-            data-active={sort.startsWith("createTime") ? "true" : "false"}
-            onClick={() => handleSortClick("createTime")}
-          >
-            Time{timeArrow}
+        <div className={styles.actions}>
+          <div className={styles.sortBtns}>
+            <button
+              className={`${styles.sortBtn}${sort.startsWith("front") ? " " + styles.activeSort : ""}`}
+              data-testid="sort-btn-name"
+              data-active={sort.startsWith("front") ? "true" : "false"}
+              onClick={() => handleSortClick("front")}
+            >
+              Aa{nameArrow}
+            </button>
+            <button
+              className={`${styles.sortBtn}${sort.startsWith("createTime") ? " " + styles.activeSort : ""}`}
+              data-testid="sort-btn-time"
+              data-active={sort.startsWith("createTime") ? "true" : "false"}
+              onClick={() => handleSortClick("createTime")}
+            >
+              T{timeArrow}
+            </button>
+          </div>
+          <button className={styles.createBtn} onClick={onCreate}>
+            +
           </button>
         </div>
       </div>
-      <div className={styles.deckChips}>
-        {decks.length === 0 ? (
-          <span style={{ color: "#555", fontSize: "0.75em" }}>暂无牌组，创建牌组</span>
-        ) : (
-          decks.map((deck) => (
-            <span
-              key={deck.id}
-              className={`${styles.deckChip}${deckId === deck.id ? " " + styles.activeDeck : ""}`}
-              data-testid="deck-chip"
-              data-active={deckId === deck.id ? "true" : "false"}
-              onClick={() => onDeckChange(deckId === deck.id ? null : deck.id)}
-            >
-              {deck.name}
-            </span>
-          ))
-        )}
-      </div>
-      <button className="btn btn-primary" onClick={onCreate}>
-        + 创建卡片
-      </button>
     </div>
   );
 }

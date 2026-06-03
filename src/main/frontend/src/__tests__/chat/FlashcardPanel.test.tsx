@@ -34,9 +34,9 @@ describe("FlashcardPanel", () => {
     fireEvent.change(screen.getByTestId("flashcard-front"), { target: { value: "test" } });
     fireEvent.click(screen.getByTestId("flashcard-continue"));
 
-    fireEvent.focus(screen.getByTestId("flashcard-tag-input"));
+    fireEvent.change(screen.getByTestId("inline-chip-input-field"), { target: { value: "v" } });
     await waitFor(() => {
-      expect(screen.getByTestId("flashcard-tag-suggestions")).toBeTruthy();
+      expect(screen.getByTestId("inline-chip-suggestions")).toBeTruthy();
     });
   });
 
@@ -45,12 +45,12 @@ describe("FlashcardPanel", () => {
     fireEvent.change(screen.getByTestId("flashcard-front"), { target: { value: "test" } });
     fireEvent.click(screen.getByTestId("flashcard-continue"));
 
-    fireEvent.focus(screen.getByTestId("flashcard-tag-input"));
+    fireEvent.change(screen.getByTestId("inline-chip-input-field"), { target: { value: "v" } });
     await waitFor(() => {
-      expect(screen.getByTestId("flashcard-tag-suggestions")).toBeTruthy();
+      expect(screen.getByTestId("inline-chip-suggestions")).toBeTruthy();
     });
-    fireEvent.click(screen.getAllByTestId("tag-suggestion-item")[0]);
-    expect(screen.getByTestId("flashcard-chip")).toBeTruthy();
+    fireEvent.click(screen.getAllByTestId("inline-chip-suggestion")[0]);
+    expect(screen.getByTestId("inline-chip")).toBeTruthy();
   });
 
   it("saves card via POST and shows toast", async () => {
@@ -67,11 +67,11 @@ describe("FlashcardPanel", () => {
     fireEvent.click(screen.getByTestId("flashcard-continue"));
     fireEvent.change(screen.getByTestId("flashcard-back"), { target: { value: "昨天" } });
 
-    fireEvent.focus(screen.getByTestId("flashcard-tag-input"));
+    fireEvent.change(screen.getByTestId("inline-chip-input-field"), { target: { value: "v" } });
     await waitFor(() => {
-      expect(screen.getByTestId("flashcard-tag-suggestions")).toBeTruthy();
+      expect(screen.getByTestId("inline-chip-suggestions")).toBeTruthy();
     });
-    fireEvent.click(screen.getAllByTestId("tag-suggestion-item")[0]);
+    fireEvent.click(screen.getAllByTestId("inline-chip-suggestion")[0]);
 
     fireEvent.click(screen.getByTestId("flashcard-save"));
 

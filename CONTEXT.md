@@ -97,7 +97,7 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 | **Alea PRNG** | A deterministic pseudo-random number generator (Johannes Baagøe's algorithm) used for fuzz in the FSRS scheduler. Replaces `java.util.Random` to enable cross-implementation reproducibility. | Fuzz, deterministic random |
 | **Two-stage input** | The flashcard creation UI flow: Stage 1 = minimal panel (~60px) with only front input, Stage 2 = expanded panel (~70vh) with back input + chip tag input + save button. Designed to let the Learner type while still seeing the chat. | 两阶段录入 |
 | **Chip tag input** | An autocomplete tag input where selected tags render as inline "chips" with × to remove. Data sourced from `GET /api/tags`, filtered client-side. Backspace on empty input removes the last chip. | Chip input, 标签输入 |
-| **activePanel** | A `window`-global variable (`null | 'debug' | 'flashcard'`) that enforces mutual exclusivity between the Debug panel and the Flashcard panel — opening one collapses the other. | Panel state, panel toggle |
+| **activePanel** | A React state variable on the chat page that enforces mutual exclusivity between the Debug panel and the Flashcard panel — opening one collapses the other. Managed by the `Header` component via `activePanel`/`onTogglePanel` props. Originally a `window`-global variable before the React migration. | Panel state, panel toggle |
 | **FlashcardController** | The first `@RestController` in the codebase, serving `POST /api/cards/add` (create card with Tag auto-upsert) and `GET /api/tags` (autocomplete data source). Authenticated via JSESSIONID cookie; CSRF exempt via `SecurityConfig`. | REST controller, 闪卡 API |
 
 ## Relationships

@@ -2,18 +2,59 @@
   margin-bottom: 12px;
 }
 
-.searchRow {
+.deckTabs {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 0;
   margin-bottom: 8px;
 }
 
+.deckTab {
+  padding: 6px 14px;
+  background: #0f3460;
+  border: 1px solid #1a5276;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-size: 0.8em;
+  color: #888;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.deckTab:first-child {
+  border-left-width: 2px;
+}
+
+@media (hover: hover) {
+  .deckTab:hover {
+    background: #16213e;
+    color: #e0e0e0;
+  }
+}
+
+.activeTab {
+  background: #e94560;
+  color: #fff;
+  border-color: #e94560;
+}
+
+.toolbarRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .searchInput {
-  width: 200px;
+  flex: 1;
+  min-width: 120px;
   -webkit-appearance: none;
   box-sizing: border-box;
-  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .sortBtns {
@@ -42,32 +83,21 @@
   border-color: #e94560;
 }
 
-.deckChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.deckChip {
-  padding: 2px 8px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 10px;
-  font-size: 0.75em;
-  color: #aaa;
+.createBtn {
+  background: #e94560;
+  border: 1px solid #e94560;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  font-size: 0.9em;
+  font-weight: 600;
+  line-height: 1;
+  transition: opacity 0.2s;
 }
 
 @media (hover: hover) {
-  .deckChip:hover {
-    background: #e94560;
-    color: #fff;
-    border-color: #e94560;
+  .createBtn:hover {
+    opacity: 0.85;
   }
-}
-.activeDeck {
-  background: #e94560;
-  color: #fff;
-  border-color: #e94560;
 }

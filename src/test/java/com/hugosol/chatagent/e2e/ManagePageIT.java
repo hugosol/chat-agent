@@ -154,19 +154,19 @@ class ManagePageIT extends E2ETestBase {
         page.waitForSelector("[data-testid='empty-state']");
         assertThat(page.locator("[data-testid='empty-state']").textContent()).contains("暂无卡片");
 
-        page.locator("button:has-text('+ 创建卡片')").click();
+        page.locator("button:has-text('+')").click();
         page.waitForSelector("[data-testid='modal-overlay']");
 
         page.locator("[data-testid='card-form-front']").fill("yesterday");
         page.locator("[data-testid='card-form-back']").fill("昨天");
 
-        page.locator("[data-testid='chip-input-field']").fill("Daily");
-        page.waitForSelector("[data-testid='chip-suggestion']:has-text('Daily English')");
-        page.locator("[data-testid='chip-suggestion']:has-text('Daily English')").click();
+        page.locator("[data-testid='inline-chip-input-field']").fill("Daily");
+        page.waitForSelector("[data-testid='inline-chip-suggestion']:has-text('Daily English')");
+        page.locator("[data-testid='inline-chip-suggestion']:has-text('Daily English')").click();
 
-        page.locator("[data-testid='chip-input-field']").fill("verb");
-        page.waitForSelector("[data-testid='chip-suggestion']:has-text('verb')");
-        page.locator("[data-testid='chip-suggestion']:has-text('verb')").click();
+        page.locator("[data-testid='inline-chip-input-field']").fill("verb");
+        page.waitForSelector("[data-testid='inline-chip-suggestion']:has-text('verb')");
+        page.locator("[data-testid='inline-chip-suggestion']:has-text('verb')").click();
 
         page.locator("[data-testid='modal-save']").click();
         page.waitForFunction(
@@ -227,7 +227,7 @@ class ManagePageIT extends E2ETestBase {
         assertThat(page.locator("[data-testid='card-front']").textContent()).contains("hello");
 
         page.locator("[data-testid='card-search']").fill("");
-        page.waitForTimeout(400);
+        page.waitForTimeout(1200);
         assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(1);
 
         takeScreenshot("search");
@@ -273,10 +273,10 @@ class ManagePageIT extends E2ETestBase {
         page.locator("[data-testid='tab-cards']").click();
         page.waitForSelector("[data-testid='card-block']");
 
-        page.waitForSelector("[data-testid='deck-chip']:has-text('Daily English')");
+        page.waitForSelector("[data-testid='deck-tab']:has-text('Daily English')");
         assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(2);
 
-        page.locator("[data-testid='deck-chip']:has-text('Daily English')").click();
+        page.locator("[data-testid='deck-tab']:has-text('Daily English')").click();
         page.waitForFunction(
                 "() => { var el = document.querySelector(\"[data-testid='card-front']\"); " +
                 "return el && el.textContent && el.textContent.includes('Yesterday'); }");
@@ -285,7 +285,7 @@ class ManagePageIT extends E2ETestBase {
 
         takeScreenshot("deck-filter");
 
-        page.locator("[data-testid='deck-chip']:has-text('Daily English')").click();
+        page.locator("[data-testid='deck-tab']:has-text('全部')").click();
         page.waitForTimeout(400);
         assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(2);
     }
