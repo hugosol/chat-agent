@@ -3,7 +3,7 @@ import type { Card, Tag, PageResponse } from "../../shared/types";
 import { CardToolbar } from "./CardToolbar";
 import { CardList } from "./CardList";
 import { Modal } from "../../shared/Modal";
-import { ChipInput } from "../../shared/ChipInput";
+import { InlineChipInput } from "../../shared/InlineChipInput";
 import { showToast } from "../../shared/Toast";
 import { speakText } from "../../shared/tts";
 import { formatDate, englishOnly } from "../../shared/utils";
@@ -179,6 +179,27 @@ function CardsTab(): JSX.Element {
     return <div className="empty-state">加载中...</div>;
   }
 
+  if (cards.length === 0) {
+    const emptyText = decks.length === 0
+      ? "暂无牌组，请先在 Tags 页面创建牌组"
+      : "暂无卡片，点击 + 创建";
+    return (
+      <div>
+        <CardToolbar
+          search={search}
+          sort={sort}
+          deckId={deckId}
+          decks={decks}
+          onSearchChange={(s) => { setSearch(s); setPage(0); }}
+          onSortChange={(s) => { setSort(s); setPage(0); }}
+          onDeckChange={(id) => { setDeckId(id); setPage(0); }}
+          onCreate={handleOpenCreate}
+        />
+        <div className="empty-state" data-testid="empty-state">{emptyText}</div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <CardToolbar
@@ -255,24 +276,28 @@ function CardsTab(): JSX.Element {
           onClose={handleCloseModal}
           onSave={modal.type === "create" ? handleCreateSave : handleEditSave}
         >
-          <input
-            type="text"
-            className="create-front"
-            data-testid="card-form-front"
-            placeholder="单词或表达..."
-            value={formFront}
-            onChange={(e) => setFormFront(e.target.value)}
-          />
-          <textarea
-            className="create-back"
-            data-testid="card-form-back"
-            placeholder="释义..."
-            rows={2}
-            value={formBack}
-            onChange={(e) => setFormBack(e.target.value)}
-          />
-          <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
-            <ChipInput
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <input
+              type="text"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              data-testid="card-form-front"
+              placeholder="单词或表达..."
+              value={formFront}
+              onChange={(e) => setFormFront(e.target.value)}
+            />
+            <textarea
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                borderLeft: "2px solid #4fc3f7",
+              }}
+              data-testid="card-form-back"
+              placeholder="释义..."
+              rows={4}
+              value={formBack}
+              onChange={(e) => setFormBack(e.target.value)}
+            />
+            <InlineChipInput
               options={allTags}
               value={formTags}
               onChange={setFormTags}
