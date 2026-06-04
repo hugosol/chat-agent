@@ -1,0 +1,45 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  color: #4a90d9;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.deckName {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+}
+
+@media (hover: hover) {
+  .backBtn:hover {
+    background-color: #f0f6ff;
+  }
+}

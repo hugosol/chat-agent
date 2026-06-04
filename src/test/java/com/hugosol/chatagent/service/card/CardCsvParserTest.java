@@ -16,8 +16,8 @@ class CardCsvParserTest {
     @Test
     void parse_fullFields_allParsedCorrectly() throws Exception {
         String csv = """
-                front,back,stability,difficulty,cardState,due,reps,lapses,lastReview
-                hello,world,3.0,0.3,Review,2024-06-01T10:00:00Z,5,2,2024-05-01T10:00:00Z
+                front,back,stability,difficulty,cardState,due,reps,lapses,lastReview,firstReviewDate
+                hello,world,3.0,0.3,Review,2024-06-01T10:00:00Z,5,2,2024-05-01T10:00:00Z,2024-06-01
                 """;
 
         List<CardCsvParser.ParsedCardRow> rows = parser.parse(toStream(csv));
@@ -34,6 +34,7 @@ class CardCsvParserTest {
         assertThat(row.fsrs().reps()).isEqualTo(5);
         assertThat(row.fsrs().lapses()).isEqualTo(2);
         assertThat(row.fsrs().lastReview()).isEqualTo("2024-05-01T10:00:00Z");
+        assertThat(row.fsrs().firstReviewDate()).isEqualTo("2024-06-01");
     }
 
     @Test
@@ -130,6 +131,7 @@ class CardCsvParserTest {
         assertThat(fsrs.reps()).isNull();
         assertThat(fsrs.lapses()).isNull();
         assertThat(fsrs.lastReview()).isNull();
+        assertThat(fsrs.firstReviewDate()).isNull();
     }
 
     @Test

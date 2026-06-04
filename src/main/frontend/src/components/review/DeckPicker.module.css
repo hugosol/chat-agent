@@ -1,0 +1,137 @@
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 24px;
+  text-align: center;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #888;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.empty {
+  color: #999;
+  font-size: 14px;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.deckList,
+.modeList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deckItem,
+.modeItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.deckItemActive,
+.modeItemActive {
+  border-color: #4a90d9;
+  background-color: #f0f6ff;
+}
+
+.radio {
+  accent-color: #4a90d9;
+  width: 18px;
+  height: 18px;
+}
+
+.deckName {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.deckCount {
+  font-size: 13px;
+  color: #888;
+}
+
+.modeItem > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modeLabel {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.modeDesc {
+  font-size: 12px;
+  color: #888;
+}
+
+.limitInput {
+  width: 80px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  text-align: center;
+}
+
+.learnedInfo {
+  margin-left: 12px;
+  font-size: 13px;
+  color: #27ae60;
+}
+
+.startBtn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 24px;
+  border: none;
+  border-radius: 12px;
+  background-color: #4a90d9;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.startBtn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .startBtn:not(:disabled):hover {
+    background-color: #3a7bc8;
+  }
+
+  .deckItem:hover,
+  .modeItem:hover {
+    border-color: #aaa;
+  }
+}

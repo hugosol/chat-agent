@@ -9,7 +9,7 @@ package com.hugosol.chatagent.flashcard;
  *  seed(1) state equals seed(1) state
  * </pre>
  */
-class AleaPrng {
+public class AleaPrng {
 
     private static final double ARC4_CONST = 2.3283064365386963E-10;
 
@@ -18,11 +18,11 @@ class AleaPrng {
     private double s2;
     private double c;
 
-    AleaPrng(long seed) {
+    public AleaPrng(long seed) {
         this(String.valueOf(seed));
     }
 
-    AleaPrng(String seed) {
+    public AleaPrng(String seed) {
         Mash m = new Mash();
         this.c = 1;
         this.s0 = m.mash(" ");
@@ -36,7 +36,7 @@ class AleaPrng {
         if (this.s2 < 0) this.s2 += 1;
     }
 
-    double next() {
+    public double next() {
         double t = 2091639 * s0 + c * ARC4_CONST;
         s0 = s1;
         s1 = s2;

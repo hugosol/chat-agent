@@ -67,6 +67,7 @@ class FlashcardIT extends E2ETestBase {
         assertThat(card.getLapses()).isEqualTo(0);
         assertThat(card.getDue()).isNotNull();
         assertThat(card.getLastReview()).isNull();
+        assertThat(card.getFirstReviewDate()).isNull();
 
         assertThat(card.getTags()).hasSize(2);
         assertThat(card.getTags()).extracting(t -> t.getName())

@@ -56,9 +56,9 @@ class CardBatchServiceTest {
         when(cardRepository.saveAll(anyList()))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        byte[] csvBytes = ("front,back,stability,difficulty,cardState,due,reps,lapses,lastReview\n" +
-                "hello,world,3.0,0.3,Review,2024-06-01T10:00:00Z,5,2,2024-05-01T10:00:00Z\n" +
-                "goodbye,再见,2.5,0.1,New,2024-06-02T10:00:00Z,0,0,\n").getBytes(StandardCharsets.UTF_8);
+        byte[] csvBytes = ("front,back,stability,difficulty,cardState,due,reps,lapses,lastReview,firstReviewDate\n" +
+                "hello,world,3.0,0.3,Review,2024-06-01T10:00:00Z,5,2,2024-05-01T10:00:00Z,2024-06-01\n" +
+                "goodbye,再见,2.5,0.1,New,2024-06-02T10:00:00Z,0,0,,\n").getBytes(StandardCharsets.UTF_8);
 
         ImportResult result = service.importCards(csvBytes, "cards.csv", "deck-1", "user-1");
 
@@ -338,7 +338,7 @@ class CardBatchServiceTest {
         assertThat(bytes[2]).isEqualTo((byte) 0xBF);
 
         String csv = new String(bytes, StandardCharsets.UTF_8);
-        assertThat(csv).contains("front,back,stability,difficulty,cardState");
+        assertThat(csv).contains("front,back,stability,difficulty,cardState,due,reps,lapses,lastReview,firstReviewDate");
         assertThat(csv).contains("hello,world,3,0.3,Review");
         assertThat(csv).contains("goodbye,再见,2.5,0.1,New");
 
@@ -363,7 +363,7 @@ class CardBatchServiceTest {
         ExportData data = service.exportCards("deck-1", "user-1");
 
         String csv = new String(data.csvBytes(), StandardCharsets.UTF_8);
-        assertThat(csv).contains("front,back,stability,difficulty,cardState");
+        assertThat(csv).contains("front,back,stability,difficulty,cardState,due,reps,lapses,lastReview,firstReviewDate");
         assertThat(csv.split("\n")).hasSize(1);
 
         ArgumentCaptor<BatchOperationLog> logCaptor = ArgumentCaptor.forClass(BatchOperationLog.class);

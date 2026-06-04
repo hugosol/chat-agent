@@ -66,6 +66,9 @@ public abstract class E2ETestBase {
     @Autowired
     protected TagRepository tagRepository;
 
+    @Autowired
+    protected UserPreferencesRepository userPreferencesRepository;
+
     private int turnNumber = 0;
     private String currentTestMethodName;
 

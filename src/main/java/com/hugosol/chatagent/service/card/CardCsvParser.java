@@ -47,7 +47,8 @@ public class CardCsvParser {
                     getOrNull(record, "due"),
                     parseIntOrNull(record, "reps"),
                     parseIntOrNull(record, "lapses"),
-                    getOrNull(record, "lastReview")
+                    getOrNull(record, "lastReview"),
+                    getOrNull(record, "firstReviewDate")
             );
 
             rows.add(new ParsedCardRow(rowNumber, front, back, fsrs));
@@ -124,7 +125,8 @@ public class CardCsvParser {
     }
 
     public record FsrsFields(Double stability, Double difficulty, Integer cardState,
-                              String due, Integer reps, Integer lapses, String lastReview) {
+                              String due, Integer reps, Integer lapses, String lastReview,
+                              String firstReviewDate) {
     }
 
     private static class UnicodeReader extends Reader {
