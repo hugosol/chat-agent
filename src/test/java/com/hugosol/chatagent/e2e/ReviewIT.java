@@ -167,6 +167,7 @@ class ReviewIT extends E2ETestBase {
                 "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
 
         page.locator("[data-testid='start-btn']").click();
+        page.waitForSelector("[data-testid='card-front']");
 
         var ratingRounds = 0;
         while (ratingRounds < 5 && page.locator("[data-testid='flip-card-btn']").count() > 0) {
