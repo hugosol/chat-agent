@@ -34,9 +34,11 @@
 .cardFront,
 .cardBack {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
   padding: 24px 20px;
   position: relative;
 }
@@ -46,7 +48,7 @@
 }
 
 .cardText {
-  font-size: 22px;
+  font-size: 18px;
   text-align: center;
   word-break: break-word;
   line-height: 1.4;
