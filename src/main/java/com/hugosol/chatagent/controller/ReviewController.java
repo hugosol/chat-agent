@@ -53,7 +53,7 @@ public class ReviewController {
     public ResponseEntity<Map<String, Object>> rateCard(@RequestBody RateCardRequest request) {
         String userId = getUserId();
         Rating rating = Rating.valueOf(request.rating().toUpperCase());
-        RateCardResult result = reviewService.rateCard(request.cardId(), rating, Instant.now(), userId);
+        RateCardResult result = reviewService.rateCard(request.cardId(), rating, request.mode(), Instant.now(), userId);
         var nextCard = reviewService.getNextCard(request.deckId(), request.mode(), userId);
 
         Map<String, Object> response = new HashMap<>();
@@ -107,12 +107,14 @@ public class ReviewController {
             @RequestParam(defaultValue = "STANDARD") String mode) {
         String userId = getUserId();
         var card = reviewService.getNextCard(deckId, mode, userId);
+        var stats = reviewService.computeReviewStats(deckId, mode, userId);
         Map<String, Object> result = new HashMap<>();
         if (card.isPresent()) {
             result.put("card", cardToMap(card.get()));
         } else {
             result.put("card", null);
         }
+        result.put("stats", statsToMap(stats));
         return ResponseEntity.ok(result);
     }
 

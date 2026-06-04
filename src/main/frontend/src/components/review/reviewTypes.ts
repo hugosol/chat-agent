@@ -42,4 +42,5 @@ export interface RateCardResponse {
 
 export interface NextCardResponse {
   card: ReviewCard | null;
+  stats: ReviewStats;
 }

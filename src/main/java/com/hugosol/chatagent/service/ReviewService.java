@@ -39,7 +39,7 @@ public class ReviewService {
     }
 
     @Transactional
-    public RateCardResult rateCard(String cardId, Rating rating, Instant now, String userId) {
+    public RateCardResult rateCard(String cardId, Rating rating, String mode, Instant now, String userId) {
         Card card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!card.getUserId().equals(userId)) {
@@ -106,9 +106,13 @@ public class ReviewService {
         log.setDeckId(deckId);
         reviewLogRepository.save(log);
 
-        ReviewStats stats = computeStats(deckId, userId);
+        ReviewStats stats = computeStats(deckId, mode, userId);
 
         return new RateCardResult(card, stats);
+    }
+
+    public ReviewStats computeReviewStats(String deckId, String mode, String userId) {
+        return computeStats(deckId, mode, userId);
     }
 
     public Optional<Card> getNextCard(String deckId, String mode, String userId) {
@@ -162,7 +166,7 @@ public class ReviewService {
         return todayStart.atZone(zoneId).toInstant();
     }
 
-    private ReviewStats computeStats(String deckId, String userId) {
+    private ReviewStats computeStats(String deckId, String mode, String userId) {
         if (deckId == null) {
             return new ReviewStats(0, 0, 0, 20, null);
         }
@@ -170,9 +174,24 @@ public class ReviewService {
         Instant todayStart = computeTodayStart(prefs);
         Instant now = Instant.now();
         long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart);
-        long remaining = cardRepository.countByTagsIdAndCardStateNotAndDueLessThanEqual(deckId, 0, now);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart);
+        long remaining = computeRemaining(deckId, mode, prefs, learnedToday, now);
         Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now);
-        return new ReviewStats(reviewedToday, remaining, learnedToday, prefs.getNewCardDailyLimit(), nextDueAt);
+        long displayedLearnedToday = "CRAM".equals(mode) ? -1 : learnedToday;
+        return new ReviewStats(reviewedToday, remaining, displayedLearnedToday, prefs.getNewCardDailyLimit(), nextDueAt);
+    }
+
+    private long computeRemaining(String deckId, String mode, UserPreferences prefs, long learnedToday, Instant now) {
+        return switch (mode) {
+            case "STANDARD" -> {
+                long dueCount = cardRepository.countDueCardsByTagsId(deckId, now);
+                long newQuota = Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
+                yield dueCount + newQuota;
+            }
+            case "REVIEW_ONLY" -> cardRepository.countDueCardsByTagsId(deckId, now);
+            case "NEW_ONLY" -> Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
+            case "CRAM" -> -1;
+            default -> 0;
+        };
     }
 }

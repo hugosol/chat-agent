@@ -30,11 +30,12 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
       );
       if (res.ok) {
         const data: NextCardResponse = await res.json();
+        setStats(data.stats);
         if (data.card) {
           setCard(data.card);
           setFlipped(false);
         } else {
-          onComplete(stats, card);
+          onComplete(data.stats, card);
         }
       }
     } finally {

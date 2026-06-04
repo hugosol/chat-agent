@@ -11,9 +11,11 @@ export function StatsBar({ stats }: Props): React.ReactElement {
     <div className={styles.container} data-testid="stats-bar">
       <span data-testid="stats-reviewed">已复习 {stats.reviewedToday} 张</span>
       <span className={styles.separator}>|</span>
-      <span data-testid="stats-remaining">剩余 {stats.remaining} 张</span>
+      <span data-testid="stats-remaining">剩余 {stats.remaining >= 0 ? stats.remaining : "-"} 张</span>
       <span className={styles.separator}>|</span>
-      <span data-testid="stats-new">新卡 {stats.learnedToday}/{stats.dailyLimit}</span>
+      <span data-testid="stats-new">
+        新卡 {stats.learnedToday >= 0 ? `${stats.learnedToday}/${stats.dailyLimit}` : "-/-"}
+      </span>
     </div>
   );
 }

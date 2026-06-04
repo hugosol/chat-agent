@@ -148,6 +148,8 @@ class ReviewIT extends E2ETestBase {
         page.waitForSelector("[data-testid='stats-bar']");
 
         assertThat(page.locator("[data-testid='stats-bar']").isVisible()).isTrue();
+        var remainingText = page.locator("[data-testid='stats-remaining']").textContent();
+        assertThat(remainingText).doesNotContain("剩余 0 张");
 
         page.locator("[data-testid='flip-card-btn']").click();
         page.waitForSelector("[data-testid='rating-good']");
@@ -194,6 +196,7 @@ class ReviewIT extends E2ETestBase {
         page.waitForSelector("[data-testid='complete-page']", new com.microsoft.playwright.Page.WaitForSelectorOptions().setTimeout(10000));
         assertThat(page.locator("[data-testid='complete-page']").isVisible()).isTrue();
         assertThat(page.locator("[data-testid='complete-back-btn']").isVisible()).isTrue();
+        assertThat(page.locator("[data-testid='complete-next-due']").isVisible()).isTrue();
 
         takeScreenshot("scenario4-complete");
     }
