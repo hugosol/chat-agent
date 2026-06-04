@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Header } from "../Header/Header";
 import { DeckPicker } from "./DeckPicker";
 import { ReviewPage } from "./ReviewPage";
 import { CompletePage } from "./CompletePage";
@@ -32,21 +33,30 @@ export function ReviewApp(): React.ReactElement {
     setCompleteCard(null);
   };
 
-  if (stage === "reviewing" && selectedDeck) {
-    return (
-      <ReviewPage
-        deck={selectedDeck}
-        mode={selectedMode}
-        limit={dailyLimit}
-        onComplete={handleReviewComplete}
-        onBack={handleBackToPicker}
-      />
-    );
-  }
+  const renderContent = () => {
+    if (stage === "reviewing" && selectedDeck) {
+      return (
+        <ReviewPage
+          deck={selectedDeck}
+          mode={selectedMode}
+          limit={dailyLimit}
+          onComplete={handleReviewComplete}
+          onBack={handleBackToPicker}
+        />
+      );
+    }
 
-  if (stage === "complete" && stats) {
-    return <CompletePage stats={stats} lastCard={completeCard} onBack={handleBackToPicker} />;
-  }
+    if (stage === "complete" && stats) {
+      return <CompletePage stats={stats} lastCard={completeCard} onBack={handleBackToPicker} />;
+    }
 
-  return <DeckPicker onStart={handleStartReview} />;
+    return <DeckPicker onStart={handleStartReview} />;
+  };
+
+  return (
+    <>
+      <Header />
+      {renderContent()}
+    </>
+  );
 }
