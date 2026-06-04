@@ -116,7 +116,7 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
           </a>
           <a
             className={classes.navLink}
-            href="/review/"
+            href="/review/index.html"
             data-testid="nav-link"
             data-active={isReviewPage ? "true" : "false"}
           >

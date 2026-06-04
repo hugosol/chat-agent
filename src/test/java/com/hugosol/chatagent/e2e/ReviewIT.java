@@ -76,7 +76,7 @@ class ReviewIT extends E2ETestBase {
 
     @Test
     void scenario1_deckAndModeSelection() {
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         assertThat(page.locator("[data-testid='deck-item']").count()).isEqualTo(1);
@@ -98,7 +98,7 @@ class ReviewIT extends E2ETestBase {
 
     @Test
     void scenario2_standardReview_flipAndRate() {
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -128,7 +128,7 @@ class ReviewIT extends E2ETestBase {
 
     @Test
     void scenario3_statsBarUpdates() {
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -159,7 +159,7 @@ class ReviewIT extends E2ETestBase {
                     cardRepository.save(c);
                 });
 
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -192,7 +192,7 @@ class ReviewIT extends E2ETestBase {
 
     @Test
     void scenario5_reviewOnlyMode() {
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -216,7 +216,7 @@ class ReviewIT extends E2ETestBase {
 
     @Test
     void scenario6_newOnlyMode() {
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -241,7 +241,7 @@ class ReviewIT extends E2ETestBase {
 
     @Test
     void scenario7_cramMode_allCardsReviewed() {
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -283,7 +283,7 @@ class ReviewIT extends E2ETestBase {
         prefs.setNewCardDailyLimit(0);
         userPreferencesRepository.save(prefs);
 
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -299,7 +299,7 @@ class ReviewIT extends E2ETestBase {
 
     @Test
     void scenario9_preferencesPersistence() {
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         page.locator("[data-testid='deck-item']").click();
@@ -313,7 +313,7 @@ class ReviewIT extends E2ETestBase {
         page.waitForSelector("[data-testid='card-front']");
         page.waitForTimeout(300);
 
-        page.navigate("http://localhost:" + serverPort + "/review/");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
         page.waitForSelector("[data-testid='deck-item']");
 
         takeScreenshot("scenario9-persistence");
