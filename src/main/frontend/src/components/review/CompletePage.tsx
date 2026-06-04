@@ -9,9 +9,22 @@ interface Props {
 }
 
 export function CompletePage({ stats, lastCard, onBack }: Props): React.ReactElement {
-  const hoursUntilNext = stats.nextDueAt
-    ? Math.round((new Date(stats.nextDueAt).getTime() - Date.now()) / 3600000)
+  const diffMs = stats.nextDueAt
+    ? new Date(stats.nextDueAt).getTime() - Date.now()
     : null;
+
+  const formatNextDue = (): string | null => {
+    if (diffMs === null) return null;
+    if (diffMs <= 0) return "即将到期";
+    const minutes = Math.round(diffMs / 60000);
+    if (minutes < 60) {
+      return `下一张卡片将在约 ${minutes} 分钟后到期`;
+    }
+    const hours = Math.round(diffMs / 3600000);
+    return `下一张卡片将在约 ${hours} 小时后到期`;
+  };
+
+  const nextDueText = formatNextDue();
 
   return (
     <div className={styles.container} data-testid="complete-page">
@@ -27,9 +40,9 @@ export function CompletePage({ stats, lastCard, onBack }: Props): React.ReactEle
             <span className={styles.statLabel}>新学张数</span>
           </div>
         </div>
-        {hoursUntilNext !== null && hoursUntilNext > 0 && (
+        {nextDueText && (
           <p className={styles.nextDue} data-testid="complete-next-due">
-            下一张卡片将在约 {hoursUntilNext} 小时后到期
+            {nextDueText}
           </p>
         )}
         <button
