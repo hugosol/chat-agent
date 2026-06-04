@@ -18,6 +18,16 @@ export function CardDisplay({ front, back }: Props): React.ReactElement {
   const showTtsFront = englishOnly(front).length > 0;
   const showTtsBack = englishOnly(back).length > 0;
 
+  const renderText = (text: string) => {
+    const lines = text.split("\n");
+    return lines.map((line, i) => (
+      <span key={i}>
+        {line}
+        {i < lines.length - 1 && <br />}
+      </span>
+    ));
+  };
+
   return (
     <div className={styles.cardArea}>
       <div
@@ -27,8 +37,8 @@ export function CardDisplay({ front, back }: Props): React.ReactElement {
       >
         <div className={styles.cardInner}>
           <div className={styles.cardFront} data-testid="card-front">
-            <span className={styles.cardText}>{front}</span>
-            {flipped && showTtsFront && (
+            <span className={styles.cardText}>{renderText(front)}</span>
+            {showTtsFront && (
               <button
                 data-testid="tts-btn-front"
                 className={styles.ttsBtn}
@@ -40,7 +50,7 @@ export function CardDisplay({ front, back }: Props): React.ReactElement {
           </div>
           {flipped && (
             <div className={styles.cardBack} data-testid="card-back">
-              <span className={styles.cardText}>{back}</span>
+              <span className={styles.cardText}>{renderText(back)}</span>
               {showTtsBack && (
                 <button
                   data-testid="tts-btn-back"

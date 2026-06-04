@@ -36,10 +36,8 @@ describe("CardDisplay", () => {
     expect(screen.getByText("你好")).toBeTruthy();
   });
 
-  it("shows TTS button for English front after flip", () => {
+  it("shows TTS button for English front before flip", () => {
     render(<CardDisplay front="hello" back="你好" />);
-
-    fireEvent.click(screen.getByTestId("flip-card-btn"));
 
     expect(screen.getByTestId("tts-btn-front")).toBeTruthy();
   });
@@ -47,9 +45,18 @@ describe("CardDisplay", () => {
   it("does not show TTS button for non-English front", () => {
     render(<CardDisplay front="你好" back="hello" />);
 
+    expect(screen.queryByTestId("tts-btn-front")).toBeNull();
+  });
+
+  it("renders back text with newlines as line breaks", () => {
+    render(<CardDisplay front="hello" back={"line1\nline2\nline3"} />);
+
     fireEvent.click(screen.getByTestId("flip-card-btn"));
 
-    expect(screen.queryByTestId("tts-btn-front")).toBeNull();
-    expect(screen.getByTestId("tts-btn-back")).toBeTruthy();
+    const backEl = screen.getByTestId("card-back");
+    expect(backEl.textContent).toContain("line1");
+    expect(backEl.textContent).toContain("line2");
+    expect(backEl.textContent).toContain("line3");
+    expect(backEl.querySelectorAll("br").length).toBe(2);
   });
 });
