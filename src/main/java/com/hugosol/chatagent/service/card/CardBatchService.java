@@ -106,7 +106,7 @@ public class CardBatchService {
     private byte[] generateCsv(List<Card> cards) {
         var csvFormat = org.apache.commons.csv.CSVFormat.DEFAULT.builder()
                 .setHeader("front", "back", "stability", "difficulty", "cardState",
-                        "due", "reps", "lapses", "lastReview", "firstReviewDate")
+                        "due", "reps", "lapses", "lastReview", "firstReviewDate", "step")
                 .build();
 
         var sw = new java.io.StringWriter();
@@ -122,6 +122,7 @@ public class CardBatchService {
                 printer.print(card.getLapses());
                 printer.print(card.getLastReview() != null ? card.getLastReview().toString() : "");
                 printer.print(card.getFirstReviewDate() != null ? formatInstantDate(card.getFirstReviewDate()) : "");
+                printer.print(card.getStep());
                 printer.println();
             }
         } catch (java.io.IOException e) {
@@ -276,6 +277,7 @@ public class CardBatchService {
             card.setStability(fsrs.stability() != null ? fsrs.stability() : defaults.stability());
             card.setDifficulty(fsrs.difficulty() != null ? fsrs.difficulty() : defaults.difficulty());
             card.setCardState(fsrs.cardState() != null ? fsrs.cardState() : defaults.state());
+            card.setStep(fsrs.step() != null ? fsrs.step() : defaults.step());
             card.setReps(fsrs.reps() != null ? fsrs.reps() : defaults.reps());
             card.setLapses(fsrs.lapses() != null ? fsrs.lapses() : defaults.lapses());
             card.setDue(fsrs.due() != null ? Instant.parse(fsrs.due()) : defaults.due());

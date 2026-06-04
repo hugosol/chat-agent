@@ -24,6 +24,7 @@ export interface ReviewCard {
   tags: { id: string; name: string; type: string | null }[];
   due: string | null;
   cardState: number;
+  step: number;
   stability: number;
   difficulty: number;
   reps: number;

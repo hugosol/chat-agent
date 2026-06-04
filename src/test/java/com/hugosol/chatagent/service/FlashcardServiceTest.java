@@ -58,6 +58,7 @@ class FlashcardServiceTest {
         assertThat(result.getCardState()).isEqualTo(0);
         assertThat(result.getReps()).isEqualTo(0);
         assertThat(result.getLapses()).isEqualTo(0);
+        assertThat(result.getStep()).isEqualTo(-1);
         assertThat(result.getDue()).isNotNull();
         assertThat(result.getLastReview()).isNull();
         assertThat(result.getTags()).hasSize(1);

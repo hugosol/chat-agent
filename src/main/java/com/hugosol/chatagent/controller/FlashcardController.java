@@ -110,6 +110,7 @@ public class FlashcardController {
             map.put("tags", tags);
             map.put("due", card.getDue() != null ? card.getDue().toString() : null);
             map.put("cardState", card.getCardState());
+            map.put("step", card.getStep());
             map.put("createTime", card.getCreateTime() != null ? card.getCreateTime().toString() : null);
             return map;
         });

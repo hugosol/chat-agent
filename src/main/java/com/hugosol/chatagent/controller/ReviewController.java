@@ -195,6 +195,7 @@ public class ReviewController {
         map.put("tags", tags);
         map.put("due", card.getDue() != null ? card.getDue().toString() : null);
         map.put("cardState", card.getCardState());
+        map.put("step", card.getStep());
         map.put("stability", card.getStability());
         map.put("difficulty", card.getDifficulty());
         map.put("reps", card.getReps());

@@ -5,15 +5,18 @@ import com.hugosol.chatagent.flashcard.CardState;
 import com.hugosol.chatagent.flashcard.FsrsScheduler;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
+import com.hugosol.chatagent.model.ReviewLog;
 import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.repository.CardRepository;
+import com.hugosol.chatagent.repository.ReviewLogRepository;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,10 +29,13 @@ public class ReviewService {
 
     private final CardRepository cardRepository;
     private final UserPreferencesService preferencesService;
+    private final ReviewLogRepository reviewLogRepository;
 
-    public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService) {
+    public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService,
+                         ReviewLogRepository reviewLogRepository) {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
+        this.reviewLogRepository = reviewLogRepository;
     }
 
     @Transactional
@@ -42,13 +48,16 @@ public class ReviewService {
 
         boolean isFirstReview = (card.getFirstReviewDate() == null);
 
+        Instant originalDue = card.getDue();
+        Instant originalLastReview = card.getLastReview();
+
         CardState inputState;
         if (card.getCardState() == 0) {
             inputState = FsrsScheduler.initNewCard(now);
         } else {
             inputState = new CardState(
                     card.getStability(), card.getDifficulty(), card.getCardState(),
-                    0, card.getDue(), card.getReps(), card.getLapses(), card.getLastReview(),
+                    card.getStep(), card.getDue(), card.getReps(), card.getLapses(), card.getLastReview(),
                     0.0, true);
         }
 
@@ -61,6 +70,7 @@ public class ReviewService {
         card.setDue(result.due());
         card.setReps(result.reps());
         card.setLapses(result.lapses());
+        card.setStep(result.step());
         card.setLastReview(result.lastReview());
         if (isFirstReview) {
             card.setFirstReviewDate(now);
@@ -73,6 +83,28 @@ public class ReviewService {
                 .findFirst()
                 .map(Tag::getId)
                 .orElse(null);
+
+        ReviewLog log = new ReviewLog();
+        log.setUserId(userId);
+        log.setCardId(cardId);
+        log.setRating(rating);
+        log.setStateBefore(inputState.state());
+        log.setStateAfter(result.state());
+        log.setStabilityBefore(inputState.stability());
+        log.setStabilityAfter(result.stability());
+        log.setDifficultyBefore(inputState.difficulty());
+        log.setDifficultyAfter(result.difficulty());
+        log.setStepBefore(inputState.step());
+        log.setScheduledDays(originalLastReview != null
+                ? Duration.between(originalLastReview, originalDue).getSeconds() / 86400.0
+                : 0);
+        log.setElapsedDays(originalLastReview != null
+                ? Duration.between(originalLastReview, now).getSeconds() / 86400.0
+                : 0);
+        log.setReviewedAt(now);
+        log.setFirstReview(isFirstReview);
+        log.setDeckId(deckId);
+        reviewLogRepository.save(log);
 
         ReviewStats stats = computeStats(deckId, now);
 

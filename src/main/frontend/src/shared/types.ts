@@ -21,6 +21,7 @@ export interface Card {
   tags: Tag[];
   due: string | null;
   cardState: number;
+  step: number;
   createTime: string | null;
 }
 
