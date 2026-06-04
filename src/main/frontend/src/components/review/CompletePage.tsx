@@ -33,11 +33,11 @@ export function CompletePage({ stats, lastCard, onBack }: Props): React.ReactEle
         <div className={styles.stats}>
           <div className={styles.statItem}>
             <span className={styles.statValue}>{stats.reviewedToday}</span>
-            <span className={styles.statLabel}>复习张数</span>
+            <span className={styles.statLabel}>今日复习</span>
           </div>
           <div className={styles.statItem}>
-            <span className={styles.statValue}>{stats.learnedToday}</span>
-            <span className={styles.statLabel}>新学张数</span>
+            <span className={styles.statValue}>{stats.learnedToday >= 0 ? stats.learnedToday : "-"}</span>
+            <span className={styles.statLabel}>今日新学</span>
           </div>
         </div>
         {nextDueText && (

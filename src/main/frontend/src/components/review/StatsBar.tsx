@@ -9,7 +9,7 @@ interface Props {
 export function StatsBar({ stats }: Props): React.ReactElement {
   return (
     <div className={styles.container} data-testid="stats-bar">
-      <span data-testid="stats-reviewed">已复习 {stats.reviewedToday} 张</span>
+      <span data-testid="stats-reviewed">今日：已复习 {stats.reviewedToday} 张</span>
       <span className={styles.separator}>|</span>
       <span data-testid="stats-remaining">剩余 {stats.remaining >= 0 ? stats.remaining : "-"} 张</span>
       <span className={styles.separator}>|</span>

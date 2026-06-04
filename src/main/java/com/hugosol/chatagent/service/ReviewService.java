@@ -185,11 +185,16 @@ public class ReviewService {
         return switch (mode) {
             case "STANDARD" -> {
                 long dueCount = cardRepository.countDueCardsByTagsId(deckId, now);
+                long actualNewCards = cardRepository.countByTagsIdAndCardState(deckId, 0);
                 long newQuota = Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
-                yield dueCount + newQuota;
+                yield dueCount + Math.min(newQuota, actualNewCards);
             }
             case "REVIEW_ONLY" -> cardRepository.countDueCardsByTagsId(deckId, now);
-            case "NEW_ONLY" -> Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
+            case "NEW_ONLY" -> {
+                long actualNewCards = cardRepository.countByTagsIdAndCardState(deckId, 0);
+                long newQuota = Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
+                yield Math.min(newQuota, actualNewCards);
+            }
             case "CRAM" -> -1;
             default -> 0;
         };

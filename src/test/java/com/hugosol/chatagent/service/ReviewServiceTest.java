@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +48,7 @@ class ReviewServiceTest {
     @BeforeEach
     void setUp() {
         reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository);
+        lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0))).thenReturn(1000L);
     }
 
     @Test
@@ -503,6 +505,40 @@ class ReviewServiceTest {
 
         assertThat(stats.remaining()).isEqualTo(-1);
         assertThat(stats.learnedToday()).isEqualTo(-1);
+    }
+
+    @Test
+    void computeReviewStats_standard_capsNewCardRemainingByActualCount() {
+        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+                .thenReturn(2L);
+        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class)))
+                .thenReturn(5L);
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+                .thenReturn(0L);
+        when(cardRepository.countByTagsIdAndCardState("deck-1", 0)).thenReturn(3L);
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+                .thenReturn(null);
+
+        var stats = reviewService.computeReviewStats("deck-1", "STANDARD", "user-1");
+
+        assertThat(stats.remaining()).isEqualTo(8L);
+    }
+
+    @Test
+    void computeReviewStats_newOnly_capsNewCardRemainingByActualCount() {
+        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+                .thenReturn(3L);
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+                .thenReturn(0L);
+        when(cardRepository.countByTagsIdAndCardState("deck-1", 0)).thenReturn(2L);
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+                .thenReturn(null);
+
+        var stats = reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
+
+        assertThat(stats.remaining()).isEqualTo(2L);
     }
 
     private UserPreferences defaultPreferences() {
