@@ -63,8 +63,12 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
 
     const effectiveLimit = showLimit ? limit : 0;
     if (showLimit && learnedToday >= effectiveLimit) {
+      if (selectedMode === "NEW_ONLY") {
+        window.alert("今日新卡已达上限，请选择其他模式复习");
+        return;
+      }
       const confirmed = window.confirm(
-        `今日新卡已达上限（已学 ${learnedToday} / 上限 ${effectiveLimit}），今日不再引入新卡。仍然继续复习吗？`
+        `今日新卡已达上限，开始复习吗？`
       );
       if (!confirmed) return;
     }
@@ -110,7 +114,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>复习</h1>
+      <h1 className={styles.title}>Anki</h1>
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>选择牌组</h2>
