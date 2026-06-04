@@ -25,7 +25,12 @@ describe("DeckPicker", () => {
       if (url.includes("/api/review/stats")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ learnedToday: 0 }),
+          json: () => Promise.resolve({
+            learnedToday: 0,
+            reviewedToday: 8,
+            remaining: 12,
+            dailyLimit: 20,
+          }),
         } as Response);
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
@@ -130,5 +135,32 @@ describe("DeckPicker", () => {
       const btn = screen.getByTestId("start-btn");
       expect(btn.textContent).toBe("开始练习");
     });
+  });
+
+  it("shows remaining count when deck and mode are selected", async () => {
+    render(<DeckPicker onStart={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Daily English (45张)")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByTestId("deck-select"), {
+      target: { value: "deck-1" },
+    });
+
+    await waitFor(() => {
+      const el = screen.getByTestId("mode-remaining");
+      expect(el.textContent).toContain("剩余 12 张");
+    });
+  });
+
+  it("does not show remaining when no deck selected", async () => {
+    render(<DeckPicker onStart={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("标准模式")).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId("mode-remaining")).toBeNull();
   });
 });

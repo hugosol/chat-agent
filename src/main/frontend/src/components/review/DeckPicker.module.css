@@ -64,6 +64,12 @@
   color: #aaa;
 }
 
+.remainingInfo {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
 .limitInput {
   width: 80px;
   padding: 8px 12px;

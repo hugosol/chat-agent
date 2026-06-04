@@ -80,10 +80,16 @@ public class ReviewController {
 
     @GetMapping("/review/stats")
     public ResponseEntity<Map<String, Object>> getStats(
-            @RequestParam String deckId) {
+            @RequestParam String deckId,
+            @RequestParam(defaultValue = "") String mode) {
         String userId = getUserId();
-        UserPreferences prefs = preferencesService.get(userId);
 
+        if (!mode.isEmpty()) {
+            var stats = reviewService.computeReviewStats(deckId, mode, userId);
+            return ResponseEntity.ok(statsToMap(stats));
+        }
+
+        UserPreferences prefs = preferencesService.get(userId);
         Instant now = Instant.now();
         Instant todayStart = computeTodayStart(prefs);
 

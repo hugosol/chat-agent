@@ -18,8 +18,10 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
   const [selectedDeckId, setSelectedDeckId] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<ReviewMode>("STANDARD");
   const [limit, setLimit] = useState(20);
+  const [limitInput, setLimitInput] = useState("20");
   const [loading, setLoading] = useState(true);
   const [learnedToday, setLearnedToday] = useState(0);
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     loadDecks();
@@ -45,7 +47,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
         const prefs = await res.json();
         if (prefs.lastDeckId) setSelectedDeckId(prefs.lastDeckId);
         if (prefs.lastMode) setSelectedMode(prefs.lastMode as ReviewMode);
-        if (prefs.newCardDailyLimit) setLimit(prefs.newCardDailyLimit);
+        if (prefs.newCardDailyLimit) { setLimit(prefs.newCardDailyLimit); setLimitInput(String(prefs.newCardDailyLimit)); }
       }
     } catch {
       // ignore
@@ -81,16 +83,17 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
     onStart(selectedDeck, selectedMode, effectiveLimit);
   };
 
-  const fetchStatsForDeck = async (deckId: string) => {
+  const fetchStatsForDeck = async (deckId: string, mode: ReviewMode) => {
     if (!deckId) return;
     try {
       const res = await fetch(
-        `/api/review/stats?deckId=${deckId}`,
+        `/api/review/stats?deckId=${deckId}&mode=${mode}`,
         { credentials: "same-origin" }
       );
       if (res.ok) {
         const data = await res.json();
         setLearnedToday(data.learnedToday ?? 0);
+        setRemaining(data.remaining ?? null);
       }
     } catch {
       // ignore
@@ -98,8 +101,8 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
   };
 
   useEffect(() => {
-    fetchStatsForDeck(selectedDeckId);
-  }, [selectedDeckId, selectedMode, limit]);
+    fetchStatsForDeck(selectedDeckId, selectedMode);
+  }, [selectedDeckId, selectedMode]);
 
   if (loading) {
     return <div className={styles.container}>Loading...</div>;
@@ -145,18 +148,34 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
           ))}
         </select>
         <p className={styles.modeDescription}>{modeDesc}</p>
+        {selectedDeckId && remaining !== null && (
+          <p className={styles.remainingInfo} data-testid="mode-remaining">
+            剩余 {remaining >= 0 ? remaining : "-"} 张
+          </p>
+        )}
       </div>
 
       {showLimit && (
         <div className={styles.section} data-testid="limit-section">
           <h2 className={styles.sectionTitle}>每日新卡上限</h2>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             data-testid="limit-input"
             className={styles.limitInput}
-            min={0}
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
+            value={limitInput}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || /^\d*$/.test(val)) {
+                setLimitInput(val);
+                const num = parseInt(val, 10);
+                if (val !== "" && !isNaN(num)) setLimit(num);
+              }
+            }}
+            onBlur={() => {
+              if (limitInput === "") setLimitInput(String(limit));
+            }}
           />
           {learnedToday > 0 && (
             <span className={styles.learnedInfo}>今日已学新卡: {learnedToday}</span>
