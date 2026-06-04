@@ -54,6 +54,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
 
   const selectedDeck = decks.find((d) => d.id === selectedDeckId);
   const showLimit = MODES.find((m) => m.value === selectedMode)?.showLimit ?? false;
+  const modeDesc = MODES.find((m) => m.value === selectedMode)?.desc ?? "";
 
   const handleStart = async () => {
     if (!selectedDeck) return;
@@ -113,53 +114,37 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
         {decks.length === 0 ? (
           <p className={styles.empty}>暂无牌组，请先在管理页面创建 Deck 标签并添加卡片</p>
         ) : (
-          <div className={styles.deckList}>
+          <select
+            data-testid="deck-select"
+            className={styles.select}
+            value={selectedDeckId}
+            onChange={(e) => setSelectedDeckId(e.target.value)}
+          >
+            <option value="">请选择牌组</option>
             {decks.map((deck) => (
-              <label
-                key={deck.id}
-                data-testid="deck-item"
-                className={`${styles.deckItem} ${selectedDeckId === deck.id ? styles.deckItemActive : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="deck"
-                  value={deck.id}
-                  checked={selectedDeckId === deck.id}
-                  onChange={() => setSelectedDeckId(deck.id)}
-                  className={styles.radio}
-                />
-                <span className={styles.deckName}>{deck.name}</span>
-                <span className={styles.deckCount}>{deck.cardCount} 张</span>
-              </label>
+              <option key={deck.id} value={deck.id}>
+                {deck.name} ({deck.cardCount}张)
+              </option>
             ))}
-          </div>
+          </select>
         )}
       </div>
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>选择模式</h2>
-        <div className={styles.modeList}>
+        <select
+          data-testid="mode-select"
+          className={styles.select}
+          value={selectedMode}
+          onChange={(e) => setSelectedMode(e.target.value as ReviewMode)}
+        >
           {MODES.map((mode) => (
-            <label
-              key={mode.value}
-              data-testid="mode-item"
-              className={`${styles.modeItem} ${selectedMode === mode.value ? styles.modeItemActive : ""}`}
-            >
-              <input
-                type="radio"
-                name="mode"
-                value={mode.value}
-                checked={selectedMode === mode.value}
-                onChange={() => setSelectedMode(mode.value)}
-                className={styles.radio}
-              />
-              <div>
-                <span className={styles.modeLabel}>{mode.label}</span>
-                <span className={styles.modeDesc}>{mode.desc}</span>
-              </div>
-            </label>
+            <option key={mode.value} value={mode.value}>
+              {mode.label}
+            </option>
           ))}
-        </div>
+        </select>
+        <p className={styles.modeDescription}>{modeDesc}</p>
       </div>
 
       {showLimit && (

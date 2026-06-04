@@ -1,4 +1,4 @@
-import { CorrectionData } from "../../shared/types";
+import { CorrectionData } from "../../../shared/types";
 import classes from "./CorrectionSidebar.module.css";
 
 interface CorrectionSidebarProps {

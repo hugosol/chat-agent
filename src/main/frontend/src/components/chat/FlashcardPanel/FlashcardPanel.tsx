@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import styles from "./FlashcardPanel.module.css";
-import { InlineChipInput } from "../../shared/InlineChipInput";
-import type { Tag } from "../../shared/types";
+import { InlineChipInput } from "../../../shared/InlineChipInput";
+import type { Tag } from "../../../shared/types";
 
 interface FlashcardPanelProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
-import { CorrectionSidebar } from "../../components/CorrectionSidebar/CorrectionSidebar";
+import { CorrectionSidebar } from "../../components/chat/CorrectionSidebar/CorrectionSidebar";
 
 describe("CorrectionSidebar", () => {
   it("renders placeholder text when corrections list is empty", () => {

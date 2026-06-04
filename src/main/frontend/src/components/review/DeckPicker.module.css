@@ -33,60 +33,18 @@
   padding: 16px 0;
 }
 
-.deckList,
-.modeList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.deckItem,
-.modeItem {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.select {
+  width: 100%;
   padding: 12px 16px;
   border: 1px solid #ddd;
   border-radius: 10px;
-  cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
-}
-
-.deckItemActive,
-.modeItemActive {
-  border-color: #4a90d9;
-  background-color: #f0f6ff;
-}
-
-.radio {
-  accent-color: #4a90d9;
-  width: 18px;
-  height: 18px;
-}
-
-.deckName {
-  flex: 1;
   font-size: 15px;
-  font-weight: 500;
+  background-color: #fff;
+  appearance: auto;
 }
 
-.deckCount {
-  font-size: 13px;
-  color: #888;
-}
-
-.modeItem > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.modeLabel {
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.modeDesc {
+.modeDescription {
+  margin: 8px 0 0;
   font-size: 12px;
   color: #888;
 }
@@ -128,10 +86,5 @@
 @media (hover: hover) {
   .startBtn:not(:disabled):hover {
     background-color: #3a7bc8;
-  }
-
-  .deckItem:hover,
-  .modeItem:hover {
-    border-color: #aaa;
   }
 }

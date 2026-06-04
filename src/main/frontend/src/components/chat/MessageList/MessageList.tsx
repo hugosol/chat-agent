@@ -1,15 +1,15 @@
 import React, { useState } from "react";
-import { useChatContext } from "../../state/ChatContext";
-import { speakText } from "../../shared/tts";
-import type { Message } from "../../state/chatState";
-import type { CorrectionData } from "../../shared/types";
+import { useChatContext } from "../../../state/ChatContext";
+import { speakText } from "../../../shared/tts";
+import type { Message } from "../../../state/chatState";
+import type { CorrectionData } from "../../../shared/types";
 import styles from "./MessageList.module.css";
 
 const MAX_VISIBLE = 10;
 
 function buildCorrectionSummary(corrections: CorrectionData[]): string {
   return corrections
-    .map((c, i) => `${i + 1}. ${c.original} â†’ ${c.corrected}`)
+    .map((c, i) => `${i + 1}. ${c.original} â†?${c.corrected}`)
     .join("\n");
 }
 

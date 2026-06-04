@@ -36,7 +36,7 @@ function TestWrapper({
   return React.createElement(ChatContext.Provider, { value: ctxValue }, children);
 }
 
-import { StatusBar } from "../../components/StatusBar/StatusBar";
+import { StatusBar } from "../../components/chat/StatusBar/StatusBar";
 
 describe("StatusBar", () => {
   it("renders Connecting message with connecting CSS class", () => {

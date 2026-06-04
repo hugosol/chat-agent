@@ -1,5 +1,5 @@
 import React from "react";
-import { useChatContext } from "../../state/ChatContext";
+import { useChatContext } from "../../../state/ChatContext";
 import styles from "./ReportModal.module.css";
 
 export function ReportModal(): React.ReactElement | null {

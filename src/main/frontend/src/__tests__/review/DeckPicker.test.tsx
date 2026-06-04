@@ -32,19 +32,18 @@ describe("DeckPicker", () => {
     });
   });
 
-  it("renders deck list after loading", async () => {
+  it("renders deck select with options including count", async () => {
     render(<DeckPicker onStart={() => {}} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Daily English")).toBeTruthy();
+      expect(screen.getByText("Daily English (45张)")).toBeTruthy();
     });
 
-    expect(screen.getByText("Business")).toBeTruthy();
-    expect(screen.getByText("45 张")).toBeTruthy();
-    expect(screen.getByText("12 张")).toBeTruthy();
+    expect(screen.getByText("Business (12张)")).toBeTruthy();
+    expect(screen.getByText("请选择牌组")).toBeTruthy();
   });
 
-  it("renders mode radio buttons", async () => {
+  it("renders mode select with description", async () => {
     render(<DeckPicker onStart={() => {}} />);
 
     await waitFor(() => {
@@ -54,6 +53,7 @@ describe("DeckPicker", () => {
     expect(screen.getByText("仅复习")).toBeTruthy();
     expect(screen.getByText("仅新卡")).toBeTruthy();
     expect(screen.getByText("速通")).toBeTruthy();
+    expect(screen.getByText("新卡 + 到期卡，按到期时间排序")).toBeTruthy();
   });
 
   it("shows limit input for STANDARD mode", async () => {
@@ -72,15 +72,28 @@ describe("DeckPicker", () => {
       expect(screen.getByText("仅复习")).toBeTruthy();
     });
 
-    const reviewOnlyRadio = screen.getAllByTestId("mode-item").find(
-      (el) => el.textContent?.includes("仅复习")
-    );
-    if (reviewOnlyRadio) {
-      fireEvent.click(reviewOnlyRadio);
-    }
+    fireEvent.change(screen.getByTestId("mode-select"), {
+      target: { value: "REVIEW_ONLY" },
+    });
 
     await waitFor(() => {
       expect(screen.queryByTestId("limit-section")).toBeNull();
+    });
+  });
+
+  it("updates mode description when mode changes", async () => {
+    render(<DeckPicker onStart={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("新卡 + 到期卡，按到期时间排序")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByTestId("mode-select"), {
+      target: { value: "REVIEW_ONLY" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("仅复习已学到期卡片")).toBeTruthy();
     });
   });
 
@@ -93,15 +106,16 @@ describe("DeckPicker", () => {
     });
   });
 
-  it("start button enabled when deck and mode selected", async () => {
+  it("start button enabled when deck selected", async () => {
     render(<DeckPicker onStart={() => {}} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Daily English")).toBeTruthy();
+      expect(screen.getByText("Daily English (45张)")).toBeTruthy();
     });
 
-    const deckItem = screen.getAllByTestId("deck-item")[0];
-    fireEvent.click(deckItem);
+    fireEvent.change(screen.getByTestId("deck-select"), {
+      target: { value: "deck-1" },
+    });
 
     await waitFor(() => {
       const btn = screen.getByTestId("start-btn") as HTMLButtonElement;

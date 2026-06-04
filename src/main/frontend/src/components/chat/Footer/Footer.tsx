@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useChatContext } from "../../state/ChatContext";
-import { isSessionActive } from "../../shared/utils";
+import { useChatContext } from "../../../state/ChatContext";
+import { isSessionActive } from "../../../shared/utils";
 import styles from "./Footer.module.css";
 
 type ModeOption = { name: string; displayName: string };

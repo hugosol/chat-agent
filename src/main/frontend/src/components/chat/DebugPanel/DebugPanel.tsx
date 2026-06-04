@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { subscribeDebug, type DebugEntry } from "../../shared/debugLog";
+import { subscribeDebug, type DebugEntry } from "../../../shared/debugLog";
 import styles from "./DebugPanel.module.css";
 
 interface DebugPanelProps {

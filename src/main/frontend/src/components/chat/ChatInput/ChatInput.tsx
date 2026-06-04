@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
-import { useChatContext } from "../../state/ChatContext";
-import { isSessionActive } from "../../shared/utils";
+import { useChatContext } from "../../../state/ChatContext";
+import { isSessionActive } from "../../../shared/utils";
 import styles from "./ChatInput.module.css";
 
 export function ChatInput(): React.ReactElement {

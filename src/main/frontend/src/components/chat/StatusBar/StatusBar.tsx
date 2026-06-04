@@ -1,6 +1,6 @@
 import React from "react";
-import { useChatContext } from "../../state/ChatContext";
-import { deriveStatus } from "../../shared/utils";
+import { useChatContext } from "../../../state/ChatContext";
+import { deriveStatus } from "../../../shared/utils";
 import styles from "./StatusBar.module.css";
 
 export function StatusBar(): JSX.Element {

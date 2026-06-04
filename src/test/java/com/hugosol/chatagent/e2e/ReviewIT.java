@@ -74,19 +74,32 @@ class ReviewIT extends E2ETestBase {
         cardRepository.save(card4);
     }
 
+    private void selectDeckAndWaitForStart() {
+        page.locator("[data-testid='deck-select']").selectOption(deckId);
+        page.waitForFunction(
+                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+    }
+
+    private void selectDeckAndModeAndWaitForStart(String modeValue) {
+        page.locator("[data-testid='deck-select']").selectOption(deckId);
+        page.locator("[data-testid='mode-select']").selectOption(modeValue);
+        page.waitForFunction(
+                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+    }
+
     @Test
     void scenario1_deckAndModeSelection() {
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        assertThat(page.locator("[data-testid='deck-item']").count()).isEqualTo(1);
-        assertThat(page.locator("[data-testid='deck-item']").textContent()).contains("Daily English");
+        assertThat(page.locator("[data-testid='deck-select'] option").count()).isGreaterThan(1);
+        assertThat(page.locator("[data-testid='deck-select']").textContent()).contains("Daily English");
 
-        assertThat(page.locator("[data-testid='mode-item']").count()).isEqualTo(4);
+        assertThat(page.locator("[data-testid='mode-select'] option").count()).isEqualTo(4);
 
         assertThat(page.locator("[data-testid='start-btn']").isEnabled()).isFalse();
 
-        page.locator("[data-testid='deck-item']").click();
+        page.locator("[data-testid='deck-select']").selectOption(deckId);
 
         var startBtn = page.locator("[data-testid='start-btn']");
         page.waitForFunction(
@@ -99,11 +112,9 @@ class ReviewIT extends E2ETestBase {
     @Test
     void scenario2_standardReview_flipAndRate() {
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
-        page.waitForFunction(
-                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+        selectDeckAndWaitForStart();
 
         page.locator("[data-testid='start-btn']").click();
         page.waitForSelector("[data-testid='card-front']");
@@ -129,11 +140,9 @@ class ReviewIT extends E2ETestBase {
     @Test
     void scenario3_statsBarUpdates() {
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
-        page.waitForFunction(
-                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+        selectDeckAndWaitForStart();
 
         page.locator("[data-testid='start-btn']").click();
         page.waitForSelector("[data-testid='stats-bar']");
@@ -160,11 +169,9 @@ class ReviewIT extends E2ETestBase {
                 });
 
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
-        page.waitForFunction(
-                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+        selectDeckAndWaitForStart();
 
         page.locator("[data-testid='start-btn']").click();
         page.waitForSelector("[data-testid='card-front']");
@@ -194,15 +201,9 @@ class ReviewIT extends E2ETestBase {
     @Test
     void scenario5_reviewOnlyMode() {
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
-
-        page.locator("[data-testid='mode-item']").filter(
-                new com.microsoft.playwright.Locator.FilterOptions().setHasText("仅复习")).click();
-
-        page.waitForFunction(
-                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+        selectDeckAndModeAndWaitForStart("REVIEW_ONLY");
 
         page.locator("[data-testid='start-btn']").click();
         page.waitForSelector("[data-testid='card-front']");
@@ -218,17 +219,11 @@ class ReviewIT extends E2ETestBase {
     @Test
     void scenario6_newOnlyMode() {
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
-
-        page.locator("[data-testid='mode-item']").filter(
-                new com.microsoft.playwright.Locator.FilterOptions().setHasText("仅新卡")).click();
+        selectDeckAndModeAndWaitForStart("NEW_ONLY");
 
         page.waitForSelector("[data-testid='limit-input']");
-
-        page.waitForFunction(
-                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
 
         page.locator("[data-testid='start-btn']").click();
         page.waitForSelector("[data-testid='card-front']");
@@ -243,15 +238,9 @@ class ReviewIT extends E2ETestBase {
     @Test
     void scenario7_cramMode_allCardsReviewed() {
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
-
-        page.locator("[data-testid='mode-item']").filter(
-                new com.microsoft.playwright.Locator.FilterOptions().setHasText("速通")).click();
-
-        page.waitForFunction(
-                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+        selectDeckAndModeAndWaitForStart("CRAM");
 
         page.locator("[data-testid='start-btn']").click();
         page.waitForSelector("[data-testid='card-front']");
@@ -285,11 +274,9 @@ class ReviewIT extends E2ETestBase {
         userPreferencesRepository.save(prefs);
 
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
-        page.waitForFunction(
-                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+        selectDeckAndWaitForStart();
 
         page.locator("[data-testid='start-btn']").click();
 
@@ -301,9 +288,9 @@ class ReviewIT extends E2ETestBase {
     @Test
     void scenario9_preferencesPersistence() {
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
-        page.locator("[data-testid='deck-item']").click();
+        selectDeckAndWaitForStart();
 
         page.locator("[data-testid='limit-input']").fill("15");
 
@@ -315,7 +302,7 @@ class ReviewIT extends E2ETestBase {
         page.waitForTimeout(300);
 
         page.navigate("http://localhost:" + serverPort + "/review/index.html");
-        page.waitForSelector("[data-testid='deck-item']");
+        page.waitForSelector("[data-testid='deck-select']");
 
         takeScreenshot("scenario9-persistence");
     }

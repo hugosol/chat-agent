@@ -31,7 +31,7 @@ function Wrapper({
   return React.createElement(ChatContext.Provider, { value: ctx }, children);
 }
 
-import { Footer } from "../../components/Footer/Footer";
+import { Footer } from "../../components/chat/Footer/Footer";
 
 const MODES_FIXTURE = [
   { name: "WORKPLACE_STANDUP", displayName: "Standup Meeting" },

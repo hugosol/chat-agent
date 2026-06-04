@@ -96,7 +96,7 @@ function InlineChipInput({
         }}
         data-testid="inline-chip-input-field"
       />
-      {showSuggestions && inputValue && filteredOptions.length > 0 && (
+      {showSuggestions && filteredOptions.length > 0 && (
         <div className={styles.suggestions} data-testid="inline-chip-suggestions">
           {filteredOptions.map((tag) => (
             <div
