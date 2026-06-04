@@ -54,9 +54,11 @@ public class ReviewController {
         String userId = getUserId();
         Rating rating = Rating.valueOf(request.rating().toUpperCase());
         RateCardResult result = reviewService.rateCard(request.cardId(), rating, Instant.now(), userId);
+        var nextCard = reviewService.getNextCard(request.deckId(), request.mode(), request.limit(), userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("card", cardToMap(result.card()));
+        response.put("nextCard", nextCard.map(this::cardToMap).orElse(null));
         response.put("stats", statsToMap(result.stats()));
         return ResponseEntity.ok(response);
     }

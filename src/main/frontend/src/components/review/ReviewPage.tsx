@@ -59,16 +59,16 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardId: card.id, rating: ratingValue }),
+        body: JSON.stringify({ cardId: card.id, rating: ratingValue, deckId: deck.id, mode, limit }),
       });
       if (res.ok) {
         const data: RateCardResponse = await res.json();
         setStats(data.stats);
-        if (data.card) {
-          setCard(data.card);
+        if (data.nextCard) {
+          setCard(data.nextCard);
           setFlipped(false);
         } else {
-          onComplete(data.stats, null);
+          onComplete(data.stats, data.card);
         }
       }
     } finally {

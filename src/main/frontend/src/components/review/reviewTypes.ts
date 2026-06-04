@@ -35,6 +35,7 @@ export interface ReviewCard {
 
 export interface RateCardResponse {
   card: ReviewCard;
+  nextCard: ReviewCard | null;
   stats: ReviewStats;
 }
 
