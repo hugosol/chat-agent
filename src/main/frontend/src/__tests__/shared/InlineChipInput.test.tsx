@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent, screen } from "@testing-library/react";
+import { render, fireEvent, screen, waitFor } from "@testing-library/react";
 import { InlineChipInput } from "../../shared/InlineChipInput";
 import type { Tag } from "../../shared/types";
 
@@ -58,6 +58,19 @@ describe("InlineChipInput", () => {
     fireEvent.keyDown(input, { key: "Backspace" });
 
     expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("shows all unselected suggestions on focus without typing", async () => {
+    const onChange = vi.fn();
+    render(<InlineChipInput options={tags} value={[]} onChange={onChange} />);
+
+    const input = screen.getByTestId("inline-chip-input-field");
+    fireEvent.focus(input);
+
+    await waitFor(() => {
+      const suggestions = screen.getAllByTestId("inline-chip-suggestion");
+      expect(suggestions).toHaveLength(3);
+    });
   });
 
   it("does not add duplicate tag", () => {

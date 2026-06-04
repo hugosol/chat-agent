@@ -1,0 +1,45 @@
+.container {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+.btn {
+  flex: 1;
+  padding: 14px 8px;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ratingAgain {
+  background-color: #e74c3c;
+}
+
+.ratingHard {
+  background-color: #e67e22;
+}
+
+.ratingGood {
+  background-color: #27ae60;
+}
+
+.ratingEasy {
+  background-color: #3498db;
+}
+
+@media (hover: hover) {
+  .btn:not(:disabled):hover {
+    opacity: 0.85;
+  }
+}

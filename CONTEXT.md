@@ -102,6 +102,14 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 | **BatchOperationLog** | A JPA entity recording each import/export operation for audit purposes. Contains operation type (IMPORT/EXPORT), target deck tag, filename, success/skip counts, and failure details as JSON. Queried via H2 console; no frontend display page. | Batch log, 批量操作日志 |
 | **CSV Import/Export** | Bulk import/export of flashcards per deck tag via CSV files. CSV format includes front, back, and full FSRS state fields (stability/difficulty/cardState/due/reps/lapses/lastReview), with cardState using human-readable text mapping (New/Learning/Review/Relearning) for cross-system readability. Import is limited to a single deck tag, validates all rows before transactional insertion, and returns detailed error list on failure. | CSV 批量导入导出 |
 | **BatchOperationModal** | A shared modal component on the manage page for both import and export operations, using a three-stage state machine: select-tag (choose deck tag) → ready (select file or confirm export) → loading (upload spinner) → result (show success/skip results). | Batch modal, 批量操作模态框 |
+| **Deck** | A Tag whose `type` is set to `"deck"`, grouping Flashcards into a reviewable collection. A Deck is selected in the DeckPicker to scope a Review Session. | 牌组 |
+| **Review** | The act of rating a Flashcard (Again / Hard / Good / Easy), applying the FSRS-6 `repeat()` function to compute the card's next `due` date and update its scheduling statefields (stability, difficulty, cardState, step, reps, lapses, lastReview). If it is the card's first Review, `firstReviewDate` is set. Each Review creates a ReviewLog. | 复习, rate, 评分 |
+| **ReviewLog** | A JPA entity stored in the `review_logs` table recording each individual Review event with before/after FSRS state snapshots (stability, difficulty, state, step), the rating, elapsed days, and whether it was the Card's first review. Used for audit and analysis; queried per-card or per-Learner. | 复习日志 |
+| **ReviewStats** | A transient record holding daily aggregate counts, computed from database COUNT / MIN queries at request time. Fields: `reviewedToday` (cards whose `lastReview ≥ todayStart`), `remaining` (due cards: `cardState ≠ 0 AND due ≤ now`), `learnedToday` (cards whose `firstReviewDate ≥ todayStart`), `dailyLimit` (from UserPreferences), `nextDueAt` (earliest future `due` in the deck). Not persisted — derived fresh each request. | 复习统计 |
+| **Review Session** | An ephemeral review exercise from the Learner clicking "开始" until all available cards per the selected mode are exhausted. Implemented as a React state machine (deck-picker → reviewing → complete). NOT a persisted entity — counts are not tracked per-session; stats always reflect the full day's work. | 一轮复习, review round |
+| **Review Mode** | One of four strategies for selecting the next Card during a Review Session: `STANDARD` (due cards first by ascending `due`, then new cards up to the daily limit), `REVIEW_ONLY` (only due cards), `NEW_ONLY` (only new cards up to the daily limit), `CRAM` (random card from the entire Deck, no state filter, no limit). | 复习模式 |
+| **Daily New Card Limit** | A per-Learner preference stored in `UserPreferences.newCardDailyLimit` that caps how many new cards (cardState = 0) the Learner can encounter per day in STANDARD or NEW_ONLY modes. Read by the backend on every request; saved by DeckPicker on "开始". | 每日新卡上限 |
+| **todayStart** | A timestamp representing "start of today" for the Learner, computed from their `timezone` and `dayStartHour` preferences. Used as the threshold for `reviewedToday` and `learnedToday` COUNT queries so that stats reflect the Learner's own day boundary. | 今日起始时间 |
 
 ## Relationships
 
@@ -122,6 +130,11 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 - A **Topic Memory** write reads the latest **Memory Version**, increments it, and inserts a new row directly from the session Report — no LLM merge. A **Learning Profile Merge** uses an LLM call to combine the previous and new profiles before inserting. Old versions remain as immutable history.
 - Each **UserLearningProfile** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
 - A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status. After all segments complete, **Tag Consolidation** merges equivalent tags across all historical MemoryCue rows for the same Learner+Mode into canonical forms in-place.
+- A **Learner** has exactly one **UserPreferences** record, storing new card daily limit, timezone, day start hour, and last-used deck/mode.
+- A **Deck** is a **Tag** whose `type = "deck"`, linked to zero or more **Cards** via Many-to-Many.
+- A **Card** has zero or more **ReviewLogs** — one per **Review** event.
+- A **ReviewLog** belongs to exactly one **Card** and exactly one **Learner**.
+- A **ReviewStats** is computed entirely from **Card** table COUNT/MIN queries at request time — it has no entity and is not persisted.
 
 ## Flagged Ambiguities
 

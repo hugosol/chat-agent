@@ -64,6 +64,7 @@ class FlashcardControllerTest {
         card.setDue(Instant.parse("2026-05-30T10:00:00Z"));
         card.setReps(0);
         card.setLapses(0);
+        card.setStep(-1);
         Tag tag = new Tag("daily", "admin");
         tag.setId("tag-id-1");
         card.setTags(Set.of(tag));
@@ -292,6 +293,7 @@ class FlashcardControllerTest {
         Card card = new Card("admin", "yesterday", "昨天");
         card.setId("card-1");
         card.setCardState(0);
+        card.setStep(-1);
         card.setDue(Instant.parse("2026-05-30T10:00:00Z"));
         Tag tag = tagWithId("daily", "admin", "t1");
         tag.setType("deck");
@@ -304,6 +306,8 @@ class FlashcardControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value("card-1"))
                 .andExpect(jsonPath("$.content[0].front").value("yesterday"))
+                .andExpect(jsonPath("$.content[0].cardState").value(0))
+                .andExpect(jsonPath("$.content[0].step").value(-1))
                 .andExpect(jsonPath("$.content[0].tags[0].id").value("t1"))
                 .andExpect(jsonPath("$.totalElements").value(1));
     }

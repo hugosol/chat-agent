@@ -45,8 +45,14 @@ public class Card extends BaseEntity {
 
     private int lapses;
 
+    @Column(nullable = false, columnDefinition = "INT DEFAULT 0")
+    private int step;
+
     @Column
     private Instant lastReview;
+
+    @Column
+    private Instant firstReviewDate;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -85,8 +91,12 @@ public class Card extends BaseEntity {
     public void setReps(int reps) { this.reps = reps; }
     public int getLapses() { return lapses; }
     public void setLapses(int lapses) { this.lapses = lapses; }
+    public int getStep() { return step; }
+    public void setStep(int step) { this.step = step; }
     public Instant getLastReview() { return lastReview; }
     public void setLastReview(Instant lastReview) { this.lastReview = lastReview; }
+    public Instant getFirstReviewDate() { return firstReviewDate; }
+    public void setFirstReviewDate(Instant firstReviewDate) { this.firstReviewDate = firstReviewDate; }
     public Set<Tag> getTags() { return tags; }
     public void setTags(Set<Tag> tags) { this.tags = tags; }
 }

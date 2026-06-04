@@ -106,7 +106,7 @@ public class CardBatchService {
     private byte[] generateCsv(List<Card> cards) {
         var csvFormat = org.apache.commons.csv.CSVFormat.DEFAULT.builder()
                 .setHeader("front", "back", "stability", "difficulty", "cardState",
-                        "due", "reps", "lapses", "lastReview")
+                        "due", "reps", "lapses", "lastReview", "firstReviewDate", "step")
                 .build();
 
         var sw = new java.io.StringWriter();
@@ -121,6 +121,8 @@ public class CardBatchService {
                 printer.print(card.getReps());
                 printer.print(card.getLapses());
                 printer.print(card.getLastReview() != null ? card.getLastReview().toString() : "");
+                printer.print(card.getFirstReviewDate() != null ? formatInstantDate(card.getFirstReviewDate()) : "");
+                printer.print(card.getStep());
                 printer.println();
             }
         } catch (java.io.IOException e) {
@@ -145,6 +147,10 @@ public class CardBatchService {
             return String.valueOf((long) value);
         }
         return String.valueOf(value);
+    }
+
+    private String formatInstantDate(Instant instant) {
+        return java.time.LocalDate.ofInstant(instant, java.time.ZoneOffset.UTC).toString();
     }
 
     private String mapCardStateToText(int state) {
@@ -227,6 +233,14 @@ public class CardBatchService {
                     continue;
                 }
             }
+            if (fsrs.firstReviewDate() != null && !fsrs.firstReviewDate().isBlank()) {
+                try {
+                    parseInstantDate(fsrs.firstReviewDate());
+                } catch (DateTimeParseException e) {
+                    errors.add(new ImportError(row.rowNumber(), row.front(), "firstReviewDate格式无效"));
+                    continue;
+                }
+            }
 
             String lower = row.front().toLowerCase();
             if (!seenFronts.add(lower)) {
@@ -263,10 +277,20 @@ public class CardBatchService {
             card.setStability(fsrs.stability() != null ? fsrs.stability() : defaults.stability());
             card.setDifficulty(fsrs.difficulty() != null ? fsrs.difficulty() : defaults.difficulty());
             card.setCardState(fsrs.cardState() != null ? fsrs.cardState() : defaults.state());
+            card.setStep(fsrs.step() != null ? fsrs.step() : defaults.step());
             card.setReps(fsrs.reps() != null ? fsrs.reps() : defaults.reps());
             card.setLapses(fsrs.lapses() != null ? fsrs.lapses() : defaults.lapses());
             card.setDue(fsrs.due() != null ? Instant.parse(fsrs.due()) : defaults.due());
             card.setLastReview(fsrs.lastReview() != null ? Instant.parse(fsrs.lastReview()) : defaults.lastReview());
+
+            Instant firstReviewDate = null;
+            if (fsrs.firstReviewDate() != null && !fsrs.firstReviewDate().isBlank()) {
+                firstReviewDate = parseInstantDate(fsrs.firstReviewDate());
+            }
+            if (firstReviewDate == null && fsrs.cardState() != null && fsrs.cardState() != 0) {
+                firstReviewDate = Instant.now();
+            }
+            card.setFirstReviewDate(firstReviewDate);
 
             card.setTags(Set.of(tag));
             cards.add(card);
@@ -304,6 +328,15 @@ public class CardBatchService {
         }
 
         batchOperationLogRepository.save(log);
+    }
+
+    private Instant parseInstantDate(String value) {
+        try {
+            java.time.LocalDate date = java.time.LocalDate.parse(value);
+            return date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+        } catch (Exception e) {
+            return Instant.parse(value);
+        }
     }
 
     private String escapeJson(String s) {

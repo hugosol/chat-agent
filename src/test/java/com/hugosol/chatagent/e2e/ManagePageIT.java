@@ -47,7 +47,7 @@ class ManagePageIT extends E2ETestBase {
         page.locator("[data-testid='nav-menu-btn']").click();
         page.waitForSelector("[data-testid='nav-sidebar'][aria-expanded='true']");
 
-        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(2);
+        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(3);
         assertThat(page.locator("[data-testid='nav-link'][data-active='true']").textContent()).isEqualTo("💬 Chat");
 
         takeScreenshot("chat-nav-open");
@@ -62,7 +62,7 @@ class ManagePageIT extends E2ETestBase {
         page.waitForSelector("[data-testid='nav-sidebar'][aria-expanded='true']");
 
         assertThat(page.locator("[data-testid='nav-link'][data-active='true']").textContent()).isEqualTo("📋 Manage");
-        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(2);
+        assertThat(page.locator("[data-testid='nav-link']").count()).isEqualTo(3);
 
         takeScreenshot("manage-nav-open");
 

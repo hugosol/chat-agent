@@ -32,7 +32,7 @@ function Wrapper({
   return React.createElement(ChatContext.Provider, { value: ctx }, children);
 }
 
-import { ChatInput } from "../../components/ChatInput/ChatInput";
+import { ChatInput } from "../../components/chat/ChatInput/ChatInput";
 
 describe("ChatInput", () => {
   it("is disabled when appStatus is not an active session state", () => {

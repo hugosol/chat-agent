@@ -54,6 +54,7 @@ public class FlashcardService {
         card.setDue(state.due());
         card.setReps(state.reps());
         card.setLapses(state.lapses());
+        card.setStep(state.step());
 
         Set<Tag> tags = new HashSet<>();
         boolean hasDeck = false;

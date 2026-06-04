@@ -1,0 +1,68 @@
+.container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.card {
+  text-align: center;
+  max-width: 360px;
+  width: 100%;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 24px;
+}
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.statValue {
+  font-size: 32px;
+  font-weight: 700;
+  color: #e0e0e0;
+}
+
+.statLabel {
+  font-size: 13px;
+  color: #aaa;
+}
+
+.nextDue {
+  font-size: 14px;
+  color: #aaa;
+  margin: 0 0 24px;
+}
+
+.backBtn {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 10px;
+  background-color: #e94560;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+@media (hover: hover) {
+  .backBtn:hover {
+    background-color: #c73a54;
+  }
+}

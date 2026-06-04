@@ -44,6 +44,8 @@ class FlashcardBatchIT extends E2ETestBase {
         card1.setReps(5);
         card1.setLapses(1);
         card1.setLastReview(Instant.parse("2024-06-10T10:00:00Z"));
+        card1.setFirstReviewDate(Instant.parse("2024-06-01T00:00:00Z"));
+        card1.setStep(-1);
         card1.setTags(Set.of(deckTag));
         card1 = cardRepository.save(card1);
 
@@ -55,6 +57,7 @@ class FlashcardBatchIT extends E2ETestBase {
         card2.setReps(3);
         card2.setLapses(0);
         card2.setLastReview(null);
+        card2.setStep(-1);
         card2.setTags(Set.of(deckTag));
         cardRepository.save(card2);
 
@@ -97,9 +100,9 @@ class FlashcardBatchIT extends E2ETestBase {
 
         page.locator("[data-testid='batch-file-input']").setInputFiles(
                 new com.microsoft.playwright.options.FilePayload("cards.csv", "text/csv",
-                        ("front,back,stability,difficulty,cardState,due,reps,lapses,lastReview\n" +
-                         "hello,Hello world,3.0,0.3,Review,2024-06-15T10:00:00Z,5,1,2024-06-10T10:00:00Z\n" +
-                         "goodbye,Goodbye world,2.5,0.1,New,2024-06-16T10:00:00Z,3,0,\n").getBytes()));
+                        ("front,back,stability,difficulty,cardState,due,reps,lapses,lastReview,firstReviewDate,step\n" +
+                         "hello,Hello world,3.0,0.3,Review,2024-06-15T10:00:00Z,5,1,2024-06-10T10:00:00Z,2024-06-01,-1\n" +
+                         "goodbye,Goodbye world,2.5,0.1,New,2024-06-16T10:00:00Z,3,0,,,-1\n").getBytes()));
 
         page.waitForFunction(
                 "() => { var btn = document.querySelector(\"[data-testid='batch-import-btn']\"); return btn && !btn.disabled; }");
@@ -121,6 +124,7 @@ class FlashcardBatchIT extends E2ETestBase {
         assertThat(helloCard.getCardState()).isEqualTo(2);
         assertThat(helloCard.getReps()).isEqualTo(5);
         assertThat(helloCard.getLapses()).isEqualTo(1);
+        assertThat(helloCard.getFirstReviewDate()).isNotNull();
 
         var goodbyeCard = cards.stream().filter(c -> c.getFront().equals("goodbye")).findFirst().orElseThrow();
         assertThat(goodbyeCard.getStability()).isEqualTo(2.5);

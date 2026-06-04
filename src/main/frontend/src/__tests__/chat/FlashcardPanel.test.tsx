@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
-import { FlashcardPanel } from "../../components/FlashcardPanel/FlashcardPanel";
+import { FlashcardPanel } from "../../components/chat/FlashcardPanel/FlashcardPanel";
 
 const TAGS_FIXTURE = [
   { id: "1", name: "vocabulary", type: "deck" },

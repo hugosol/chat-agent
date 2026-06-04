@@ -36,7 +36,7 @@ function TestWrapper({
   return React.createElement(ChatContext.Provider, { value: ctxValue }, children);
 }
 
-import { MessageList } from "../../components/MessageList/MessageList";
+import { MessageList } from "../../components/chat/MessageList/MessageList";
 
 describe("MessageList", () => {
   it("renders a user message bubble with data-testid and data-role", () => {
