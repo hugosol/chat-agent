@@ -6,7 +6,6 @@ import com.hugosol.chatagent.flashcard.FsrsScheduler;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.ReviewLog;
-import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
@@ -39,7 +38,7 @@ public class ReviewService {
     }
 
     @Transactional
-    public RateCardResult rateCard(String cardId, Rating rating, String mode, Instant now, String userId) {
+    public Card rateCard(String cardId, Rating rating, String mode, Instant now, String userId, String deckId) {
         Card card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!card.getUserId().equals(userId)) {
@@ -78,12 +77,6 @@ public class ReviewService {
 
         card = cardRepository.save(card);
 
-        String deckId = card.getTags().stream()
-                .filter(t -> "deck".equals(t.getType()))
-                .findFirst()
-                .map(Tag::getId)
-                .orElse(null);
-
         ReviewLog log = new ReviewLog();
         log.setUserId(userId);
         log.setCardId(cardId);
@@ -106,9 +99,7 @@ public class ReviewService {
         log.setDeckId(deckId);
         reviewLogRepository.save(log);
 
-        ReviewStats stats = computeStats(deckId, mode, userId);
-
-        return new RateCardResult(card, stats);
+        return card;
     }
 
     public ReviewStats computeReviewStats(String deckId, String mode, String userId) {

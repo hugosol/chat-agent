@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { CompletePage } from "../../components/review/CompletePage";
-import type { ReviewStats, ReviewCard } from "../../components/review/reviewTypes";
+import type { ReviewStats } from "../../components/review/reviewTypes";
 
 function makeDate(offsetMs: number): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -18,35 +18,16 @@ function normalStats(overrides: Partial<ReviewStats> = {}): ReviewStats {
   };
 }
 
-function normalCard(): ReviewCard {
-  return {
-    id: "card-1",
-    front: "hello",
-    back: "你好",
-    tags: [],
-    due: makeDate(3 * 3600 * 1000),
-    cardState: 2,
-    step: 0,
-    stability: 3.0,
-    difficulty: 0.3,
-    reps: 5,
-    lapses: 0,
-    lastReview: new Date().toISOString(),
-    firstReviewDate: null,
-    createTime: new Date().toISOString(),
-  };
-}
-
 describe("CompletePage", () => {
   it("renders reviewedToday and learnedToday counts", () => {
-    render(<CompletePage stats={normalStats()} lastCard={normalCard()} onBack={() => {}} />);
+    render(<CompletePage stats={normalStats()} onBack={() => {}} />);
 
     expect(screen.getByText("8")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
   });
 
   it("uses updated labels 今日复习 and 今日新学", () => {
-    render(<CompletePage stats={normalStats()} lastCard={normalCard()} onBack={() => {}} />);
+    render(<CompletePage stats={normalStats()} onBack={() => {}} />);
 
     expect(screen.getByText("今日复习")).toBeTruthy();
     expect(screen.getByText("今日新学")).toBeTruthy();
@@ -56,7 +37,6 @@ describe("CompletePage", () => {
     render(
       <CompletePage
         stats={normalStats({ learnedToday: -1, remaining: -1 })}
-        lastCard={normalCard()}
         onBack={() => {}}
       />
     );
@@ -66,7 +46,7 @@ describe("CompletePage", () => {
 
   it("does not show next-due element when nextDueAt is null", () => {
     render(
-      <CompletePage stats={normalStats({ nextDueAt: null })} lastCard={normalCard()} onBack={() => {}} />
+      <CompletePage stats={normalStats({ nextDueAt: null })} onBack={() => {}} />
     );
 
     expect(screen.queryByTestId("complete-next-due")).toBeNull();
@@ -76,7 +56,6 @@ describe("CompletePage", () => {
     render(
       <CompletePage
         stats={normalStats({ nextDueAt: makeDate(10 * 60 * 1000) })}
-        lastCard={normalCard()}
         onBack={() => {}}
       />
     );
@@ -90,7 +69,6 @@ describe("CompletePage", () => {
     render(
       <CompletePage
         stats={normalStats({ nextDueAt: makeDate(3 * 3600 * 1000) })}
-        lastCard={normalCard()}
         onBack={() => {}}
       />
     );
@@ -104,7 +82,6 @@ describe("CompletePage", () => {
     render(
       <CompletePage
         stats={normalStats({ nextDueAt: makeDate(-60 * 1000) })}
-        lastCard={normalCard()}
         onBack={() => {}}
       />
     );
@@ -116,7 +93,6 @@ describe("CompletePage", () => {
     render(
       <CompletePage
         stats={normalStats({ nextDueAt: makeDate(30 * 1000) })}
-        lastCard={normalCard()}
         onBack={() => {}}
       />
     );
@@ -128,7 +104,7 @@ describe("CompletePage", () => {
 
   it("calls onBack when back button is clicked", () => {
     const onBack = vi.fn();
-    render(<CompletePage stats={normalStats()} lastCard={normalCard()} onBack={onBack} />);
+    render(<CompletePage stats={normalStats()} onBack={onBack} />);
 
     fireEvent.click(screen.getByTestId("complete-back-btn"));
 

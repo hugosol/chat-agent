@@ -1,14 +1,13 @@
 import React from "react";
-import type { ReviewStats, ReviewCard } from "./reviewTypes";
+import type { ReviewStats } from "./reviewTypes";
 import styles from "./CompletePage.module.css";
 
 interface Props {
   stats: ReviewStats;
-  lastCard: ReviewCard | null;
   onBack: () => void;
 }
 
-export function CompletePage({ stats, lastCard, onBack }: Props): React.ReactElement {
+export function CompletePage({ stats, onBack }: Props): React.ReactElement {
   const diffMs = stats.nextDueAt
     ? new Date(stats.nextDueAt).getTime() - Date.now()
     : null;

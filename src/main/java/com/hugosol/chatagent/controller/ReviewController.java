@@ -1,6 +1,6 @@
 package com.hugosol.chatagent.controller;
 
-import com.hugosol.chatagent.dto.RateCardRequest;
+import com.hugosol.chatagent.dto.RateRequest;
 import com.hugosol.chatagent.dto.TagResponse;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
@@ -8,7 +8,6 @@ import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.TagRepository;
-import com.hugosol.chatagent.service.RateCardResult;
 import com.hugosol.chatagent.service.ReviewService;
 import com.hugosol.chatagent.service.UserPreferencesService;
 
@@ -49,17 +48,17 @@ public class ReviewController {
         this.cardRepository = cardRepository;
     }
 
-    @PostMapping("/review/rate")
-    public ResponseEntity<Map<String, Object>> rateCard(@RequestBody RateCardRequest request) {
+    @PostMapping("/review/next")
+    public ResponseEntity<Map<String, Object>> processNextCard(@RequestBody RateRequest request) {
         String userId = getUserId();
         Rating rating = Rating.valueOf(request.rating().toUpperCase());
-        RateCardResult result = reviewService.rateCard(request.cardId(), rating, request.mode(), Instant.now(), userId);
-        var nextCard = reviewService.getNextCard(request.deckId(), request.mode(), userId);
+        reviewService.rateCard(request.cardId(), rating, request.mode(), Instant.now(), userId, request.deckId());
+        var card = reviewService.getNextCard(request.deckId(), request.mode(), userId);
+        var stats = reviewService.computeReviewStats(request.deckId(), request.mode(), userId);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("card", cardToMap(result.card()));
-        response.put("nextCard", nextCard.map(this::cardToMap).orElse(null));
-        response.put("stats", statsToMap(result.stats()));
+        response.put("card", card.map(this::cardToMap).orElse(null));
+        response.put("stats", statsToMap(stats));
         return ResponseEntity.ok(response);
     }
 
@@ -107,8 +106,8 @@ public class ReviewController {
         return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/review/next")
-    public ResponseEntity<Map<String, Object>> getNextCard(
+    @GetMapping("/review/start")
+    public ResponseEntity<Map<String, Object>> startReview(
             @RequestParam String deckId,
             @RequestParam(defaultValue = "STANDARD") String mode) {
         String userId = getUserId();

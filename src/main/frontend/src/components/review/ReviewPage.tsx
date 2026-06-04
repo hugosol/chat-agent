@@ -2,14 +2,16 @@ import React, { useState, useEffect, useCallback } from "react";
 import { CardDisplay } from "./CardDisplay";
 import { RatingButtons, RatingValue } from "./RatingButtons";
 import { StatsBar } from "./StatsBar";
-import type { DeckInfo, ReviewMode, ReviewCard, ReviewStats, RateCardResponse, NextCardResponse } from "./reviewTypes";
+import type { DeckInfo, ReviewMode, ReviewCard, ReviewStats, CardResponse } from "./reviewTypes";
 import styles from "./ReviewPage.module.css";
+
+type PageState = "start" | "review" | "submit";
 
 interface Props {
   deck: DeckInfo;
   mode: ReviewMode;
   limit: number;
-  onComplete: (stats: ReviewStats, lastCard: ReviewCard | null) => void;
+  onComplete: (stats: ReviewStats) => void;
   onBack: () => void;
 }
 
@@ -19,65 +21,68 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
   const [stats, setStats] = useState<ReviewStats>({
     reviewedToday: 0, remaining: 0, learnedToday: 0, dailyLimit: limit, nextDueAt: null,
   });
-  const [loading, setLoading] = useState(true);
-  const [rating, setRating] = useState(false);
+  const [pageState, setPageState] = useState<PageState>("start");
 
-  const loadNextCard = useCallback(async () => {
+  const loadFirstCard = useCallback(async () => {
     try {
       const res = await fetch(
-        `/api/review/next?deckId=${deck.id}&mode=${mode}`,
+        `/api/review/start?deckId=${deck.id}&mode=${mode}`,
         { credentials: "same-origin" }
       );
       if (res.ok) {
-        const data: NextCardResponse = await res.json();
+        const data: CardResponse = await res.json();
         setStats(data.stats);
         if (data.card) {
           setCard(data.card);
           setFlipped(false);
+          setPageState("review");
         } else {
-          onComplete(data.stats, card);
+          onComplete(data.stats);
         }
       }
-    } finally {
-      setLoading(false);
+    } catch {
+      setPageState("review");
     }
   }, [deck.id, mode, limit]);
 
   useEffect(() => {
-    loadNextCard();
+    loadFirstCard();
   }, []);
 
   const handleFlip = () => {
     setFlipped(true);
   };
 
-  const handleRate = async (ratingValue: RatingValue) => {
-    if (!card || rating) return;
-    setRating(true);
+  const handleNextCard = async (ratingValue: RatingValue) => {
+    if (!card || pageState === "submit") return;
+    setPageState("submit");
 
     try {
-      const res = await fetch("/api/review/rate", {
+      const res = await fetch("/api/review/next", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cardId: card.id, rating: ratingValue, deckId: deck.id, mode }),
       });
       if (res.ok) {
-        const data: RateCardResponse = await res.json();
+        const data: CardResponse = await res.json();
         setStats(data.stats);
-        if (data.nextCard) {
-          setCard(data.nextCard);
+        if (data.card) {
+          setCard(data.card);
           setFlipped(false);
+          setPageState("review");
         } else {
-          onComplete(data.stats, data.card);
+          onComplete(data.stats);
         }
       }
     } finally {
-      setRating(false);
+      if (pageState === "submit") {
+        setPageState("review");
+      }
     }
   };
 
-  if (loading) {
+  if (pageState === "start") {
     return <div className={styles.container}>Loading...</div>;
   }
 
@@ -105,7 +110,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
       </div>
 
       {flipped && (
-        <RatingButtons onRate={handleRate} disabled={rating} />
+        <RatingButtons onRate={handleNextCard} disabled={pageState === "submit"} />
       )}
 
       <StatsBar stats={stats} />

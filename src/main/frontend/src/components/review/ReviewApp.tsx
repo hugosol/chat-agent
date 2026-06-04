@@ -3,7 +3,7 @@ import { Header } from "../Header/Header";
 import { DeckPicker } from "./DeckPicker";
 import { ReviewPage } from "./ReviewPage";
 import { CompletePage } from "./CompletePage";
-import type { ReviewStage, ReviewMode, DeckInfo, ReviewStats, ReviewCard } from "./reviewTypes";
+import type { ReviewStage, ReviewMode, DeckInfo, ReviewStats } from "./reviewTypes";
 import styles from "./ReviewApp.module.css";
 
 export function ReviewApp(): React.ReactElement {
@@ -12,7 +12,6 @@ export function ReviewApp(): React.ReactElement {
   const [selectedMode, setSelectedMode] = useState<ReviewMode>("STANDARD");
   const [dailyLimit, setDailyLimit] = useState(20);
   const [stats, setStats] = useState<ReviewStats | null>(null);
-  const [completeCard, setCompleteCard] = useState<ReviewCard | null>(null);
 
   const handleStartReview = (deck: DeckInfo, mode: ReviewMode, limit: number) => {
     setSelectedDeck(deck);
@@ -21,9 +20,8 @@ export function ReviewApp(): React.ReactElement {
     setStage("reviewing");
   };
 
-  const handleReviewComplete = (finalStats: ReviewStats, lastCard: ReviewCard | null) => {
+  const handleReviewComplete = (finalStats: ReviewStats) => {
     setStats(finalStats);
-    setCompleteCard(lastCard);
     setStage("complete");
   };
 
@@ -31,7 +29,6 @@ export function ReviewApp(): React.ReactElement {
     setStage("deck-picker");
     setSelectedDeck(null);
     setStats(null);
-    setCompleteCard(null);
   };
 
   const renderContent = () => {
@@ -48,7 +45,7 @@ export function ReviewApp(): React.ReactElement {
     }
 
     if (stage === "complete" && stats) {
-      return <CompletePage stats={stats} lastCard={completeCard} onBack={handleBackToPicker} />;
+      return <CompletePage stats={stats} onBack={handleBackToPicker} />;
     }
 
     return <DeckPicker onStart={handleStartReview} />;

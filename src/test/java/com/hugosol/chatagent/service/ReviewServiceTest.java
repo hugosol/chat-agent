@@ -68,19 +68,10 @@ class ReviewServiceTest {
         deckTag.setType("deck");
         card.setTags(Set.of(deckTag));
 
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
         when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(1L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(3L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(1L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(Instant.parse("2026-06-05T10:00:00Z"));
 
-        var result = reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1");
+        Card result = reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1", "deck-tag-id");
 
         ArgumentCaptor<Card> captor = ArgumentCaptor.forClass(Card.class);
         verify(cardRepository).save(captor.capture());
@@ -94,12 +85,7 @@ class ReviewServiceTest {
         assertThat(saved.getLapses()).isEqualTo(0);
         assertThat(saved.getLastReview()).isEqualTo(NOW);
 
-        assertThat(result.card().getFirstReviewDate()).isEqualTo(NOW);
-        assertThat(result.stats().reviewedToday()).isEqualTo(1);
-        assertThat(result.stats().remaining()).isEqualTo(22L);
-        assertThat(result.stats().learnedToday()).isEqualTo(1);
-        assertThat(result.stats().dailyLimit()).isEqualTo(20);
-        assertThat(result.stats().nextDueAt()).isEqualTo("2026-06-05T10:00:00Z");
+        assertThat(result.getFirstReviewDate()).isEqualTo(NOW);
     }
 
     @Test
@@ -121,26 +107,13 @@ class ReviewServiceTest {
         deckTag.setType("deck");
         card.setTags(Set.of(deckTag));
 
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
         when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(2L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(4L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(null);
 
-        var result = reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1");
+        Card result = reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1", "deck-tag-id");
 
-        assertThat(result.card().getFirstReviewDate()).isEqualTo(originalFirstReview);
-        assertThat(result.card().getCardState()).isEqualTo(2);
-        assertThat(result.stats().learnedToday()).isEqualTo(0);
-        assertThat(result.stats().dailyLimit()).isEqualTo(20);
-        assertThat(result.stats().remaining()).isEqualTo(24L);
-        assertThat(result.stats().nextDueAt()).isNull();
+        assertThat(result.getFirstReviewDate()).isEqualTo(originalFirstReview);
+        assertThat(result.getCardState()).isEqualTo(2);
     }
 
     @Test
@@ -160,19 +133,10 @@ class ReviewServiceTest {
         deckTag.setType("deck");
         card.setTags(Set.of(deckTag));
 
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
         when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(1L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(5L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(1L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(null);
 
-        reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1");
+        reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1", "deck-tag-id");
 
         ArgumentCaptor<Card> captor = ArgumentCaptor.forClass(Card.class);
         verify(cardRepository).save(captor.capture());
@@ -201,19 +165,10 @@ class ReviewServiceTest {
         deckTag.setType("deck");
         card.setTags(Set.of(deckTag));
 
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
         when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(1L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(4L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(null);
 
-        reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1");
+        reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1", "deck-tag-id");
 
         ArgumentCaptor<Card> captor = ArgumentCaptor.forClass(Card.class);
         verify(cardRepository).save(captor.capture());
@@ -240,28 +195,19 @@ class ReviewServiceTest {
         deckTag.setType("deck");
         card.setTags(Set.of(deckTag));
 
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
         when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(1L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(4L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-tag-id"), any(Instant.class)))
-                .thenReturn(null);
 
-        var result = reviewService.rateCard("card-1", Rating.AGAIN, "STANDARD", NOW, "user-1");
+        Card result = reviewService.rateCard("card-1", Rating.AGAIN, "STANDARD", NOW, "user-1", "deck-tag-id");
 
-        assertThat(result.card().getLapses()).isEqualTo(1);
+        assertThat(result.getLapses()).isEqualTo(1);
     }
 
     @Test
     void rateCard_cardNotFound_throws404() {
         when(cardRepository.findById("nonexistent")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> reviewService.rateCard("nonexistent", Rating.GOOD, "STANDARD", NOW, "user-1"))
+        assertThatThrownBy(() -> reviewService.rateCard("nonexistent", Rating.GOOD, "STANDARD", NOW, "user-1", "deck-1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
@@ -274,7 +220,7 @@ class ReviewServiceTest {
 
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
 
-        assertThatThrownBy(() -> reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1"))
+        assertThatThrownBy(() -> reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1", "deck-1"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
@@ -414,15 +360,10 @@ class ReviewServiceTest {
         deckTag.setType("deck");
         card.setTags(Set.of(deckTag));
 
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
         when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-tag-id"), any(Instant.class))).thenReturn(1L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-tag-id"), any(Instant.class))).thenReturn(5L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-tag-id"), any(Instant.class))).thenReturn(1L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-tag-id"), any(Instant.class))).thenReturn(null);
 
-        reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1");
+        Card result = reviewService.rateCard("card-1", Rating.GOOD, "STANDARD", NOW, "user-1", "deck-tag-id");
 
         ArgumentCaptor<ReviewLog> captor = ArgumentCaptor.forClass(ReviewLog.class);
         verify(reviewLogRepository).save(captor.capture());
@@ -435,6 +376,10 @@ class ReviewServiceTest {
         assertThat(log.isFirstReview()).isTrue();
         assertThat(log.getDeckId()).isEqualTo("deck-tag-id");
         assertThat(log.getReviewedAt()).isEqualTo(NOW);
+
+        assertThat(result.getFirstReviewDate()).isEqualTo(NOW);
+        assertThat(result.getCardState()).isNotEqualTo(0);
+        assertThat(result.getStability()).isGreaterThan(1.0);
     }
 
     @Test

@@ -34,13 +34,7 @@ export interface ReviewCard {
   createTime: string | null;
 }
 
-export interface RateCardResponse {
-  card: ReviewCard;
-  nextCard: ReviewCard | null;
-  stats: ReviewStats;
-}
-
-export interface NextCardResponse {
+export interface CardResponse {
   card: ReviewCard | null;
   stats: ReviewStats;
 }
