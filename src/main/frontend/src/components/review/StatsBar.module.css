@@ -4,12 +4,12 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #f8f9fa;
-  border-top: 1px solid #eee;
+  background: #0d1b36;
+  border-top: 1px solid #0f3460;
   font-size: 13px;
-  color: #666;
+  color: #aaa;
 }
 
 .separator {
-  color: #ddd;
+  color: #444;
 }

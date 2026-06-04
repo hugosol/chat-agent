@@ -7,7 +7,7 @@ interface Props {
 }
 
 const MODES: { value: ReviewMode; label: string; desc: string; showLimit: boolean }[] = [
-  { value: "STANDARD", label: "标准复习", desc: "新卡 + 到期卡，按到期时间排序", showLimit: true },
+  { value: "STANDARD", label: "标准模式", desc: "新卡 + 到期卡，按到期时间排序", showLimit: true },
   { value: "REVIEW_ONLY", label: "仅复习", desc: "仅复习已学到期卡片", showLimit: false },
   { value: "NEW_ONLY", label: "仅新卡", desc: "仅学习新卡片，按创建时间排序", showLimit: true },
   { value: "CRAM", label: "速通", desc: "全卡组随机顺序，不限到期时间", showLimit: false },
@@ -170,7 +170,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
         disabled={!selectedDeckId || !selectedMode}
         onClick={handleStart}
       >
-        开始复习
+        开始练习
       </button>
     </div>
   );

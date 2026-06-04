@@ -47,7 +47,7 @@ describe("DeckPicker", () => {
     render(<DeckPicker onStart={() => {}} />);
 
     await waitFor(() => {
-      expect(screen.getByText("标准复习")).toBeTruthy();
+      expect(screen.getByText("标准模式")).toBeTruthy();
     });
 
     expect(screen.getByText("仅复习")).toBeTruthy();
@@ -120,6 +120,15 @@ describe("DeckPicker", () => {
     await waitFor(() => {
       const btn = screen.getByTestId("start-btn") as HTMLButtonElement;
       expect(btn.disabled).toBe(false);
+    });
+  });
+
+  it("renders start button with correct text", async () => {
+    render(<DeckPicker onStart={() => {}} />);
+
+    await waitFor(() => {
+      const btn = screen.getByTestId("start-btn");
+      expect(btn.textContent).toBe("开始练习");
     });
   });
 });

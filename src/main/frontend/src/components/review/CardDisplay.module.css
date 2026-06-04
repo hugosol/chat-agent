@@ -10,9 +10,9 @@
   width: 100%;
   max-width: 360px;
   min-height: 200px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid #1a5276;
   border-radius: 16px;
-  background: #fff;
+  background: #1a3a6a;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -23,8 +23,8 @@
 }
 
 .cardFlipped {
-  border-color: #4a90d9;
-  box-shadow: 0 4px 16px rgba(74, 144, 217, 0.15);
+  border-color: #1a5276;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .cardInner {
@@ -42,7 +42,7 @@
 }
 
 .cardBack {
-  border-top: 1px solid #eee;
+  border-top: 1px solid #1a5276;
 }
 
 .cardText {
@@ -60,7 +60,7 @@
 
 .ttsBtn {
   background: none;
-  border: 1px solid #ddd;
+  border: 1px solid #1a5276;
   border-radius: 50%;
   width: 36px;
   height: 36px;
@@ -74,10 +74,10 @@
 
 @media (hover: hover) {
   .card:not(.cardFlipped):hover {
-    border-color: #bbb;
+    border-color: #2a6a96;
   }
 
   .ttsBtn:hover {
-    background-color: #f5f5f5;
+    background-color: #0f3460;
   }
 }

@@ -4,6 +4,7 @@ import { DeckPicker } from "./DeckPicker";
 import { ReviewPage } from "./ReviewPage";
 import { CompletePage } from "./CompletePage";
 import type { ReviewStage, ReviewMode, DeckInfo, ReviewStats, ReviewCard } from "./reviewTypes";
+import styles from "./ReviewApp.module.css";
 
 export function ReviewApp(): React.ReactElement {
   const [stage, setStage] = useState<ReviewStage>("deck-picker");
@@ -54,9 +55,9 @@ export function ReviewApp(): React.ReactElement {
   };
 
   return (
-    <>
+    <div className={styles.app}>
       <Header />
       {renderContent()}
-    </>
+    </div>
   );
 }

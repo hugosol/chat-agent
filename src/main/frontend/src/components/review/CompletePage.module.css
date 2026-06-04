@@ -1,8 +1,8 @@
 .container {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
   padding: 24px 16px;
 }
 
@@ -35,17 +35,17 @@
 .statValue {
   font-size: 32px;
   font-weight: 700;
-  color: #4a90d9;
+  color: #e0e0e0;
 }
 
 .statLabel {
   font-size: 13px;
-  color: #888;
+  color: #aaa;
 }
 
 .nextDue {
   font-size: 14px;
-  color: #666;
+  color: #aaa;
   margin: 0 0 24px;
 }
 
@@ -53,7 +53,7 @@
   padding: 12px 32px;
   border: none;
   border-radius: 10px;
-  background-color: #4a90d9;
+  background-color: #e94560;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
@@ -63,6 +63,6 @@
 
 @media (hover: hover) {
   .backBtn:hover {
-    background-color: #3a7bc8;
+    background-color: #c73a54;
   }
 }
