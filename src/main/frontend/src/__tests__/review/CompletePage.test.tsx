@@ -112,6 +112,20 @@ describe("CompletePage", () => {
     expect(screen.getByText("即将到期")).toBeTruthy();
   });
 
+  it("shows seconds when next due is under 60 seconds", () => {
+    render(
+      <CompletePage
+        stats={normalStats({ nextDueAt: makeDate(30 * 1000) })}
+        lastCard={normalCard()}
+        onBack={() => {}}
+      />
+    );
+
+    const el = screen.getByTestId("complete-next-due");
+    expect(el.textContent).toContain("秒后到期");
+    expect(el.textContent).not.toContain("分钟后到期");
+  });
+
   it("calls onBack when back button is clicked", () => {
     const onBack = vi.fn();
     render(<CompletePage stats={normalStats()} lastCard={normalCard()} onBack={onBack} />);

@@ -16,6 +16,10 @@ export function CompletePage({ stats, lastCard, onBack }: Props): React.ReactEle
   const formatNextDue = (): string | null => {
     if (diffMs === null) return null;
     if (diffMs <= 0) return "即将到期";
+    if (diffMs < 60000) {
+      const seconds = Math.round(diffMs / 1000);
+      return `下一张卡片将在约 ${seconds} 秒后到期`;
+    }
     const minutes = Math.round(diffMs / 60000);
     if (minutes < 60) {
       return `下一张卡片将在约 ${minutes} 分钟后到期`;
