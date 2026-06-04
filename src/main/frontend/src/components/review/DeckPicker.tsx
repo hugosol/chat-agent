@@ -72,7 +72,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
         method: "PUT",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lastDeckId: selectedDeck.id, lastMode: selectedMode }),
+        body: JSON.stringify({ lastDeckId: selectedDeck.id, lastMode: selectedMode, newCardDailyLimit: limit }),
       });
     } catch {
       // ignore
@@ -85,7 +85,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
     if (!deckId) return;
     try {
       const res = await fetch(
-        `/api/review/stats?deckId=${deckId}&mode=${selectedMode}&limit=${limit}`,
+        `/api/review/stats?deckId=${deckId}`,
         { credentials: "same-origin" }
       );
       if (res.ok) {

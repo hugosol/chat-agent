@@ -54,7 +54,7 @@ public class ReviewController {
         String userId = getUserId();
         Rating rating = Rating.valueOf(request.rating().toUpperCase());
         RateCardResult result = reviewService.rateCard(request.cardId(), rating, Instant.now(), userId);
-        var nextCard = reviewService.getNextCard(request.deckId(), request.mode(), request.limit(), userId);
+        var nextCard = reviewService.getNextCard(request.deckId(), request.mode(), userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("card", cardToMap(result.card()));
@@ -80,9 +80,7 @@ public class ReviewController {
 
     @GetMapping("/review/stats")
     public ResponseEntity<Map<String, Object>> getStats(
-            @RequestParam String deckId,
-            @RequestParam(defaultValue = "STANDARD") String mode,
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam String deckId) {
         String userId = getUserId();
         UserPreferences prefs = preferencesService.get(userId);
 
@@ -106,10 +104,9 @@ public class ReviewController {
     @GetMapping("/review/next")
     public ResponseEntity<Map<String, Object>> getNextCard(
             @RequestParam String deckId,
-            @RequestParam(defaultValue = "STANDARD") String mode,
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam(defaultValue = "STANDARD") String mode) {
         String userId = getUserId();
-        var card = reviewService.getNextCard(deckId, mode, limit, userId);
+        var card = reviewService.getNextCard(deckId, mode, userId);
         Map<String, Object> result = new HashMap<>();
         if (card.isPresent()) {
             result.put("card", cardToMap(card.get()));
@@ -212,6 +209,7 @@ public class ReviewController {
         map.put("remaining", stats.remaining());
         map.put("learnedToday", stats.learnedToday());
         map.put("dailyLimit", stats.dailyLimit());
+        map.put("nextDueAt", stats.nextDueAt() != null ? stats.nextDueAt().toString() : null);
         return map;
     }
 }

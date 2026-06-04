@@ -25,7 +25,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
   const loadNextCard = useCallback(async () => {
     try {
       const res = await fetch(
-        `/api/review/next?deckId=${deck.id}&mode=${mode}&limit=${limit}`,
+        `/api/review/next?deckId=${deck.id}&mode=${mode}`,
         { credentials: "same-origin" }
       );
       if (res.ok) {
@@ -59,7 +59,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardId: card.id, rating: ratingValue, deckId: deck.id, mode, limit }),
+        body: JSON.stringify({ cardId: card.id, rating: ratingValue, deckId: deck.id, mode }),
       });
       if (res.ok) {
         const data: RateCardResponse = await res.json();

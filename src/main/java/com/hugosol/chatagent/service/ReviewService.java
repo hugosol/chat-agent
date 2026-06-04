@@ -106,12 +106,12 @@ public class ReviewService {
         log.setDeckId(deckId);
         reviewLogRepository.save(log);
 
-        ReviewStats stats = computeStats(deckId, now);
+        ReviewStats stats = computeStats(deckId, userId);
 
         return new RateCardResult(card, stats);
     }
 
-    public Optional<Card> getNextCard(String deckId, String mode, int limit, String userId) {
+    public Optional<Card> getNextCard(String deckId, String mode, String userId) {
         Instant now = Instant.now();
         UserPreferences prefs = preferencesService.get(userId);
 
@@ -121,7 +121,7 @@ public class ReviewService {
                 if (dueCard.isPresent()) {
                     return dueCard;
                 }
-                if (isNewCardLimitExceeded(deckId, prefs, limit)) {
+                if (isNewCardLimitExceeded(deckId, prefs)) {
                     return Optional.empty();
                 }
                 return cardRepository.findFirstNewCardByDeckId(deckId);
@@ -130,7 +130,7 @@ public class ReviewService {
                 return cardRepository.findFirstDueCardByDeckId(deckId, now);
             }
             case "NEW_ONLY" -> {
-                if (isNewCardLimitExceeded(deckId, prefs, limit)) {
+                if (isNewCardLimitExceeded(deckId, prefs)) {
                     return Optional.empty();
                 }
                 return cardRepository.findFirstNewCardByDeckId(deckId);
@@ -142,11 +142,10 @@ public class ReviewService {
         }
     }
 
-    private boolean isNewCardLimitExceeded(String deckId, UserPreferences prefs, int limit) {
+    private boolean isNewCardLimitExceeded(String deckId, UserPreferences prefs) {
         Instant todayStart = computeTodayStart(prefs);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart);
-        int effectiveLimit = limit > 0 ? limit : prefs.getNewCardDailyLimit();
-        return learnedToday >= effectiveLimit;
+        return learnedToday >= prefs.getNewCardDailyLimit();
     }
 
     private Instant computeTodayStart(UserPreferences prefs) {
@@ -163,13 +162,17 @@ public class ReviewService {
         return todayStart.atZone(zoneId).toInstant();
     }
 
-    private ReviewStats computeStats(String deckId, Instant now) {
+    private ReviewStats computeStats(String deckId, String userId) {
         if (deckId == null) {
-            return new ReviewStats(0, 0, 0, 20);
+            return new ReviewStats(0, 0, 0, 20, null);
         }
-        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, now);
+        UserPreferences prefs = preferencesService.get(userId);
+        Instant todayStart = computeTodayStart(prefs);
+        Instant now = Instant.now();
+        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart);
         long remaining = cardRepository.countByTagsIdAndCardStateNotAndDueLessThanEqual(deckId, 0, now);
-        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, now);
-        return new ReviewStats(reviewedToday, remaining, learnedToday, 20);
+        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart);
+        Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now);
+        return new ReviewStats(reviewedToday, remaining, learnedToday, prefs.getNewCardDailyLimit(), nextDueAt);
     }
 }
