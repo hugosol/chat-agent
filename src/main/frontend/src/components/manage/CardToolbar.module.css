@@ -57,6 +57,26 @@
   flex-shrink: 0;
 }
 
+.deckForgetBtn {
+  background: #b8860b;
+  border: 1px solid #b8860b;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 1;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .deckForgetBtn:hover {
+    opacity: 0.85;
+  }
+}
+
 .createBtn {
   background: #e94560;
   border: 1px solid #e94560;

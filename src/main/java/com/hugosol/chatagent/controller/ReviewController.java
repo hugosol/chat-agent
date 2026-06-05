@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.controller;
 
+import com.hugosol.chatagent.dto.ForgetDeckResult;
 import com.hugosol.chatagent.dto.RateRequest;
 import com.hugosol.chatagent.dto.TagResponse;
 import com.hugosol.chatagent.flashcard.Rating;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -121,6 +123,29 @@ public class ReviewController {
         }
         result.put("stats", statsToMap(stats));
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/cards/{cardId}/forget")
+    public ResponseEntity<Map<String, Object>> forgetCard(@PathVariable String cardId) {
+        String userId = getUserId();
+        reviewService.forgetCard(cardId, userId);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", cardId);
+        response.put("cardState", 0);
+        response.put("deletedReviewCount", 0);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/cards/forget")
+    public ResponseEntity<Map<String, Object>> forgetDeck(@RequestParam String deckId) {
+        String userId = getUserId();
+        ForgetDeckResult result = reviewService.forgetDeck(deckId, userId);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("cardCount", result.cardCount());
+        response.put("totalDeletedReviewCount", result.deletedReviewCount());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/user/preferences")

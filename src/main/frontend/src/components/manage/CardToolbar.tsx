@@ -14,6 +14,7 @@ interface CardToolbarProps {
   onDeckChange: (deckId: string | null) => void;
   onCreate: () => void;
   onBatchOpen: (mode: "import" | "export") => void;
+  onDeckForget: () => void;
 }
 
 const SORT_ITEMS: DropdownItem[] = [
@@ -38,6 +39,7 @@ function CardToolbar({
   onDeckChange,
   onCreate,
   onBatchOpen,
+  onDeckForget,
 }: CardToolbarProps): JSX.Element {
   const [localSearch, setLocalSearch] = useState(search);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,6 +111,15 @@ function CardToolbar({
           onChange={handleSearchChange}
         />
         <div className={styles.actions}>
+          {deckId && (
+            <button
+              className={styles.deckForgetBtn}
+              data-testid="btn-deck-forget"
+              onClick={onDeckForget}
+            >
+              重置全部卡片
+            </button>
+          )}
           <DropdownMenu
             label="Aa ↑"
             items={SORT_ITEMS.map((item) => ({

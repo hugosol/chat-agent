@@ -13,6 +13,8 @@ type ModalState =
   | { type: "detail"; card: Card }
   | { type: "create" | "edit"; card?: Card }
   | { type: "confirm-delete"; card: Card }
+  | { type: "confirm-forget"; card: Card }
+  | { type: "confirm-deck-forget" }
   | { type: "batch"; mode: "import" | "export" }
   | null;
 
@@ -94,6 +96,14 @@ function CardsTab(): JSX.Element {
     setModal({ type: "confirm-delete", card });
   }, []);
 
+  const handleOpenForget = useCallback((card: Card) => {
+    setModal({ type: "confirm-forget", card });
+  }, []);
+
+  const handleOpenDeckForget = useCallback(() => {
+    setModal({ type: "confirm-deck-forget" });
+  }, []);
+
   const handleCloseModal = useCallback(() => {
     setModal(null);
   }, []);
@@ -172,6 +182,38 @@ function CardsTab(): JSX.Element {
       .catch(() => showToast("删除失败"));
   }, [modal, fetchCards]);
 
+  const handleForgetConfirm = useCallback(() => {
+    if (modal?.type !== "confirm-forget") return;
+    const cardId = modal.card.id;
+    fetch(`/api/cards/${cardId}/forget`, { method: "POST", credentials: "same-origin" })
+      .then((resp) => {
+        if (resp.ok) {
+          setModal(null);
+          fetchCards();
+          return;
+        }
+        showToast("遗忘失败");
+      })
+      .catch(() => showToast("遗忘失败"));
+  }, [modal, fetchCards]);
+
+  const handleDeckForgetConfirm = useCallback(() => {
+    if (!deckId) return;
+    fetch(`/api/cards/forget?deckId=${encodeURIComponent(deckId)}`, {
+      method: "POST",
+      credentials: "same-origin",
+    })
+      .then((resp) => {
+        if (resp.ok) {
+          setModal(null);
+          fetchCards();
+          return;
+        }
+        showToast("重置失败");
+      })
+      .catch(() => showToast("重置失败"));
+  }, [deckId, fetchCards]);
+
   const handleSpeak = useCallback((text: string) => {
     const eng = englishOnly(text);
     if (eng) speakText(eng);
@@ -192,6 +234,7 @@ function CardsTab(): JSX.Element {
       onDeckChange={(id) => { setDeckId(id); setPage(0); }}
       onCreate={handleOpenCreate}
       onBatchOpen={handleBatchOpen}
+      onDeckForget={handleOpenDeckForget}
     />
   );
 
@@ -212,6 +255,7 @@ function CardsTab(): JSX.Element {
         onPageChange={setPage}
         onCardClick={handleOpenDetail}
         onCardEdit={handleOpenEdit}
+        onCardForget={handleOpenForget}
         onCardDelete={handleOpenDelete}
       />
     );
@@ -316,6 +360,32 @@ function CardsTab(): JSX.Element {
           saveLabel="Delete"
         >
           <p>确定要删除卡片 "{modal.card.front}" 吗？</p>
+        </Modal>
+      )}
+
+      {modal?.type === "confirm-forget" && (
+        <Modal
+          open={true}
+          title="遗忘卡片"
+          onClose={handleCloseModal}
+          onSave={handleForgetConfirm}
+          saveLabel="确认遗忘"
+          danger={true}
+        >
+          <p>将删除 {modal.card.reps + modal.card.lapses} 条复习记录，卡片恢复为全新状态。此操作不可撤销。</p>
+        </Modal>
+      )}
+
+      {modal?.type === "confirm-deck-forget" && (
+        <Modal
+          open={true}
+          title="重置 Deck 全部卡片"
+          onClose={handleCloseModal}
+          onSave={handleDeckForgetConfirm}
+          saveLabel="确认重置"
+          danger={true}
+        >
+          <p>将重置当前牌组中所有卡片为全新状态，并删除所有复习记录。此操作不可撤销。</p>
         </Modal>
       )}
 

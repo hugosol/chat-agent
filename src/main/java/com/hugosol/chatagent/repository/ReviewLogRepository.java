@@ -10,4 +10,10 @@ public interface ReviewLogRepository extends JpaRepository<ReviewLog, String> {
     List<ReviewLog> findByUserIdAndCardIdOrderByReviewedAtAsc(String userId, String cardId);
 
     List<ReviewLog> findByUserIdOrderByReviewedAtAsc(String userId);
+
+    void deleteByCardId(String cardId);
+
+    void deleteByCardIdIn(List<String> cardIds);
+
+    int countByCardId(String cardId);
 }

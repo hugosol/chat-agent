@@ -18,6 +18,7 @@ const defaultProps = {
   onDeckChange: vi.fn(),
   onCreate: vi.fn(),
   onBatchOpen: vi.fn(),
+  onDeckForget: vi.fn(),
 };
 
 describe("CardToolbar", () => {
@@ -138,5 +139,22 @@ describe("CardToolbar", () => {
     render(<CardToolbar {...defaultProps} decks={[]} onCreate={onCreate} />);
     fireEvent.click(screen.getByText("+"));
     expect(onCreate).toHaveBeenCalledOnce();
+  });
+
+  it("shows deck forget button when deckId is set", () => {
+    render(<CardToolbar {...defaultProps} deckId="1" />);
+    expect(screen.getByTestId("btn-deck-forget")).toBeInTheDocument();
+  });
+
+  it("hides deck forget button when deckId is null", () => {
+    render(<CardToolbar {...defaultProps} deckId={null} />);
+    expect(screen.queryByTestId("btn-deck-forget")).not.toBeInTheDocument();
+  });
+
+  it("calls onDeckForget when deck forget button is clicked", () => {
+    const onDeckForget = vi.fn();
+    render(<CardToolbar {...defaultProps} deckId="1" onDeckForget={onDeckForget} />);
+    fireEvent.click(screen.getByTestId("btn-deck-forget"));
+    expect(onDeckForget).toHaveBeenCalledOnce();
   });
 });

@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.service;
 
+import com.hugosol.chatagent.dto.ForgetDeckResult;
 import com.hugosol.chatagent.flashcard.AleaPrng;
 import com.hugosol.chatagent.flashcard.CardState;
 import com.hugosol.chatagent.flashcard.FsrsScheduler;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -106,6 +108,68 @@ public class ReviewService {
         reviewLogRepository.save(log);
 
         return card;
+    }
+
+    @Transactional
+    public void forgetCard(String cardId, String userId) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!card.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        reviewLogRepository.deleteByCardId(cardId);
+
+        Instant now = Instant.now();
+        CardState initState = FsrsScheduler.createInitState(now);
+
+        card.setStability(initState.stability());
+        card.setDifficulty(initState.difficulty());
+        card.setCardState(initState.state());
+        card.setDue(initState.due());
+        card.setReps(initState.reps());
+        card.setLapses(initState.lapses());
+        card.setStep(initState.step());
+        card.setLastReview(initState.lastReview());
+        card.setFirstReviewDate(null);
+
+        cardRepository.save(card);
+    }
+
+    @Transactional
+    public ForgetDeckResult forgetDeck(String deckId, String userId) {
+        List<String> cardIds = cardRepository.findByFilteredDeckIds(deckId, userId);
+        if (cardIds.isEmpty()) {
+            return new ForgetDeckResult(0, 0);
+        }
+
+        int totalReviewCount = 0;
+        for (String cardId : cardIds) {
+            totalReviewCount += reviewLogRepository.countByCardId(cardId);
+        }
+
+        reviewLogRepository.deleteByCardIdIn(cardIds);
+
+        List<Card> cards = cardRepository.findAllById(cardIds);
+        Instant now = Instant.now();
+
+        for (Card card : cards) {
+            CardState initState = FsrsScheduler.createInitState(now);
+
+            card.setStability(initState.stability());
+            card.setDifficulty(initState.difficulty());
+            card.setCardState(initState.state());
+            card.setDue(initState.due());
+            card.setReps(initState.reps());
+            card.setLapses(initState.lapses());
+            card.setStep(initState.step());
+            card.setLastReview(initState.lastReview());
+            card.setFirstReviewDate(null);
+        }
+
+        cardRepository.saveAll(cards);
+
+        return new ForgetDeckResult(cards.size(), totalReviewCount);
     }
 
     public ReviewStats computeReviewStats(String deckId, String mode, String userId) {

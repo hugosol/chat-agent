@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.service;
 
+import com.hugosol.chatagent.dto.ForgetDeckResult;
 import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
@@ -19,15 +20,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -489,6 +494,129 @@ class ReviewServiceTest {
         var stats = reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
 
         assertThat(stats.remaining()).isEqualTo(2L);
+    }
+
+    @Test
+    void forgetCard_resetsFsrsStateToNew() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(15.0);
+        card.setDifficulty(5.0);
+        card.setCardState(2);
+        card.setDue(Instant.parse("2026-07-01T10:00:00Z"));
+        card.setReps(10);
+        card.setLapses(3);
+        card.setStep(2);
+        card.setLastReview(Instant.parse("2026-06-01T10:00:00Z"));
+        card.setFirstReviewDate(Instant.parse("2026-05-01T10:00:00Z"));
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewService.forgetCard("card-1", "user-1");
+
+        ArgumentCaptor<Card> captor = ArgumentCaptor.forClass(Card.class);
+        verify(cardRepository).save(captor.capture());
+        Card saved = captor.getValue();
+
+        assertThat(saved.getStability()).isEqualTo(2.5);
+        assertThat(saved.getDifficulty()).isEqualTo(0.0);
+        assertThat(saved.getCardState()).isEqualTo(0);
+        assertThat(saved.getStep()).isEqualTo(-1);
+        assertThat(saved.getReps()).isEqualTo(0);
+        assertThat(saved.getLapses()).isEqualTo(0);
+        assertThat(saved.getLastReview()).isNull();
+        assertThat(saved.getFirstReviewDate()).isNull();
+    }
+
+    @Test
+    void forgetCard_deletesAllReviewLogs() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(15.0);
+        card.setDifficulty(5.0);
+        card.setCardState(2);
+        card.setDue(Instant.parse("2026-07-01T10:00:00Z"));
+        card.setReps(10);
+        card.setLapses(3);
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewService.forgetCard("card-1", "user-1");
+
+        verify(reviewLogRepository).deleteByCardId("card-1");
+    }
+
+    @Test
+    void forgetCard_cardNotFound_throws404() {
+        when(cardRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reviewService.forgetCard("nonexistent", "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void forgetCard_wrongUser_throws404() {
+        Card card = new Card("other-user", "hello", "你好");
+        card.setId("card-1");
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        assertThatThrownBy(() -> reviewService.forgetCard("card-1", "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void forgetDeck_resetsAllCardsAndDeletesLogs() {
+        Card card1 = new Card("user-1", "hello", "你好");
+        card1.setId("card-1");
+        card1.setStability(10.0);
+        card1.setDifficulty(3.0);
+        card1.setCardState(2);
+        card1.setDue(Instant.parse("2026-07-01T10:00:00Z"));
+        card1.setReps(5);
+        card1.setLapses(1);
+
+        Card card2 = new Card("user-1", "world", "世界");
+        card2.setId("card-2");
+        card2.setStability(20.0);
+        card2.setDifficulty(4.0);
+        card2.setCardState(2);
+        card2.setDue(Instant.parse("2026-08-01T10:00:00Z"));
+        card2.setReps(8);
+        card2.setLapses(2);
+
+        when(cardRepository.findByFilteredDeckIds("deck-1", "user-1"))
+                .thenReturn(List.of("card-1", "card-2"));
+        when(reviewLogRepository.countByCardId("card-1")).thenReturn(3);
+        when(reviewLogRepository.countByCardId("card-2")).thenReturn(4);
+        when(cardRepository.findAllById(List.of("card-1", "card-2")))
+                .thenReturn(List.of(card1, card2));
+        when(cardRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        ForgetDeckResult result = reviewService.forgetDeck("deck-1", "user-1");
+
+        assertThat(result.cardCount()).isEqualTo(2);
+        assertThat(result.deletedReviewCount()).isEqualTo(7);
+        verify(reviewLogRepository).deleteByCardIdIn(List.of("card-1", "card-2"));
+        verify(cardRepository).saveAll(anyList());
+    }
+
+    @Test
+    void forgetDeck_emptyDeck_returnsZeroCounts() {
+        when(cardRepository.findByFilteredDeckIds("deck-1", "user-1"))
+                .thenReturn(List.of());
+
+        ForgetDeckResult result = reviewService.forgetDeck("deck-1", "user-1");
+
+        assertThat(result.cardCount()).isEqualTo(0);
+        assertThat(result.deletedReviewCount()).isEqualTo(0);
+        verify(reviewLogRepository, never()).deleteByCardIdIn(anyList());
     }
 
     private UserPreferences defaultPreferences() {
