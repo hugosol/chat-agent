@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import classes from "./Header.module.css";
 
 type PanelType = "menu" | "correction" | "debug" | "flashcard" | null;
@@ -21,6 +21,14 @@ function tokenColor(pct: number): string {
 
 function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.Element {
   const [localSidebarOpen, setLocalSidebarOpen] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/user/me")
+      .then((r) => r.json())
+      .then((data) => setUsername(data.username))
+      .catch(() => setUsername("Logout"));
+  }, []);
 
   const sidebarOpen = activePanel !== undefined ? activePanel === "menu" : localSidebarOpen;
 
@@ -45,21 +53,24 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
   const isManagePage = currentPath.startsWith("/manage/");
   const isReviewPage = currentPath.startsWith("/review/");
   const isSettingsPage = currentPath.startsWith("/settings/");
+  const isProfilePage = currentPath.startsWith("/profile/");
   const showToken = isChatPage;
   const pct = tokenPercent ?? 0;
 
+  const displayName = username ?? "...";
+
   return (
     <div className={classes.navRoot}>
-      <form
-        action="/logout"
-        method="post"
-        className={classes.logoutForm}
-        data-testid="nav-logout-form"
-      >
-        <button type="submit" className={classes.btnLogout}>
-          Logout
-        </button>
-      </form>
+      <div className={classes.userArea} data-testid="nav-user-btn">
+        <span className={classes.userLabel}>{"\u25C1"} {displayName}</span>
+        <form
+          action="/logout"
+          method="post"
+          className={classes.logoutForm}
+        >
+          <button type="submit" className={classes.btnLogout} aria-label="Logout"></button>
+        </form>
+      </div>
 
       {showToken && (
         <div className={classes.tokenBarContainer}>
@@ -130,6 +141,14 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
             data-active={isSettingsPage ? "true" : "false"}
           >
             {"\u2699"} 设置
+          </a>
+          <a
+            className={classes.navLink}
+            href="/profile/index.html"
+            data-testid="nav-profile-link"
+            data-active={isProfilePage ? "true" : "false"}
+          >
+            {"\uD83D\uDC64"} Profile
           </a>
         </div>
       </div>

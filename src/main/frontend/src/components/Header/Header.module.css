@@ -127,22 +127,38 @@
 }
 
 .logoutForm {
-  display: flex;
-  align-items: center;
+  position: absolute;
+  inset: 0;
 }
 
 .btnLogout {
-  padding: 4px 12px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
   background: none;
-  border: 1px solid #0f3460;
-  border-radius: 4px;
-  color: #888;
+  border: none;
+  color: transparent;
   font-size: 0.75em;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.btnLogout:hover {
+.userArea {
+  position: relative;
+  padding: 4px 12px;
+  color: #888;
+  font-size: 0.75em;
+  white-space: nowrap;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.userArea:hover {
   color: #e94560;
   border-color: #e94560;
+}
+
+.userLabel {
+  pointer-events: none;
 }

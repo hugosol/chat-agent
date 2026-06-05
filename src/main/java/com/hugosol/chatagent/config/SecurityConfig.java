@@ -39,6 +39,7 @@ public class SecurityConfig {
                     .frameOptions(frameOptions -> frameOptions.sameOrigin())
             )
             .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
                     appProperties.getSecurity().getPermitAllPaths()
                             .forEach(path -> auth.requestMatchers(path).permitAll());
                     auth.anyRequest().authenticated();
@@ -73,6 +74,8 @@ public class SecurityConfig {
                 .map(user -> org.springframework.security.core.userdetails.User
                         .withUsername(user.getUsername())
                         .password(user.getPassword())
+                        .roles("admin".equals(user.getUsername()) ? "ADMIN" : "USER")
+                        .disabled(!user.isEnabled())
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }

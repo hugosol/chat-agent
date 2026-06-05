@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, fireEvent, waitFor } from "@testing-library/react";
 import { Header } from "../../components/Header/Header";
 
 function setPath(path: string): void {
@@ -10,12 +10,54 @@ function setPath(path: string): void {
 }
 
 describe("Header", () => {
-  it("renders a logout form with correct action and method", () => {
+  let originalFetch: typeof global.fetch;
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ username: "testuser", admin: false }),
+    } as Response);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("renders username button after fetching user info", async () => {
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    const btn = await findByTestId("nav-user-btn");
+    expect(btn.textContent).toBe("\u25C1 testuser");
+  });
+
+  it("renders logout form inside user button", async () => {
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    const btn = await findByTestId("nav-user-btn");
+    const form = btn.querySelector("form");
+    expect(form).not.toBeNull();
+    expect(form!.getAttribute("action")).toBe("/logout");
+    expect(form!.method).toBe("post");
+    const logoutBtn = form!.querySelector("button");
+    expect(logoutBtn).not.toBeNull();
+    expect(logoutBtn!.getAttribute("aria-label")).toBe("Logout");
+  });
+
+  it("shows placeholder text while loading", () => {
+    global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
+    setPath("/");
     const { getByTestId } = render(<Header />);
-    const form = getByTestId("nav-logout-form") as HTMLFormElement;
-    expect(form.getAttribute("action")).toBe("/logout");
-    expect(form.method).toBe("post");
-    expect(form.querySelector("button")?.textContent).toBe("Logout");
+    const btn = getByTestId("nav-user-btn");
+    expect(btn.textContent).toBe("\u25C1 ...");
+  });
+
+  it("shows fallback Logout text on fetch error", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("network"));
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    const btn = await findByTestId("nav-user-btn");
+    expect(btn.textContent).toBe("\u25C1 Logout");
   });
 
   it("renders a hamburger menu button", () => {
@@ -43,18 +85,18 @@ describe("Header", () => {
     expect(sidebar.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("highlights Chat link on chat page path /", () => {
+  it("highlights Chat link on chat page path /", async () => {
     setPath("/");
-    const { getAllByTestId } = render(<Header />);
-    const links = getAllByTestId("nav-link");
+    const { findAllByTestId } = render(<Header />);
+    const links = await findAllByTestId("nav-link");
     const chatLink = links.find((l) => l.textContent?.includes("Chat"));
     expect(chatLink?.getAttribute("data-active")).toBe("true");
   });
 
-  it("highlights Manage link on manage page path", () => {
+  it("highlights Manage link on manage page path", async () => {
     setPath("/manage/index.html");
-    const { getAllByTestId } = render(<Header />);
-    const links = getAllByTestId("nav-link");
+    const { findAllByTestId } = render(<Header />);
+    const links = await findAllByTestId("nav-link");
     const manageLink = links.find((l) => l.textContent?.includes("Manage"));
     expect(manageLink?.getAttribute("data-active")).toBe("true");
   });
@@ -124,17 +166,33 @@ describe("Header", () => {
     expect(getByTestId("nav-sidebar").getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("renders settings nav link with correct href", () => {
-    const { getByTestId } = render(<Header />);
-    const link = getByTestId("nav-settings") as HTMLAnchorElement;
+  it("renders settings nav link with correct href", async () => {
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    const link = (await findByTestId("nav-settings")) as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("/settings/index.html");
     expect(link.textContent).toContain("设置");
   });
 
-  it("highlights Settings link on settings page path", () => {
+  it("highlights Settings link on settings page path", async () => {
     setPath("/settings/index.html");
-    const { getByTestId } = render(<Header />);
-    const link = getByTestId("nav-settings");
+    const { findByTestId } = render(<Header />);
+    const link = await findByTestId("nav-settings");
+    expect(link.getAttribute("data-active")).toBe("true");
+  });
+
+  it("renders Profile nav link with correct href", async () => {
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    const link = (await findByTestId("nav-profile-link")) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/profile/index.html");
+    expect(link.textContent).toContain("Profile");
+  });
+
+  it("highlights Profile link on profile page path", async () => {
+    setPath("/profile/index.html");
+    const { findByTestId } = render(<Header />);
+    const link = await findByTestId("nav-profile-link");
     expect(link.getAttribute("data-active")).toBe("true");
   });
 });
