@@ -33,6 +33,24 @@ public class UserPreferences extends BaseEntity {
     @Column
     private String lastMode;
 
+    @Column
+    private String learningSteps;
+
+    @Column
+    private String relearningSteps;
+
+    @Column
+    private Double desiredRetention;
+
+    @Column
+    private Integer maximumInterval;
+
+    @Column
+    private Boolean enableFuzz;
+
+    @Column
+    private Boolean shuffleDueCards;
+
     public UserPreferences() {
     }
 
@@ -54,4 +72,16 @@ public class UserPreferences extends BaseEntity {
     public void setLastDeckId(String lastDeckId) { this.lastDeckId = lastDeckId; }
     public String getLastMode() { return lastMode; }
     public void setLastMode(String lastMode) { this.lastMode = lastMode; }
+    public String getLearningSteps() { return learningSteps; }
+    public void setLearningSteps(String learningSteps) { this.learningSteps = learningSteps; }
+    public String getRelearningSteps() { return relearningSteps; }
+    public void setRelearningSteps(String relearningSteps) { this.relearningSteps = relearningSteps; }
+    public Double getDesiredRetention() { return desiredRetention; }
+    public void setDesiredRetention(Double desiredRetention) { this.desiredRetention = desiredRetention; }
+    public Integer getMaximumInterval() { return maximumInterval; }
+    public void setMaximumInterval(Integer maximumInterval) { this.maximumInterval = maximumInterval; }
+    public Boolean getEnableFuzz() { return enableFuzz; }
+    public void setEnableFuzz(Boolean enableFuzz) { this.enableFuzz = enableFuzz; }
+    public Boolean getShuffleDueCards() { return shuffleDueCards; }
+    public void setShuffleDueCards(Boolean shuffleDueCards) { this.shuffleDueCards = shuffleDueCards; }
 }

@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.service;
 
+import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.ReviewLog;
@@ -42,12 +43,16 @@ class ReviewServiceTest {
     @Mock
     private ReviewLogRepository reviewLogRepository;
 
+    @Mock
+    private FsrsConfigService fsrsConfigService;
+
     private ReviewService reviewService;
     private static final Instant NOW = Instant.parse("2026-06-04T10:00:00Z");
 
     @BeforeEach
     void setUp() {
-        reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository);
+        lenient().when(fsrsConfigService.getConfig(anyString())).thenReturn(FsrsSchedulerConfig.defaults());
+        reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository, fsrsConfigService);
         lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0))).thenReturn(1000L);
     }
 

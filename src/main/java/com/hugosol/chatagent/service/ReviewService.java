@@ -3,6 +3,7 @@ package com.hugosol.chatagent.service;
 import com.hugosol.chatagent.flashcard.AleaPrng;
 import com.hugosol.chatagent.flashcard.CardState;
 import com.hugosol.chatagent.flashcard.FsrsScheduler;
+import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.ReviewLog;
@@ -29,12 +30,14 @@ public class ReviewService {
     private final CardRepository cardRepository;
     private final UserPreferencesService preferencesService;
     private final ReviewLogRepository reviewLogRepository;
+    private final FsrsConfigService fsrsConfigService;
 
     public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService,
-                         ReviewLogRepository reviewLogRepository) {
+                         ReviewLogRepository reviewLogRepository, FsrsConfigService fsrsConfigService) {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
         this.reviewLogRepository = reviewLogRepository;
+        this.fsrsConfigService = fsrsConfigService;
     }
 
     @Transactional
@@ -50,9 +53,12 @@ public class ReviewService {
         Instant originalDue = card.getDue();
         Instant originalLastReview = card.getLastReview();
 
+        FsrsSchedulerConfig config = fsrsConfigService.getConfig(userId);
+        FsrsScheduler scheduler = new FsrsScheduler(config);
+
         CardState inputState;
         if (card.getCardState() == 0) {
-            inputState = FsrsScheduler.initNewCard(now);
+            inputState = scheduler.initNewCard(now);
         } else {
             inputState = new CardState(
                     card.getStability(), card.getDifficulty(), card.getCardState(),
@@ -60,7 +66,7 @@ public class ReviewService {
                     0.0, true);
         }
 
-        CardState result = FsrsScheduler.repeat(inputState, rating, now,
+        CardState result = scheduler.repeat(inputState, rating, now,
                 new AleaPrng(now.toEpochMilli())::next);
 
         card.setStability(result.stability());
@@ -109,26 +115,35 @@ public class ReviewService {
     public Optional<Card> getNextCard(String deckId, String mode, String userId) {
         Instant now = Instant.now();
         UserPreferences prefs = preferencesService.get(userId);
+        boolean shuffle = prefs.getShuffleDueCards() != null && prefs.getShuffleDueCards();
 
         switch (mode) {
             case "STANDARD" -> {
-                Optional<Card> dueCard = cardRepository.findFirstDueCardByDeckId(deckId, now);
+                Optional<Card> dueCard = shuffle
+                        ? cardRepository.findRandomDueCardByDeckId(deckId, now)
+                        : cardRepository.findFirstDueCardByDeckId(deckId, now);
                 if (dueCard.isPresent()) {
                     return dueCard;
                 }
                 if (isNewCardLimitExceeded(deckId, prefs)) {
                     return Optional.empty();
                 }
-                return cardRepository.findFirstNewCardByDeckId(deckId);
+                return shuffle
+                        ? cardRepository.findRandomNewCardByDeckId(deckId)
+                        : cardRepository.findFirstNewCardByDeckId(deckId);
             }
             case "REVIEW_ONLY" -> {
-                return cardRepository.findFirstDueCardByDeckId(deckId, now);
+                return shuffle
+                        ? cardRepository.findRandomDueCardByDeckId(deckId, now)
+                        : cardRepository.findFirstDueCardByDeckId(deckId, now);
             }
             case "NEW_ONLY" -> {
                 if (isNewCardLimitExceeded(deckId, prefs)) {
                     return Optional.empty();
                 }
-                return cardRepository.findFirstNewCardByDeckId(deckId);
+                return shuffle
+                        ? cardRepository.findRandomNewCardByDeckId(deckId)
+                        : cardRepository.findFirstNewCardByDeckId(deckId);
             }
             case "CRAM" -> {
                 return cardRepository.findRandomCardByDeckId(deckId);

@@ -1,6 +1,8 @@
 package com.hugosol.chatagent.config;
 
+import com.hugosol.chatagent.model.FsrsParameters;
 import com.hugosol.chatagent.model.User;
+import com.hugosol.chatagent.repository.FsrsParametersRepository;
 import com.hugosol.chatagent.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,9 @@ class DataInitializerTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private FsrsParametersRepository fsrsParametersRepository;
 
     @Mock
     private AppProperties appProperties;
@@ -66,5 +71,36 @@ class DataInitializerTest {
 
         verify(userRepository, never()).findByUsername(any());
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldCreateFsrsParametersForNewUser() throws Exception {
+        User existingUser = new User("admin", "existing-hash");
+        existingUser.setId("user-1");
+        when(appProperties.getInitialUsers()).thenReturn(List.of());
+        when(userRepository.findAll()).thenReturn(List.of(existingUser));
+        when(fsrsParametersRepository.findByUserId("user-1")).thenReturn(Optional.empty());
+
+        dataInitializer.run();
+
+        ArgumentCaptor<FsrsParameters> captor = ArgumentCaptor.forClass(FsrsParameters.class);
+        verify(fsrsParametersRepository).save(captor.capture());
+        FsrsParameters saved = captor.getValue();
+        assertThat(saved.getUserId()).isEqualTo("user-1");
+        assertThat(saved.getWeights()).hasSize(21);
+    }
+
+    @Test
+    void shouldNotDuplicateFsrsParameters() throws Exception {
+        User existingUser = new User("admin", "existing-hash");
+        existingUser.setId("user-1");
+        when(appProperties.getInitialUsers()).thenReturn(List.of());
+        when(userRepository.findAll()).thenReturn(List.of(existingUser));
+        when(fsrsParametersRepository.findByUserId("user-1"))
+                .thenReturn(Optional.of(FsrsParameters.defaults("user-1")));
+
+        dataInitializer.run();
+
+        verify(fsrsParametersRepository, never()).save(any(FsrsParameters.class));
     }
 }

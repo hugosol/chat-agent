@@ -133,6 +133,12 @@ public class ReviewController {
         result.put("newCardDailyLimit", prefs.getNewCardDailyLimit());
         result.put("dayStartHour", prefs.getDayStartHour());
         result.put("timezone", prefs.getTimezone());
+        result.put("learningSteps", prefs.getLearningSteps());
+        result.put("relearningSteps", prefs.getRelearningSteps());
+        result.put("desiredRetention", prefs.getDesiredRetention());
+        result.put("maximumInterval", prefs.getMaximumInterval());
+        result.put("enableFuzz", prefs.getEnableFuzz());
+        result.put("shuffleDueCards", prefs.getShuffleDueCards());
         return ResponseEntity.ok(result);
     }
 
@@ -155,6 +161,26 @@ public class ReviewController {
         if (body.containsKey("timezone")) {
             prefs.setTimezone((String) body.get("timezone"));
         }
+        if (body.containsKey("learningSteps")) {
+            prefs.setLearningSteps((String) body.get("learningSteps"));
+        }
+        if (body.containsKey("relearningSteps")) {
+            prefs.setRelearningSteps((String) body.get("relearningSteps"));
+        }
+        if (body.containsKey("desiredRetention")) {
+            Object val = body.get("desiredRetention");
+            prefs.setDesiredRetention(val != null ? ((Number) val).doubleValue() : null);
+        }
+        if (body.containsKey("maximumInterval")) {
+            Object val = body.get("maximumInterval");
+            prefs.setMaximumInterval(val != null ? ((Number) val).intValue() : null);
+        }
+        if (body.containsKey("enableFuzz")) {
+            prefs.setEnableFuzz((Boolean) body.get("enableFuzz"));
+        }
+        if (body.containsKey("shuffleDueCards")) {
+            prefs.setShuffleDueCards((Boolean) body.get("shuffleDueCards"));
+        }
         preferencesService.save(prefs);
 
         Map<String, Object> result = new HashMap<>();
@@ -163,6 +189,12 @@ public class ReviewController {
         result.put("newCardDailyLimit", prefs.getNewCardDailyLimit());
         result.put("dayStartHour", prefs.getDayStartHour());
         result.put("timezone", prefs.getTimezone());
+        result.put("learningSteps", prefs.getLearningSteps());
+        result.put("relearningSteps", prefs.getRelearningSteps());
+        result.put("desiredRetention", prefs.getDesiredRetention());
+        result.put("maximumInterval", prefs.getMaximumInterval());
+        result.put("enableFuzz", prefs.getEnableFuzz());
+        result.put("shuffleDueCards", prefs.getShuffleDueCards());
         return ResponseEntity.ok(result);
     }
 
