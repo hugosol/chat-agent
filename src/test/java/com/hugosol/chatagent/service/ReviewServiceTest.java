@@ -16,14 +16,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -51,13 +54,28 @@ class ReviewServiceTest {
     @Mock
     private FsrsConfigService fsrsConfigService;
 
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private Cache cache;
+
+    @Mock
+    private ExecutorService optimizerExecutor;
+
     private ReviewService reviewService;
     private static final Instant NOW = Instant.parse("2026-06-04T10:00:00Z");
 
     @BeforeEach
     void setUp() {
         lenient().when(fsrsConfigService.getConfig(anyString())).thenReturn(FsrsSchedulerConfig.defaults());
-        reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository, fsrsConfigService);
+        lenient().when(cacheManager.getCache("fsrsConfig")).thenReturn(cache);
+        lenient().doAnswer(inv -> {
+            ((Runnable) inv.getArgument(0)).run();
+            return null;
+        }).when(optimizerExecutor).execute(any(Runnable.class));
+        reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository,
+                fsrsConfigService, cacheManager, optimizerExecutor);
         lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0))).thenReturn(1000L);
     }
 
@@ -673,5 +691,62 @@ class ReviewServiceTest {
         prefs.setNewCardDailyLimit(20);
         prefs.setDayStartHour(6);
         return prefs;
+    }
+
+    @Test
+    void rescheduleAllCards_processesCardsWithReviewLogs() {
+        ReviewLog log1 = new ReviewLog();
+        log1.setCardId("card-1");
+        log1.setRating(Rating.GOOD);
+        log1.setReviewedAt(NOW);
+        ReviewLog log2 = new ReviewLog();
+        log2.setCardId("card-2");
+        log2.setRating(Rating.EASY);
+        log2.setReviewedAt(NOW);
+        ReviewLog log3 = new ReviewLog();
+        log3.setCardId("card-3");
+        log3.setRating(Rating.HARD);
+        log3.setReviewedAt(NOW);
+
+        when(reviewLogRepository.findByUserIdOrderByReviewedAtAsc("user-1"))
+                .thenReturn(List.of(log1, log2, log3));
+
+        Card card1 = new Card("user-1", "foo", "bar");
+        card1.setId("card-1");
+        card1.setStability(2.5);
+        card1.setDifficulty(0.0);
+        card1.setCardState(0);
+        Card card2 = new Card("user-1", "baz", "qux");
+        card2.setId("card-2");
+        card2.setStability(5.0);
+        card2.setDifficulty(2.0);
+        card2.setCardState(2);
+        Card card3 = new Card("user-1", "quux", "corge");
+        card3.setId("card-3");
+        card3.setStability(10.0);
+        card3.setDifficulty(3.0);
+        card3.setCardState(2);
+
+        when(cardRepository.findAllById(anyList()))
+                .thenReturn(List.of(card1, card2, card3));
+        when(cardRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewService.rescheduleAllCards("user-1");
+
+        ArgumentCaptor<List<Card>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cardRepository).saveAll(captor.capture());
+        List<Card> savedCards = captor.getValue();
+        assertThat(savedCards).hasSize(3);
+        verify(cache).evict("user-1");
+    }
+
+    @Test
+    void rescheduleAllCards_skipsCardsWithoutReviewLogs() {
+        when(reviewLogRepository.findByUserIdOrderByReviewedAtAsc("user-1"))
+                .thenReturn(List.of());
+
+        reviewService.rescheduleAllCards("user-1");
+
+        verify(cardRepository, never()).saveAll(anyList());
     }
 }

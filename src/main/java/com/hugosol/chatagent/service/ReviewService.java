@@ -12,6 +12,8 @@ import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +25,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 @Service
 public class ReviewService {
@@ -34,13 +40,19 @@ public class ReviewService {
     private final UserPreferencesService preferencesService;
     private final ReviewLogRepository reviewLogRepository;
     private final FsrsConfigService fsrsConfigService;
+    private final CacheManager cacheManager;
+    private final ExecutorService optimizerExecutor;
 
     public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService,
-                         ReviewLogRepository reviewLogRepository, FsrsConfigService fsrsConfigService) {
+                         ReviewLogRepository reviewLogRepository, FsrsConfigService fsrsConfigService,
+                         CacheManager cacheManager,
+                         @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor) {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
         this.reviewLogRepository = reviewLogRepository;
         this.fsrsConfigService = fsrsConfigService;
+        this.cacheManager = cacheManager;
+        this.optimizerExecutor = optimizerExecutor;
     }
 
     @Transactional
@@ -112,7 +124,7 @@ public class ReviewService {
 
     private CardState buildCardState(Card card, FsrsScheduler scheduler, Instant now) {
         if (card.getCardState() == 0) {
-            return scheduler.initNewCard(now);
+            return scheduler.enchantCard(now);
         }
         return new CardState(
                 card.getStability(), card.getDifficulty(), card.getCardState(),
@@ -180,6 +192,51 @@ public class ReviewService {
         cardRepository.saveAll(cards);
 
         return new ForgetDeckResult(cards.size(), totalReviewCount);
+    }
+
+    public void rescheduleAllCards(String userId) {
+        CompletableFuture.runAsync(() -> {
+            List<ReviewLog> allLogs = reviewLogRepository.findByUserIdOrderByReviewedAtAsc(userId);
+            if (allLogs.isEmpty()) {
+                return;
+            }
+
+            Map<String, List<ReviewLog>> logsByCard = allLogs.stream()
+                    .collect(Collectors.groupingBy(ReviewLog::getCardId));
+
+            List<String> cardIds = new ArrayList<>(logsByCard.keySet());
+            List<Card> cards = cardRepository.findAllById(cardIds);
+
+            List<Card> updatedCards = new ArrayList<>();
+            Instant now = Instant.now();
+
+            for (Card card : cards) {
+                List<ReviewLog> logs = logsByCard.get(card.getId());
+                if (logs == null || logs.isEmpty()) {
+                    continue;
+                }
+                FsrsSchedulerConfig config = fsrsConfigService.getConfig(userId);
+                FsrsScheduler scheduler = new FsrsScheduler(config);
+                CardState result = scheduler.reschedule(logs, now);
+
+                card.setStability(result.stability());
+                card.setDifficulty(result.difficulty());
+                card.setCardState(result.state());
+                card.setDue(result.due());
+                card.setReps(result.reps());
+                card.setLapses(result.lapses());
+                card.setStep(result.step());
+                card.setLastReview(result.lastReview());
+
+                updatedCards.add(card);
+            }
+
+            if (!updatedCards.isEmpty()) {
+                cardRepository.saveAll(updatedCards);
+            }
+
+            cacheManager.getCache("fsrsConfig").evict(userId);
+        }, optimizerExecutor);
     }
 
     public ReviewStats computeReviewStats(String deckId, String mode, String userId) {

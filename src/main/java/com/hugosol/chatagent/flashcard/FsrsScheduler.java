@@ -1,8 +1,13 @@
 package com.hugosol.chatagent.flashcard;
 
+import com.hugosol.chatagent.model.ReviewLog;
+
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.DoubleSupplier;
 
@@ -31,8 +36,21 @@ public class FsrsScheduler {
         return new CardState(2.5, 0.0, STATE_NEW, -1, now, 0, 0, null, 0.0, true);
     }
 
-    public CardState initNewCard(Instant now) {
+    public CardState enchantCard(Instant now) {
         return CardState.forInitialLearning(now);
+    }
+
+    public CardState reschedule(List<ReviewLog> reviewLogs, Instant now) {
+        if (reviewLogs == null || reviewLogs.isEmpty()) {
+            return createInitState(now);
+        }
+        List<ReviewLog> sorted = new ArrayList<>(reviewLogs);
+        sorted.sort(Comparator.comparing(ReviewLog::getReviewedAt));
+        CardState card = enchantCard(sorted.get(0).getReviewedAt());
+        for (ReviewLog log : sorted) {
+            card = repeat(card, log.getRating(), log.getReviewedAt(), null);
+        }
+        return card;
     }
 
     public CardState repeat(CardState card, Rating rating, Instant now, DoubleSupplier fuzzSource) {

@@ -77,6 +77,35 @@ public class AsyncConfig {
     }
 
     @Bean
+    @Qualifier("optimizerExecutor")
+    public ExecutorService optimizerExecutor() {
+        if (!asyncEnabled) {
+            log.info("Optimizer executor configured as synchronous (e2e/test mode)");
+            return new DirectExecutorService();
+        }
+
+        ThreadFactory threadFactory = r -> {
+            ThreadFactory defaultFactory = Executors.defaultThreadFactory();
+            Thread t = defaultFactory.newThread(r);
+            t.setName("optimizer-" + t.getName());
+            t.setDaemon(true);
+            return t;
+        };
+
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2,
+                4,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(),
+                threadFactory,
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+        executor.allowCoreThreadTimeOut(true);
+        log.info("Optimizer executor configured: core=2, max=4");
+        return executor;
+    }
+
+    @Bean
     @Qualifier("embeddingExecutor")
     public ExecutorService embeddingExecutor() {
         if (!asyncEnabled) {
