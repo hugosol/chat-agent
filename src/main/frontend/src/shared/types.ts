@@ -22,6 +22,8 @@ export interface Card {
   due: string | null;
   cardState: number;
   step: number;
+  reps: number;
+  lapses: number;
   createTime: string | null;
 }
 

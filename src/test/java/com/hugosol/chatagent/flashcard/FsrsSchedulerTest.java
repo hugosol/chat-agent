@@ -3,23 +3,28 @@ package com.hugosol.chatagent.flashcard;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import com.hugosol.chatagent.model.ReviewLog;
+
 import java.time.Duration;
 import java.time.Instant;
-import java.util.function.DoubleSupplier;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
 class FsrsSchedulerTest {
+
+    private static final FsrsScheduler scheduler = new FsrsScheduler(FsrsSchedulerConfig.defaults());
 
     private static final Instant BASE_TIME = Instant.parse("2022-11-29T12:30:00Z");
 
     private static final double TOLERANCE = 1e-4;
 
     @Test
-    void initNewCard_createsLearningCardWithoutStability() {
+    void enchantCard_createsLearningCardWithoutStability() {
         Instant now = BASE_TIME;
 
-        CardState state = FsrsScheduler.initNewCard(now);
+        CardState state = scheduler.enchantCard(now);
 
         assertThat(state.state()).isEqualTo(CardState.STATE_LEARNING);
         assertThat(state.step()).isEqualTo(0);
@@ -32,12 +37,12 @@ class FsrsSchedulerTest {
 
     @Test
     void firstRepeat_perRating_givesCorrectInitialStabilityAndDifficulty() {
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
 
-        CardState againResult = FsrsScheduler.repeat(card, Rating.AGAIN, BASE_TIME, null);
-        CardState hardResult = FsrsScheduler.repeat(card, Rating.HARD, BASE_TIME, null);
-        CardState goodResult = FsrsScheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
-        CardState easyResult = FsrsScheduler.repeat(card, Rating.EASY, BASE_TIME, null);
+        CardState againResult = scheduler.repeat(card, Rating.AGAIN, BASE_TIME, null);
+        CardState hardResult = scheduler.repeat(card, Rating.HARD, BASE_TIME, null);
+        CardState goodResult = scheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
+        CardState easyResult = scheduler.repeat(card, Rating.EASY, BASE_TIME, null);
 
         assertThat(againResult.stability()).isCloseTo(0.212, within(TOLERANCE));
         assertThat(hardResult.stability()).isCloseTo(1.2931, within(TOLERANCE));
@@ -62,18 +67,18 @@ class FsrsSchedulerTest {
 
     @Test
     void retrievability_newCard_returnsZero() {
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
-        double r = FsrsScheduler.retrievability(card, BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
+        double r = scheduler.retrievability(card, BASE_TIME);
         assertThat(r).isEqualTo(0.0);
     }
 
     @Test
     void retrievability_afterReview_returnsReasonableValue() {
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
-        card = FsrsScheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), null);
+        CardState card = scheduler.enchantCard(BASE_TIME);
+        card = scheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), null);
 
-        double r = FsrsScheduler.retrievability(card, card.due());
+        double r = scheduler.retrievability(card, card.due());
         assertThat(r).isCloseTo(0.9, within(0.01));
     }
 
@@ -86,11 +91,11 @@ class FsrsSchedulerTest {
         };
         int[] expectedIntervals = {0, 2, 11, 46, 163, 498, 0, 0, 2, 4, 7, 12, 21};
 
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
         Instant now = BASE_TIME;
 
         for (int i = 0; i < ratings.length; i++) {
-            card = FsrsScheduler.repeat(card, ratings[i], now, null);
+            card = scheduler.repeat(card, ratings[i], now, null);
             int ivl = (int) Duration.between(card.lastReview(), card.due()).toDays();
             assertThat(ivl).as("interval " + i).isEqualTo(expectedIntervals[i]);
             now = card.due();
@@ -102,12 +107,12 @@ class FsrsSchedulerTest {
         Rating[] ratings = {Rating.AGAIN, Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD, Rating.GOOD};
         int[] advanceDays = {0, 0, 1, 3, 8, 21};
 
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
         Instant now = BASE_TIME;
 
         for (int i = 0; i < ratings.length; i++) {
             now = now.plus(Duration.ofDays(advanceDays[i]));
-            card = FsrsScheduler.repeat(card, ratings[i], now, null);
+            card = scheduler.repeat(card, ratings[i], now, null);
         }
 
         assertThat(card.stability()).isCloseTo(53.62691, within(TOLERANCE));
@@ -116,12 +121,12 @@ class FsrsSchedulerTest {
 
     @Test
     void repeat_10Easy_hitsDifficultyFloor() {
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
         Instant now = BASE_TIME;
 
         for (int i = 0; i < 10; i++) {
             now = now.plus(Duration.ofSeconds(1));
-            card = FsrsScheduler.repeat(card, Rating.EASY, now, null);
+            card = scheduler.repeat(card, Rating.EASY, now, null);
         }
 
         assertThat(card.difficulty()).isEqualTo(1.0);
@@ -129,12 +134,12 @@ class FsrsSchedulerTest {
 
     @Test
     void repeat_1000Again_stabilityAtLeastMinimum() {
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
         Instant now = BASE_TIME;
 
         for (int i = 0; i < 1000; i++) {
             now = now.plus(Duration.ofDays(1));
-            card = FsrsScheduler.repeat(card, Rating.AGAIN, now, null);
+            card = scheduler.repeat(card, Rating.AGAIN, now, null);
             assertThat(card.stability()).isGreaterThanOrEqualTo(FsrsScheduler.STABILITY_MIN);
         }
     }
@@ -142,13 +147,13 @@ class FsrsSchedulerTest {
     @Test
     void repeat_fuzzDeterministic_seed42GivesConsistentInterval() {
         AleaPrng alea = new AleaPrng(42);
-        CardState card = FsrsScheduler.initNewCard(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
+        CardState card = scheduler.enchantCard(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
         Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
 
-        card = FsrsScheduler.repeat(card, Rating.GOOD, now, alea::next);
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
+        card = scheduler.repeat(card, Rating.GOOD, now, alea::next);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
         Instant prevDue = card.due();
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
         int interval = (int) Duration.between(prevDue, card.due()).toDays();
 
         assertThat(interval).isEqualTo(12);
@@ -157,13 +162,13 @@ class FsrsSchedulerTest {
     @Test
     void repeat_fuzzDeterministic_seed12345GivesConsistentInterval() {
         AleaPrng alea = new AleaPrng(12345);
-        CardState card = FsrsScheduler.initNewCard(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
+        CardState card = scheduler.enchantCard(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
         Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
 
-        card = FsrsScheduler.repeat(card, Rating.GOOD, now, alea::next);
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
+        card = scheduler.repeat(card, Rating.GOOD, now, alea::next);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
         Instant prevDue = card.due();
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), alea::next);
         int interval = (int) Duration.between(prevDue, card.due()).toDays();
 
         assertThat(interval).isEqualTo(11);
@@ -171,19 +176,19 @@ class FsrsSchedulerTest {
 
     @Test
     void repeat_hardModifier_hardIntervalShorterThanGood() {
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
 
-        card = FsrsScheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), null);
+        card = scheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), null);
 
-        CardState hardCard = FsrsScheduler.initNewCard(BASE_TIME);
-        hardCard = FsrsScheduler.repeat(hardCard, Rating.GOOD, BASE_TIME, null);
-        hardCard = FsrsScheduler.repeat(hardCard, Rating.GOOD, hardCard.due(), null);
+        CardState hardCard = scheduler.enchantCard(BASE_TIME);
+        hardCard = scheduler.repeat(hardCard, Rating.GOOD, BASE_TIME, null);
+        hardCard = scheduler.repeat(hardCard, Rating.GOOD, hardCard.due(), null);
 
         Instant goodDue = card.due();
-        CardState goodResult = FsrsScheduler.repeat(card, Rating.GOOD, goodDue, null);
+        CardState goodResult = scheduler.repeat(card, Rating.GOOD, goodDue, null);
 
-        CardState hardResult = FsrsScheduler.repeat(hardCard, Rating.HARD, hardCard.due(), null);
+        CardState hardResult = scheduler.repeat(hardCard, Rating.HARD, hardCard.due(), null);
 
         long goodInterval = Duration.between(goodDue, goodResult.due()).toDays();
         long hardInterval = Duration.between(hardCard.due(), hardResult.due()).toDays();
@@ -193,18 +198,288 @@ class FsrsSchedulerTest {
 
     @Test
     void repeat_easyBoost_easyStabilityGreaterThanGood() {
-        CardState card = FsrsScheduler.initNewCard(BASE_TIME);
+        CardState card = scheduler.enchantCard(BASE_TIME);
 
-        card = FsrsScheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), null);
+        card = scheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), null);
 
-        CardState easyCard = FsrsScheduler.initNewCard(BASE_TIME);
-        easyCard = FsrsScheduler.repeat(easyCard, Rating.GOOD, BASE_TIME, null);
-        easyCard = FsrsScheduler.repeat(easyCard, Rating.GOOD, easyCard.due(), null);
+        CardState easyCard = scheduler.enchantCard(BASE_TIME);
+        easyCard = scheduler.repeat(easyCard, Rating.GOOD, BASE_TIME, null);
+        easyCard = scheduler.repeat(easyCard, Rating.GOOD, easyCard.due(), null);
 
-        card = FsrsScheduler.repeat(card, Rating.GOOD, card.due(), null);
-        easyCard = FsrsScheduler.repeat(easyCard, Rating.EASY, easyCard.due(), null);
+        card = scheduler.repeat(card, Rating.GOOD, card.due(), null);
+        easyCard = scheduler.repeat(easyCard, Rating.EASY, easyCard.due(), null);
 
         assertThat(easyCard.stability()).isGreaterThan(card.stability());
+    }
+
+    @Test
+    void noLearningSteps_newCardGraduatesImmediately() {
+        FsrsSchedulerConfig config = new FsrsSchedulerConfig(
+                FsrsSchedulerConfig.defaults().weights(), 0.9,
+                new java.time.Duration[0],
+                FsrsSchedulerConfig.defaults().relearningSteps(),
+                36500, true, true);
+        FsrsScheduler s = new FsrsScheduler(config);
+
+        CardState card = s.enchantCard(BASE_TIME);
+        CardState result = s.repeat(card, Rating.GOOD, BASE_TIME, null);
+
+        assertThat(result.state()).isEqualTo(CardState.STATE_REVIEW);
+        assertThat(result.step()).isEqualTo(-1);
+    }
+
+    @Test
+    void noRelearningSteps_againDoesNotEnterRelearning() {
+        FsrsSchedulerConfig config = new FsrsSchedulerConfig(
+                FsrsSchedulerConfig.defaults().weights(), 0.9,
+                FsrsSchedulerConfig.defaults().learningSteps(),
+                new java.time.Duration[0],
+                36500, true, true);
+        FsrsScheduler s = new FsrsScheduler(config);
+
+        CardState card = s.enchantCard(BASE_TIME);
+        card = s.repeat(card, Rating.GOOD, BASE_TIME, null);
+        card = s.repeat(card, Rating.GOOD, card.due(), null);
+        CardState result = s.repeat(card, Rating.AGAIN, card.due(), null);
+
+        assertThat(result.state()).isNotEqualTo(CardState.STATE_RELEARNING);
+    }
+
+    @Test
+    void differentWeights_produceDifferentResult() {
+        double[] altWeights = FsrsSchedulerConfig.defaults().weights().clone();
+        altWeights[0] = 0.5;
+        FsrsSchedulerConfig altConfig = new FsrsSchedulerConfig(
+                altWeights, 0.9,
+                FsrsSchedulerConfig.defaults().learningSteps(),
+                FsrsSchedulerConfig.defaults().relearningSteps(),
+                36500, true, true);
+        FsrsScheduler altS = new FsrsScheduler(altConfig);
+
+        CardState card = scheduler.enchantCard(BASE_TIME);
+        CardState defResult = scheduler.repeat(card, Rating.AGAIN, BASE_TIME, null);
+
+        CardState altCard = altS.enchantCard(BASE_TIME);
+        CardState altResult = altS.repeat(altCard, Rating.AGAIN, BASE_TIME, null);
+
+        assertThat(altResult.stability()).isNotEqualTo(defResult.stability());
+    }
+
+    @Test
+    void disableFuzz_producesNoIntervalVariation() {
+        FsrsSchedulerConfig config = new FsrsSchedulerConfig(
+                FsrsSchedulerConfig.defaults().weights(), 0.9,
+                FsrsSchedulerConfig.defaults().learningSteps(),
+                FsrsSchedulerConfig.defaults().relearningSteps(),
+                36500, false, true);
+        FsrsScheduler noFuzz = new FsrsScheduler(config);
+
+        AleaPrng alea = new AleaPrng(42);
+        CardState card = noFuzz.enchantCard(BASE_TIME);
+        card = noFuzz.repeat(card, Rating.GOOD, BASE_TIME, alea::next);
+        card = noFuzz.repeat(card, Rating.GOOD, card.due(), alea::next);
+        Instant prevDue = card.due();
+        card = noFuzz.repeat(card, Rating.GOOD, card.due(), alea::next);
+        int ivl = (int) java.time.Duration.between(prevDue, card.due()).toDays();
+
+        assertThat(ivl).isEqualTo((int) Math.round(card.stability()));
+    }
+
+    @Test
+    void customMaximumInterval_capsInterval() {
+        FsrsSchedulerConfig config = new FsrsSchedulerConfig(
+                FsrsSchedulerConfig.defaults().weights(), 0.9,
+                FsrsSchedulerConfig.defaults().learningSteps(),
+                FsrsSchedulerConfig.defaults().relearningSteps(),
+                5, true, true);
+        FsrsScheduler capped = new FsrsScheduler(config);
+
+        CardState card = capped.enchantCard(BASE_TIME);
+        card = capped.repeat(card, Rating.EASY, BASE_TIME, null);
+        card = capped.repeat(card, Rating.EASY, card.due(), null);
+        card = capped.repeat(card, Rating.EASY, card.due(), null);
+
+        long ivl = java.time.Duration.between(card.lastReview(), card.due()).toDays();
+        assertThat(ivl).isLessThanOrEqualTo(5);
+    }
+
+    @Test
+    void forgettingCurve_returnsReasonableValue() {
+        double r = FsrsScheduler.forgettingCurve(0, 10, -0.1542);
+        assertThat(r).isCloseTo(1.0, within(0.001));
+
+        double r2 = FsrsScheduler.forgettingCurve(10, 10, -0.1542);
+        assertThat(r2).isLessThan(1.0);
+        assertThat(r2).isGreaterThan(0.0);
+    }
+
+    @Test
+    void stateNew_constantIsZero() {
+        assertThat(FsrsScheduler.STATE_NEW).isEqualTo(0);
+    }
+
+    @Test
+    void retrievability_isPublicInstanceMethod() {
+        CardState card = scheduler.enchantCard(BASE_TIME);
+        card = scheduler.repeat(card, Rating.GOOD, BASE_TIME, null);
+        double r = scheduler.retrievability(card, card.due());
+        assertThat(r).isGreaterThan(0.8);
+    }
+
+    @Test
+    void createInitState_isStaticAndReturnsNewCard() {
+        CardState state = FsrsScheduler.createInitState(BASE_TIME);
+        assertThat(state.state()).isEqualTo(FsrsScheduler.STATE_NEW);
+        assertThat(state.stability()).isCloseTo(2.5, within(TOLERANCE));
+        assertThat(state.difficulty()).isCloseTo(0.0, within(TOLERANCE));
+    }
+
+    @Test
+    void preview_returnsFourOutcomes() {
+        CardState card = scheduler.enchantCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result = scheduler.preview(card, BASE_TIME);
+
+        assertThat(result).containsKeys(Rating.AGAIN, Rating.HARD, Rating.GOOD, Rating.EASY);
+        assertThat(result.get(Rating.AGAIN)).isNotNull();
+        assertThat(result.get(Rating.HARD)).isNotNull();
+        assertThat(result.get(Rating.GOOD)).isNotNull();
+        assertThat(result.get(Rating.EASY)).isNotNull();
+    }
+
+    @Test
+    void preview_differentRatingsProduceDifferentDue() {
+        CardState card = scheduler.enchantCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result = scheduler.preview(card, BASE_TIME);
+
+        assertThat(result.get(Rating.AGAIN).due()).isNotEqualTo(result.get(Rating.HARD).due());
+        assertThat(result.get(Rating.AGAIN).due()).isNotEqualTo(result.get(Rating.GOOD).due());
+        assertThat(result.get(Rating.AGAIN).due()).isNotEqualTo(result.get(Rating.EASY).due());
+        assertThat(result.get(Rating.EASY).due()).isAfter(result.get(Rating.AGAIN).due());
+    }
+
+    @Test
+    void preview_noFuzzIsDeterministic() {
+        CardState card = scheduler.enchantCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result1 = scheduler.preview(card, BASE_TIME);
+        java.util.Map<Rating, CardState> result2 = scheduler.preview(card, BASE_TIME);
+
+        for (Rating r : Rating.values()) {
+            assertThat(result1.get(r).due()).isEqualTo(result2.get(r).due());
+            assertThat(result1.get(r).stability()).isEqualTo(result2.get(r).stability());
+            assertThat(result1.get(r).difficulty()).isEqualTo(result2.get(r).difficulty());
+        }
+    }
+
+    @Test
+    void preview_newCard_learningStateGraduation() {
+        CardState card = scheduler.enchantCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result = scheduler.preview(card, BASE_TIME);
+
+        assertThat(result.get(Rating.GOOD).state()).isEqualTo(CardState.STATE_LEARNING);
+        assertThat(result.get(Rating.EASY).state()).isEqualTo(CardState.STATE_REVIEW);
+        assertThat(result.get(Rating.AGAIN).state()).isEqualTo(CardState.STATE_LEARNING);
+        assertThat(result.get(Rating.AGAIN).step()).isEqualTo(0);
+    }
+
+    @Test
+    void reschedule_emptyLogs_returnsCreateInitState() {
+        List<ReviewLog> emptyLogs = List.of();
+
+        CardState result = scheduler.reschedule(emptyLogs, BASE_TIME);
+
+        assertThat(result.state()).isEqualTo(FsrsScheduler.STATE_NEW);
+        assertThat(result.stability()).isCloseTo(2.5, within(TOLERANCE));
+        assertThat(result.difficulty()).isCloseTo(0.0, within(TOLERANCE));
+    }
+
+    @Test
+    void reschedule_singleReview_updatesState() {
+        ReviewLog log = new ReviewLog();
+        log.setRating(Rating.GOOD);
+        log.setReviewedAt(BASE_TIME);
+
+        CardState result = scheduler.reschedule(List.of(log), BASE_TIME);
+
+        assertThat(result.state()).isNotEqualTo(FsrsScheduler.STATE_NEW);
+        assertThat(result.stability()).isGreaterThan(0);
+        assertThat(result.reps()).isEqualTo(1);
+    }
+
+    @Test
+    void reschedule_multipleReviews_accumulatesState() {
+        List<ReviewLog> logs = new ArrayList<>();
+        Instant now = BASE_TIME;
+
+        Rating[] ratings = {Rating.GOOD, Rating.AGAIN, Rating.GOOD, Rating.GOOD, Rating.GOOD,
+                Rating.AGAIN, Rating.GOOD, Rating.EASY, Rating.GOOD, Rating.GOOD};
+        int[] advanceDays = {0, 0, 1, 3, 8, 21, 0, 3, 8, 21};
+
+        for (int i = 0; i < ratings.length; i++) {
+            if (i > 0) {
+                now = now.plus(Duration.ofDays(advanceDays[i]));
+            }
+            ReviewLog log = new ReviewLog();
+            log.setRating(ratings[i]);
+            log.setReviewedAt(now);
+            logs.add(log);
+        }
+
+        CardState result = scheduler.reschedule(logs, BASE_TIME.plus(Duration.ofDays(365)));
+
+        CardState singleLogResult = scheduler.reschedule(List.of(logs.get(0)), BASE_TIME);
+        assertThat(result.stability()).isGreaterThan(singleLogResult.stability());
+    }
+
+    @Test
+    void reschedule_deterministic_noFuzz() {
+        List<ReviewLog> logs = new ArrayList<>();
+        Instant now = BASE_TIME;
+        Rating[] ratings = {Rating.GOOD, Rating.GOOD, Rating.EASY, Rating.GOOD, Rating.HARD};
+
+        for (int i = 0; i < ratings.length; i++) {
+            now = now.plus(Duration.ofDays(i + 1));
+            ReviewLog log = new ReviewLog();
+            log.setRating(ratings[i]);
+            log.setReviewedAt(now);
+            logs.add(log);
+        }
+
+        CardState run1 = scheduler.reschedule(logs, now);
+        CardState run2 = scheduler.reschedule(logs, now);
+
+        assertThat(run1.due()).isEqualTo(run2.due());
+        assertThat(run1.stability()).isEqualTo(run2.stability());
+        assertThat(run1.difficulty()).isEqualTo(run2.difficulty());
+    }
+
+    @Test
+    void reschedule_differentConfig_producesDifferentDue() {
+        List<ReviewLog> logs = new ArrayList<>();
+        Instant now = BASE_TIME;
+        for (int i = 0; i < 5; i++) {
+            now = now.plus(Duration.ofDays(i + 1));
+            ReviewLog log = new ReviewLog();
+            log.setRating(Rating.GOOD);
+            log.setReviewedAt(now);
+            logs.add(log);
+        }
+
+        CardState resultDefault = scheduler.reschedule(logs, now);
+
+        FsrsSchedulerConfig highRetentionConfig = new FsrsSchedulerConfig(
+                FsrsSchedulerConfig.defaults().weights(), 0.95,
+                FsrsSchedulerConfig.defaults().learningSteps(),
+                FsrsSchedulerConfig.defaults().relearningSteps(),
+                36500, true, true);
+        FsrsScheduler highRetention = new FsrsScheduler(highRetentionConfig);
+        CardState resultHighRetention = highRetention.reschedule(logs, now);
+
+        assertThat(resultHighRetention.due()).isNotEqualTo(resultDefault.due());
+        assertThat(resultHighRetention.due()).isBefore(resultDefault.due());
     }
 }

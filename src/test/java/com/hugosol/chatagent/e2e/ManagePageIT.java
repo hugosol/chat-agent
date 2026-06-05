@@ -1,12 +1,15 @@
 package com.hugosol.chatagent.e2e;
 
 import com.hugosol.chatagent.e2e.helper.E2ETestBase;
+import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
+import com.hugosol.chatagent.model.ReviewLog;
 import com.hugosol.chatagent.model.Tag;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -424,5 +427,126 @@ class ManagePageIT extends E2ETestBase {
         assertThat(tagRepository.findAll()).isEmpty();
 
         takeScreenshot("tags-all-deleted");
+    }
+
+    @Test
+    void manageCardForget() {
+        Tag deckTag = createTag("Daily English", "deck");
+        Card card = createCard("yesterday", "昨天", deckTag);
+
+        card.setReps(3);
+        card.setLapses(1);
+        card.setCardState(2);
+        card.setStability(15.0);
+        card.setDifficulty(5.0);
+        card.setFirstReviewDate(Instant.parse("2026-06-01T10:00:00Z"));
+        card.setLastReview(Instant.parse("2026-06-04T10:00:00Z"));
+        cardRepository.save(card);
+
+        ReviewLog log = new ReviewLog();
+        log.setUserId(DEFAULT_USER_ID);
+        log.setCardId(card.getId());
+        log.setRating(Rating.GOOD);
+        log.setReviewedAt(Instant.parse("2026-06-04T10:00:00Z"));
+        reviewLogRepository.save(log);
+
+        navigateToManage();
+        page.locator("[data-testid='tab-cards']").click();
+        page.waitForSelector("[data-testid='card-block']");
+
+        assertThat(reviewLogRepository.countByCardId(card.getId())).isEqualTo(1);
+
+        page.waitForSelector("[data-testid='btn-forget-card']");
+        page.locator("[data-testid='btn-forget-card']").click();
+        page.waitForSelector("[data-testid='modal-overlay']");
+
+        assertThat(page.locator("[data-testid='modal-overlay'] h2").textContent()).isEqualTo("遗忘卡片");
+        assertThat(page.locator("[data-testid='modal-save']").textContent()).isEqualTo("确认遗忘");
+
+        takeScreenshot("card-forget-modal");
+
+        page.locator("[data-testid='modal-save']").click();
+        page.waitForFunction(
+                "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
+
+        page.waitForTimeout(500);
+
+        Card reloaded = cardRepository.findById(card.getId()).orElseThrow();
+        assertThat(reloaded.getCardState()).isEqualTo(0);
+        assertThat(reloaded.getReps()).isEqualTo(0);
+        assertThat(reloaded.getLapses()).isEqualTo(0);
+        assertThat(reloaded.getStability()).isEqualTo(2.5);
+        assertThat(reloaded.getDifficulty()).isEqualTo(0.0);
+        assertThat(reloaded.getFirstReviewDate()).isNull();
+        assertThat(reloaded.getLastReview()).isNull();
+        assertThat(reviewLogRepository.countByCardId(card.getId())).isEqualTo(0);
+
+        takeScreenshot("card-forgotten");
+    }
+
+    @Test
+    void manageDeckForget() {
+        Tag deckTag = createTag("Daily English", "deck");
+        Tag normalTag = createTag("verb", null);
+
+        Card card1 = createCard("Yesterday", "昨天", deckTag, normalTag);
+        Card card2 = createCard("hello", "你好", deckTag);
+
+        for (Card c : new Card[]{card1, card2}) {
+            c.setReps(2);
+            c.setLapses(1);
+            c.setCardState(2);
+            c.setStability(10.0);
+            c.setDifficulty(3.0);
+            c.setFirstReviewDate(Instant.parse("2026-06-01T10:00:00Z"));
+            cardRepository.save(c);
+
+            for (int i = 0; i < 2; i++) {
+                ReviewLog log = new ReviewLog();
+                log.setUserId(DEFAULT_USER_ID);
+                log.setCardId(c.getId());
+                log.setRating(i == 0 ? Rating.GOOD : Rating.AGAIN);
+                log.setReviewedAt(Instant.now());
+                log.setDeckId(deckTag.getId());
+                reviewLogRepository.save(log);
+            }
+        }
+
+        assertThat(reviewLogRepository.countByCardId(card1.getId())).isEqualTo(2);
+
+        navigateToManage();
+        page.locator("[data-testid='tab-cards']").click();
+        page.waitForSelector("[data-testid='card-block']");
+
+        page.waitForSelector("[data-testid='deck-tab']:has-text('Daily English')");
+        page.locator("[data-testid='deck-tab']:has-text('Daily English')").click();
+        page.waitForTimeout(400);
+
+        assertThat(page.locator("[data-testid='card-block']").count()).isEqualTo(2);
+
+        page.waitForSelector("[data-testid='btn-deck-forget']");
+        page.locator("[data-testid='btn-deck-forget']").click();
+        page.waitForSelector("[data-testid='modal-overlay']");
+
+        assertThat(page.locator("[data-testid='modal-overlay'] h2").textContent()).isEqualTo("重置 Deck 全部卡片");
+        assertThat(page.locator("[data-testid='modal-save']").textContent()).isEqualTo("确认重置");
+
+        takeScreenshot("deck-forget-modal");
+
+        page.locator("[data-testid='modal-save']").click();
+        page.waitForFunction(
+                "() => document.querySelector(\"[data-testid='modal-overlay']\") === null");
+
+        page.waitForTimeout(500);
+
+        for (Card c : new Card[]{card1, card2}) {
+            Card reloaded = cardRepository.findById(c.getId()).orElseThrow();
+            assertThat(reloaded.getCardState()).isEqualTo(0);
+            assertThat(reloaded.getReps()).isEqualTo(0);
+            assertThat(reloaded.getStability()).isEqualTo(2.5);
+            assertThat(reviewLogRepository.countByCardId(c.getId())).isEqualTo(0);
+        }
+
+        takeScreenshot("deck-forgotten");
     }
 }

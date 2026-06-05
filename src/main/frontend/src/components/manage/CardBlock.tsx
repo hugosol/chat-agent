@@ -8,9 +8,10 @@ interface CardBlockProps {
   onClick: (card: Card) => void;
   onEdit: (card: Card) => void;
   onDelete: (card: Card) => void;
+  onForget: (card: Card) => void;
 }
 
-function CardBlock({ card, onClick, onEdit, onDelete }: CardBlockProps): JSX.Element {
+function CardBlock({ card, onClick, onEdit, onDelete, onForget }: CardBlockProps): JSX.Element {
   const truncatedBack = truncate(card.back, 100);
   const backLines = truncatedBack.split("\n");
 
@@ -51,6 +52,9 @@ function CardBlock({ card, onClick, onEdit, onDelete }: CardBlockProps): JSX.Ele
       <div className={styles.actions}>
         <button data-testid="btn-edit-card" onClick={(e) => { e.stopPropagation(); onEdit(card); }}>
           Edit
+        </button>
+        <button data-testid="btn-forget-card" onClick={(e) => { e.stopPropagation(); onForget(card); }}>
+          Forget
         </button>
         <button data-testid="btn-delete-card" onClick={(e) => { e.stopPropagation(); onDelete(card); }}>
           Delete

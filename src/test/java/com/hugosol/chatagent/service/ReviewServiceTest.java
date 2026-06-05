@@ -1,5 +1,7 @@
 package com.hugosol.chatagent.service;
 
+import com.hugosol.chatagent.dto.ForgetDeckResult;
+import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.ReviewLog;
@@ -14,19 +16,26 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,12 +51,31 @@ class ReviewServiceTest {
     @Mock
     private ReviewLogRepository reviewLogRepository;
 
+    @Mock
+    private FsrsConfigService fsrsConfigService;
+
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private Cache cache;
+
+    @Mock
+    private ExecutorService optimizerExecutor;
+
     private ReviewService reviewService;
     private static final Instant NOW = Instant.parse("2026-06-04T10:00:00Z");
 
     @BeforeEach
     void setUp() {
-        reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository);
+        lenient().when(fsrsConfigService.getConfig(anyString())).thenReturn(FsrsSchedulerConfig.defaults());
+        lenient().when(cacheManager.getCache("fsrsConfig")).thenReturn(cache);
+        lenient().doAnswer(inv -> {
+            ((Runnable) inv.getArgument(0)).run();
+            return null;
+        }).when(optimizerExecutor).execute(any(Runnable.class));
+        reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository,
+                fsrsConfigService, cacheManager, optimizerExecutor);
         lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0))).thenReturn(1000L);
     }
 
@@ -486,10 +514,239 @@ class ReviewServiceTest {
         assertThat(stats.remaining()).isEqualTo(2L);
     }
 
+    @Test
+    void forgetCard_resetsFsrsStateToNew() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(15.0);
+        card.setDifficulty(5.0);
+        card.setCardState(2);
+        card.setDue(Instant.parse("2026-07-01T10:00:00Z"));
+        card.setReps(10);
+        card.setLapses(3);
+        card.setStep(2);
+        card.setLastReview(Instant.parse("2026-06-01T10:00:00Z"));
+        card.setFirstReviewDate(Instant.parse("2026-05-01T10:00:00Z"));
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewService.forgetCard("card-1", "user-1");
+
+        ArgumentCaptor<Card> captor = ArgumentCaptor.forClass(Card.class);
+        verify(cardRepository).save(captor.capture());
+        Card saved = captor.getValue();
+
+        assertThat(saved.getStability()).isEqualTo(2.5);
+        assertThat(saved.getDifficulty()).isEqualTo(0.0);
+        assertThat(saved.getCardState()).isEqualTo(0);
+        assertThat(saved.getStep()).isEqualTo(-1);
+        assertThat(saved.getReps()).isEqualTo(0);
+        assertThat(saved.getLapses()).isEqualTo(0);
+        assertThat(saved.getLastReview()).isNull();
+        assertThat(saved.getFirstReviewDate()).isNull();
+    }
+
+    @Test
+    void forgetCard_deletesAllReviewLogs() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(15.0);
+        card.setDifficulty(5.0);
+        card.setCardState(2);
+        card.setDue(Instant.parse("2026-07-01T10:00:00Z"));
+        card.setReps(10);
+        card.setLapses(3);
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewService.forgetCard("card-1", "user-1");
+
+        verify(reviewLogRepository).deleteByCardId("card-1");
+    }
+
+    @Test
+    void forgetCard_cardNotFound_throws404() {
+        when(cardRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reviewService.forgetCard("nonexistent", "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void forgetCard_wrongUser_throws404() {
+        Card card = new Card("other-user", "hello", "你好");
+        card.setId("card-1");
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        assertThatThrownBy(() -> reviewService.forgetCard("card-1", "user-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void forgetDeck_resetsAllCardsAndDeletesLogs() {
+        Card card1 = new Card("user-1", "hello", "你好");
+        card1.setId("card-1");
+        card1.setStability(10.0);
+        card1.setDifficulty(3.0);
+        card1.setCardState(2);
+        card1.setDue(Instant.parse("2026-07-01T10:00:00Z"));
+        card1.setReps(5);
+        card1.setLapses(1);
+
+        Card card2 = new Card("user-1", "world", "世界");
+        card2.setId("card-2");
+        card2.setStability(20.0);
+        card2.setDifficulty(4.0);
+        card2.setCardState(2);
+        card2.setDue(Instant.parse("2026-08-01T10:00:00Z"));
+        card2.setReps(8);
+        card2.setLapses(2);
+
+        when(cardRepository.findByFilteredDeckIds("deck-1", "user-1"))
+                .thenReturn(List.of("card-1", "card-2"));
+        when(reviewLogRepository.countByCardId("card-1")).thenReturn(3);
+        when(reviewLogRepository.countByCardId("card-2")).thenReturn(4);
+        when(cardRepository.findAllById(List.of("card-1", "card-2")))
+                .thenReturn(List.of(card1, card2));
+        when(cardRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        ForgetDeckResult result = reviewService.forgetDeck("deck-1", "user-1");
+
+        assertThat(result.cardCount()).isEqualTo(2);
+        assertThat(result.deletedReviewCount()).isEqualTo(7);
+        verify(reviewLogRepository).deleteByCardIdIn(List.of("card-1", "card-2"));
+        verify(cardRepository).saveAll(anyList());
+    }
+
+    @Test
+    void forgetDeck_emptyDeck_returnsZeroCounts() {
+        when(cardRepository.findByFilteredDeckIds("deck-1", "user-1"))
+                .thenReturn(List.of());
+
+        ForgetDeckResult result = reviewService.forgetDeck("deck-1", "user-1");
+
+        assertThat(result.cardCount()).isEqualTo(0);
+        assertThat(result.deletedReviewCount()).isEqualTo(0);
+        verify(reviewLogRepository, never()).deleteByCardIdIn(anyList());
+    }
+
+    @Test
+    void previewCard_newCard_returnsFourOutcomes() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(2.5);
+        card.setDifficulty(0.0);
+        card.setCardState(0);
+        card.setDue(NOW);
+        card.setReps(0);
+        card.setLapses(0);
+        card.setLastReview(null);
+
+        java.util.Map<com.hugosol.chatagent.flashcard.Rating, com.hugosol.chatagent.flashcard.CardState> result =
+                reviewService.previewCard(card, NOW);
+
+        assertThat(result).containsKeys(
+                com.hugosol.chatagent.flashcard.Rating.AGAIN,
+                com.hugosol.chatagent.flashcard.Rating.HARD,
+                com.hugosol.chatagent.flashcard.Rating.GOOD,
+                com.hugosol.chatagent.flashcard.Rating.EASY);
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.GOOD)).isNotNull();
+    }
+
+    @Test
+    void previewCard_reviewedCard_differentIntervals() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(2.5);
+        card.setDifficulty(3.0);
+        card.setCardState(2);
+        card.setDue(Instant.parse("2026-06-03T10:00:00Z"));
+        card.setReps(2);
+        card.setLapses(0);
+        card.setLastReview(Instant.parse("2026-06-01T10:00:00Z"));
+        card.setFirstReviewDate(Instant.parse("2026-06-01T10:00:00Z"));
+
+        java.util.Map<com.hugosol.chatagent.flashcard.Rating, com.hugosol.chatagent.flashcard.CardState> result =
+                reviewService.previewCard(card, NOW);
+
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due())
+                .isNotEqualTo(result.get(com.hugosol.chatagent.flashcard.Rating.HARD).due());
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due())
+                .isNotEqualTo(result.get(com.hugosol.chatagent.flashcard.Rating.GOOD).due());
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due())
+                .isNotEqualTo(result.get(com.hugosol.chatagent.flashcard.Rating.EASY).due());
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.EASY).due())
+                .isAfter(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due());
+    }
+
     private UserPreferences defaultPreferences() {
         UserPreferences prefs = new UserPreferences("user-1");
         prefs.setNewCardDailyLimit(20);
         prefs.setDayStartHour(6);
         return prefs;
+    }
+
+    @Test
+    void rescheduleAllCards_processesCardsWithReviewLogs() {
+        ReviewLog log1 = new ReviewLog();
+        log1.setCardId("card-1");
+        log1.setRating(Rating.GOOD);
+        log1.setReviewedAt(NOW);
+        ReviewLog log2 = new ReviewLog();
+        log2.setCardId("card-2");
+        log2.setRating(Rating.EASY);
+        log2.setReviewedAt(NOW);
+        ReviewLog log3 = new ReviewLog();
+        log3.setCardId("card-3");
+        log3.setRating(Rating.HARD);
+        log3.setReviewedAt(NOW);
+
+        when(reviewLogRepository.findByUserIdOrderByReviewedAtAsc("user-1"))
+                .thenReturn(List.of(log1, log2, log3));
+
+        Card card1 = new Card("user-1", "foo", "bar");
+        card1.setId("card-1");
+        card1.setStability(2.5);
+        card1.setDifficulty(0.0);
+        card1.setCardState(0);
+        Card card2 = new Card("user-1", "baz", "qux");
+        card2.setId("card-2");
+        card2.setStability(5.0);
+        card2.setDifficulty(2.0);
+        card2.setCardState(2);
+        Card card3 = new Card("user-1", "quux", "corge");
+        card3.setId("card-3");
+        card3.setStability(10.0);
+        card3.setDifficulty(3.0);
+        card3.setCardState(2);
+
+        when(cardRepository.findAllById(anyList()))
+                .thenReturn(List.of(card1, card2, card3));
+        when(cardRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        reviewService.rescheduleAllCards("user-1");
+
+        ArgumentCaptor<List<Card>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cardRepository).saveAll(captor.capture());
+        List<Card> savedCards = captor.getValue();
+        assertThat(savedCards).hasSize(3);
+        verify(cache).evict("user-1");
+    }
+
+    @Test
+    void rescheduleAllCards_skipsCardsWithoutReviewLogs() {
+        when(reviewLogRepository.findByUserIdOrderByReviewedAtAsc("user-1"))
+                .thenReturn(List.of());
+
+        reviewService.rescheduleAllCards("user-1");
+
+        verify(cardRepository, never()).saveAll(anyList());
     }
 }

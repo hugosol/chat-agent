@@ -57,12 +57,12 @@
 | 43 | LLM max output tokens 按 Agent 配置 | 新增 `app.llm.max-output-tokens` 配置，支持按 Agent 类型独立设置最大输出 token 数。默认 2048，ReportAgent 使用 4096（报告需更长输出）。`LangChain4jConfig` 创建独立的 `ChatLanguageModel` bean（default / report），`TaskRunner` 按 `TaskName.REPORT` 路由到对应模型。`MaxOutputTokens` 通过 `@ConfigurationProperties` 绑定，未配置的 Agent 自动回退到 default。 |
 | 44 | MemoryCueQueue LRU 淘汰设计 | `MemoryCueQueue` 为有容量上限的 LRU 有序集合（capacity = topK+1），跨 Turn 存活于 ChatState。首次加载（队列空）search topK+1 条，后续 search topK 条。push 时去重：同 cueId 刷新到队头；满容时淘汰队尾（最久未访问）。fallback anchor（最新 completed session 的 last cue）生命周期约 1 轮——下一轮被 RAG 结果替代。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。 |
 | 45 | 闪卡模块解耦 | 独立 JPA 实体 (Card, Tag) + REST API (`FlashcardController`) + React 前端 `FlashcardPanel.tsx`。闪卡模块与现有聊天功能完全解耦——不依赖 WebSocket，不依赖 Practice session。Tag 有可空 `type` 字段，为未来 Deck 概念预留。 |
-| 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~300 行），无 JNI 依赖。`FsrsScheduler` 为无状态纯函数——`initNewCard()` 返回 py-fsrs 兼容初始态（用于测试验证），`createInitState()` 返回 PRD 默认值（用于 Card 实体初始化）。12 个单元测试：8 个来自 PRD 测试向量 + 4 个来自 ts-fsrs（首次复习值、retrievability）。Fuzz 使用自研 `AleaPrng`（Johannes Baagøe 算法 Java 端口）替代 `java.util.Random`——seed(42)→12 天、seed(12345)→11 天，精准匹配 PRD 预期值。 |
+| 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~300 行），无 JNI 依赖。`FsrsScheduler` 为**实例类**，通过 `FsrsSchedulerConfig` 接受可配置参数（W[21] 权重、desired_retention、learning/relearning steps、fuzz 开关等）。`enchantCard()`（原 `initNewCard`）准备首次复习的 Learning 状态；`createInitState()` 静态方法创建全新卡片。实例方法：`repeat()`（完整 4 状态机）、`preview()`（返回 4 种评分的 CardState）、`reschedule()`（从 ReviewLog 重放历史重建状态）、`retrievability()`（记忆概率）。配置通过 `FsrsSchedulerConfig.merge(FsrsParameters, UserPreferences)` 合并系统参数与用户偏好。Fuzz 使用自研 `AleaPrng`（Johannes Baagøe 算法 Java 端口）。12+ 单元测试。 |
 | 47 | REST API 模式引入 | `FlashcardController` 为代码库首个 `@RestController`（`POST /api/cards/add` + `GET /api/tags`）。认证走 JSESSIONID cookie（与 WebSocket 一致），`/api/**` 不走 `permit-all-paths`（需要认证），CSRF 对 `/api/**` 在 `SecurityConfig` 中禁用。 |
 | 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。Phase 1：Header.tsx + CorrectionSidebar 迁入 React。Phase 2：WebSocket 服务层 + `useReducer + context` 集中状态管理。Phase 3：MessageList + ChatInput + Footer 迁入 React，`useChatWebSocket` 移除。**Phase 4 完成**：StatusBar、ReportModal、DebugPanel、FlashcardPanel 全部迁入 React；`app.js`、`flashcard.js`、`style.css` 及 manage 页面 vanilla JS 文件全部删除；Chat 页面单根渲染（无 Portal）；`ChatProvider` 直接处理所有 WS 消息（无 vanilla bridge）。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试，E2E 测试使用 `data-testid` 属性选择器。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
 | 49 | Chat 页面 React 集中状态管理 | 四期路线图：Phase 1（CorrectionSidebar 独立模块）→ Phase 2（WebSocket 服务层 + `useReducer + context`）→ Phase 3（MessageList + ChatInput + Footer）→ **Phase 4 完成**（StatusBar + ReportModal + DebugPanel + FlashcardPanel）。Phase 4 成果：`app.js` 完全删除，Chat 页面单根 `ChatPage` 组件渲染；`ChatProvider` 统一处理所有 WS 消息类型（SESSION_REPORT, ERROR, TOKEN_WARNING, STATE_UPDATE, WS_CLOSED 全部通过 `dispatch(action)` 进入 reducer）；`appStatus` 替代 `sessionStatus`，覆盖完整生命周期（Connecting→Connected→UserTurn→Processing→Warning→Error→Disconnected）；组件依赖关系完全通过 `useChatContext()`。详见 ADR `centralized-chat-state.md`。 |
 | 50 | CSV 批量导入导出设计决策 | 选择 Apache Commons CSV（RFC 4180 兼容、流式解析、轻量依赖）作为 CSV 解析库。限定单 deck tag 导入/导出（简化数据模型，CSV 不含 tags 列避免多对多序列化复杂度）。导入采用"前置全量校验 + 整体事务"策略：tagId 校验 → 逐行校验 → 内存去重 → SQL 查重全部在内存完成，全部通过后才 @Transactional 批量插入。cardState 使用文本映射（New/Learning/Review/Relearning）保证 CSV 跨系统可读性。parser 按名称匹配列（非列序号），缺失列自动留空、多余列忽略——兼容各种编辑器生成或手动调整的 CSV。新增 BatchOperationLog 表记录所有批量操作历史（审计追溯）。前端工具栏重构：排序和批量操作合并为两个 DropdownMenu 按钮，BatchOperationModal 共享导入/导出两种模式。 |
-| 51 | Review 模块：双端点架构 | 复习模块不引入 WebSocket，使用两个 REST 端点完成完整复习循环：① `GET /api/review/start?deckId=X&mode=Y`（获取首张卡片，按 Mode 策略选卡）；② `POST /api/review/next {cardId, rating, deckId, mode}`（评分当前卡 → 更新 FSRS 状态 + ReviewLog，controller 层统一调用 `computeReviewStats` + `getNextCard`，返回 `{card, stats}`——统一使用 `card` 字段，不区分首卡/下一卡）。前端在收到 `card` 后原地替换当前卡片展示，不单独再次请求。此设计让 ReviewPage 只需管理当前卡片和翻面状态，无需跨请求状态同步。 |
+| 51 | Review 模块：双端点架构 | 复习模块不引入 WebSocket，使用两个 REST 端点完成完整复习循环：① `GET /api/review/start?deckId=X&mode=Y`（获取首张卡片，按 Mode 策略选卡）；② `POST /api/review/next {cardId, rating, deckId, mode}`（评分当前卡 → 更新 FSRS 状态 + ReviewLog，controller 层统一调用 `computeReviewStats` + `getNextCard`，返回 `{card, stats, preview}`——统一使用 `card` 字段，不区分首卡/下一卡）。`preview` 字段包含四种评分（Again/Hard/Good/Easy）的 CardState，前端评分按钮展示"Good · 约15天后"间隔信息（不含 fuzz，确定性预览）。前端在收到 `card` 后原地替换当前卡片展示，不单独再次请求。此设计让 ReviewPage 只需管理当前卡片和翻面状态，无需跨请求状态同步。 |
 | 52 | ReviewStats：日累计 + 后端全量计算 | `ReviewStats` 不做"复习轮次"追踪（Review Session 是瞬时 UI 状态机，无持久化实体），统一使用**日累计**语义：`reviewedToday` = COUNT cards 里 `lastReview >= todayStart`，`learnedToday` = COUNT cards 里 `firstReviewDate >= todayStart`（`todayStart` 由 Learner 的 timezone + dayStartHour 算得）。`remaining` = COUNT `cardState ≠ 0 AND due ≤ now`（用于 StatsBar "剩余"），`nextDueAt` = MIN cards 里 `due > now`（用于结算页"下一张卡片约 X 小时后到期"）。所有数字完全由后端数据库实时 COUNT/MIN 查询计算——前端不累积、不传参，仅负责渲染。与 `GET /api/review/stats`（DeckPicker 进场前调一次）共享同一套 `todayStart` 计算逻辑。 |
 | 53 | 每日新卡上限后端化 | `newCardDailyLimit` 存储在 `UserPreferences` 表，由后端 `ReviewService.getNextCard()` 和 `computeReviewStats()` 统一读取。DeckPicker 点击"开始"时通过 `PUT /api/user/preferences` 将用户输入的上限值保存到数据库；后续 `GET /api/review/start` 和 `POST /api/review/next` 请求不再携带 `limit` 参数——后端自行从 `prefs.getNewCardDailyLimit()` 读取。此前 `computeStats()` 将 `dailyLimit` 硬编码为 20 且使用错误的 `Instant.now()` 阈值（非 `todayStart`）导致 StatsBar 和结算页数字错误——本次一并修正。 |
 
@@ -561,7 +561,9 @@ chat-agent/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
 │   ├── flashcard/                          // 闪卡模块核心
-│   │   ├── FsrsScheduler.java             // FSRS-6 调度器（initNewCard + createInitState + repeat + retrievability）
+│   │   ├── FsrsScheduler.java             // FSRS-6 实例调度器（enchantCard + createInitState + repeat + preview + reschedule + retrievability）
+│   │   ├── FsrsSchedulerConfig.java        // 不可变运行时参数 record（W[21] + desired_retention + steps + fuzz）+ merge() + parseSteps()
+│   │   ├── AleaPrng.java                   // 确定性 fuzz PRNG
 │   │   ├── CardState.java                 // 卡片状态记录（Learning/Review/Relearning 状态机 + step + hasStability）
 │   │   ├── Rating.java                    // AGAIN/HARD/GOOD/EASY（pyValue 1-4 映射，匹配 py-fsrs 索引）
 │   │   └── AleaPrng.java                  // Alea PRNG（Johannes Baagøe 算法，替代 java.util.Random 用于确定性 fuzz）
@@ -612,6 +614,9 @@ chat-agent/
 │   │   ├── Message.java
 │   │   ├── Card.java                       // 闪卡（front/back + FSRS 状态字段, @ManyToMany Tag）
 │   │   ├── Tag.java                        // 标签（name + 可空 type, userId 隔离）
+│   │   ├── ReviewLog.java                   // 复习日志（before/after FSRS 状态快照 + 评分 + 间隔）
+│   │   ├── UserPreferences.java             // 用户偏好（dailyLimit + timezone + FSRS 学习步/retention/fuzz 等）
+│   │   ├── FsrsParameters.java              // 系统 FSRS 权重（w0-w20, enableShortTerm, userId 软关联）
 │   │   ├── ErrorRecord.java
 │   │   ├── SessionReport.java
 │   │   ├── UserProgress.java               // 学习进度（含 userId unique，每用户一行）
@@ -627,13 +632,15 @@ chat-agent/
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED / FAILED
 │   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP (含 displayName + templatePath)
 │   │
-│   ├── repository/                         // Spring Data JPA（11 个）
+│   ├── repository/                         // Spring Data JPA（14 个）
 │   │   ├── UserRepository.java             // findByUsername
 │   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
-│   │   ├── CardRepository.java             // 闪卡 CRUD + findExistingFronts 批量查重
+│   │   ├── CardRepository.java             // 闪卡 CRUD + findExistingFronts 批量查重 + 随机到期/新卡查询
+│   │   ├── TagRepository.java              // findByNameAndUserId + findByUserId + findByUserIdAndType
+│   │   ├── ReviewLogRepository.java         // findByUserIdAndCardId + deleteByCardId + deleteByCardIdIn
+│   │   ├── FsrsParametersRepository.java    // findByUserId
 │   │   ├── BatchOperationLogRepository.java // 批量操作日志 CRUD
-│   │   ├── TagRepository.java              // findByNameAndUserId + findByUserId
 │   │   ├── ErrorRecordRepository.java
 │   │   ├── SessionReportRepository.java
 │   │   ├── UserProgressRepository.java     // findByUserId
@@ -645,6 +652,10 @@ chat-agent/
 │   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
 │   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图 + RAG 检索)
 │   │   ├── FlashcardService.java           // 闪卡创建（FSRS 初始化 + Tag upsert）+ 标签查询
+│   │   ├── ReviewService.java               // 复习核心（rateCard 含 FSRS 调度 + ReviewLog 记录 + rescheduleAllCards + forgetCard/Deck）
+│   │   ├── UserPreferencesService.java      // 用户偏好读写（含 FSRS 参数 + 缓存清除）
+│   │   ├── FsrsOptimizeService.java         // 优化器编排（planned，读 ReviewLog→优化→写参数→reschedule）
+│   │   ├── CardBatchService.java            // 批量导入/导出编排
 │   │   ├── SessionComplete.java            // 会话结束管线 (report+persist+async memory)
 │   │   ├── SessionDbStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
 │   │   ├── LearningProfileService.java              // 异步保存 Topic 摘要 + Learning Profile 合并（含 sessionId 追溯）
@@ -657,6 +668,9 @@ chat-agent/
 │   │   └── card/                           // 闪卡批量操作
 │   │       ├── CardCsvParser.java           // CSV 解析器（按名称匹配列，BOM 兼容，cardState 文本映射）
 │   │       └── CardBatchService.java        // 批量导入/导出编排（校验 + 事务 + CSV 生成）
+│   │   └── optimizer/                       // FSRS 优化器（planned）
+│   │       ├── FsrsOptimizer.java           // 纯 Java Adam + 数值梯度优化器
+│   │       └── FsrsOptimizeService.java     // 优化编排（读 ReviewLog→优化→写 FsrsParameters→reschedule→清除缓存）
 │   │
 │   └── config/                             // 配置类
 │       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel + OpenAiStreamingChatModel) Bean 配置
@@ -761,17 +775,28 @@ src/main/frontend/
     │   └── manage/                          // Manage 页面组件
     │       ├── ManageApp.tsx                // Tab 切换容器
     │       ├── ManageApp.module.css
-    │       ├── CardsTab.tsx                 // Cards 列表页（搜索/排序/牌组筛选/分页/CRUD modal）
+    │       ├── CardsTab.tsx                 // Cards 列表页（搜索/排序/牌组筛选/分页/CRUD modal + forget 按钮）
     │       ├── CardToolbar.tsx              // 搜索栏 + 排序按钮 + 牌组 chip 筛选 + 创建按钮
     │       ├── CardToolbar.module.css
     │       ├── CardList.tsx                 // 卡片分页列表
-    │       ├── CardBlock.tsx                // 单张卡片展示 + 编辑/删除按钮
+    │       ├── CardBlock.tsx                // 单张卡片展示 + 编辑/删除/遗忘按钮
     │       ├── CardBlock.module.css
     │       ├── TagsTab.tsx                  // Tags 管理页（CRUD 表格）
     │       ├── TagTable.tsx                 // Tag 表格 + 内联编辑 + 删除
     │       ├── TagTable.module.css
     │       ├── TabBar.tsx                   // Cards / Tags 切换 Tab
     │       └── TabBar.module.css
+    │   ├── settings/                        // Settings 页面（planned）
+    │   │   ├── SettingsPage.tsx             // 9 个字段的统一设置页面
+    │   │   └── SettingsPage.module.css
+    │   ├── review/                          // Review 页面组件
+    │       ├── ReviewApp.tsx                // Review 入口容器
+    │       ├── DeckPicker.tsx               // 牌组/模式/上限选择
+    │       ├── ReviewPage.tsx               // 复习主流程（翻面 + 评分 + 统计栏）
+    │       ├── CardDisplay.tsx              // 卡片正面/背面展示
+    │       ├── RatingButtons.tsx            // 四级评分按钮（含间隔预览）
+    │       ├── StatsBar.tsx                 // 实时复习统计
+    │       └── CompletePage.tsx             // 复习完成页
     ├── state/                               // React 状态管理
     │   ├── chatState.ts                     (ChatState, Message, AppStatus, Action, initialState)
     │   ├── chatReducer.ts                   (纯函数 reducer，11 种 Action)
@@ -803,6 +828,7 @@ src/main/frontend/
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
 | **TTS** | 浏览器 SpeechSynthesis（🔊 按钮手动触发） | OpenAI TTS（自然度更高） |
+| **闪卡** | 录入 + 批量 CSV + 复习（4 模式 + 评分预览 + ReviewLog + forget） | FSRS 优化器 + 学习设置页 |
 | **LangGraph** | 1 节点线性图（仅 correction） | 可探索条件边 + 子图 |
 | **持久化** | H2 File | H2 File（不变） |
 | **恢复** | MemorySaver | 可升级到 Postgres/Redis Saver |
@@ -857,4 +883,4 @@ src/main/frontend/
 | **16. 会话结束管线抽取** | `SessionComplete` 深模块：报告生成+持久化+异步记忆管线统一；`SessionDbStore.completeSession(null report)` → FAILED；`SessionStatus.FAILED` 枚举值；降级报告（fluencyScore=-1）+ 前端条件渲染；Handler 依赖 7→4 | 会话结束逻辑局部化，降级路径明确，前端不再展示 "0/10" |
 | **17. REST API 模式引入** | 全 WebSocket 通信 | `FlashcardController` 为 `@RestController`，POST /api/cards/add + GET /api/tags | 闪卡录入为独立 CRUD 操作，天然适配 REST 语义而非 WS 长连接；SecurityConfig 中 `/api/**` CSRF 豁免 |
 | **18. Fuzz PRNG 替换** | `java.util.Random` | `AleaPrng`（Johannes Baagøe 算法 Java 端口），通过 `DoubleSupplier` 接口注入 `repeat()` | 需跨实现 fuzz 确定性；Alea seed(42)→12 天、seed(12345)→11 天 精准匹配 PRD 预期值 |
-| **19. FSRS 代码量** | ~150 行预估 | ~300 行实际 | 算法复杂度被低估：含学习步进逻辑（Learning→Review→Relearning 4 状态机）、同日复习修正（short-term stability）、Fuzz 区间计算、retrievability 公式 |
+| **19. FSRS 代码量** | ~150 行预估 | ~300 行实际 → 重构后 ~500 行（FsrsScheduler + FsrsSchedulerConfig） | 算法复杂度被低估；重构后新增 preview/reschedule 方法 + FsrsSchedulerConfig.merge() + parseSteps() |

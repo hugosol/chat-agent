@@ -1,29 +1,20 @@
 package com.hugosol.chatagent.flashcard;
 
+import com.hugosol.chatagent.model.ReviewLog;
+
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.DoubleSupplier;
 
-public final class FsrsScheduler {
+public class FsrsScheduler {
 
     public static final double STABILITY_MIN = 0.001;
-
-    private static final double[] W = {
-            0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001,
-            1.8722, 0.1666, 0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014,
-            1.8729, 0.5425, 0.0912, 0.0658, 0.1542
-    };
-
-    private static final double DESIRED_RETENTION = 0.9;
-    private static final int MAXIMUM_INTERVAL = 36500;
-    private static final double DECAY = -W[20];
-    private static final double FACTOR = Math.pow(0.9, 1.0 / DECAY) - 1;
-
-    private static final long LEARNING_STEP_1_SECONDS = 60;
-    private static final long LEARNING_STEP_2_SECONDS = 600;
-    private static final int LEARNING_STEPS_COUNT = 2;
-    private static final long RELEARNING_STEP_SECONDS = 600;
-    private static final int RELEARNING_STEPS_COUNT = 1;
+    public static final int STATE_NEW = 0;
 
     private static final double[][] FUZZ_RANGES = {
             {2.5, 7.0, 0.15},
@@ -31,18 +22,38 @@ public final class FsrsScheduler {
             {20.0, Double.POSITIVE_INFINITY, 0.05}
     };
 
-    private FsrsScheduler() {
-    }
+    private final FsrsSchedulerConfig config;
+    private final double decay;
+    private final double factor;
 
-    public static CardState initNewCard(Instant now) {
-        return CardState.forInitialLearning(now);
+    public FsrsScheduler(FsrsSchedulerConfig config) {
+        this.config = config;
+        this.decay = -config.weights()[20];
+        this.factor = Math.pow(config.desiredRetention(), 1.0 / decay) - 1;
     }
 
     public static CardState createInitState(Instant now) {
-        return new CardState(2.5, 0.0, 0, -1, now, 0, 0, null, 0.0, true);
+        return new CardState(2.5, 0.0, STATE_NEW, -1, now, 0, 0, null, 0.0, true);
     }
 
-    public static CardState repeat(CardState card, Rating rating, Instant now, DoubleSupplier fuzzSource) {
+    public CardState enchantCard(Instant now) {
+        return CardState.forInitialLearning(now);
+    }
+
+    public CardState reschedule(List<ReviewLog> reviewLogs, Instant now) {
+        if (reviewLogs == null || reviewLogs.isEmpty()) {
+            return createInitState(now);
+        }
+        List<ReviewLog> sorted = new ArrayList<>(reviewLogs);
+        sorted.sort(Comparator.comparing(ReviewLog::getReviewedAt));
+        CardState card = enchantCard(sorted.get(0).getReviewedAt());
+        for (ReviewLog log : sorted) {
+            card = repeat(card, log.getRating(), log.getReviewedAt(), null);
+        }
+        return card;
+    }
+
+    public CardState repeat(CardState card, Rating rating, Instant now, DoubleSupplier fuzzSource) {
         double stability = card.stability();
         double difficulty = card.difficulty();
         int reps = card.reps() + 1;
@@ -62,7 +73,7 @@ public final class FsrsScheduler {
             stability = initialStability(rating);
             difficulty = initialDifficulty(rating, true);
             hasStability = true;
-        } else if (state == CardState.STATE_LEARNING || state == CardState.STATE_RELEARNING) {
+        } else if (config.enableShortTerm() && (state == CardState.STATE_LEARNING || state == CardState.STATE_RELEARNING)) {
             if (sameDay) {
                 stability = shortTermStability(stability, rating);
             } else {
@@ -70,13 +81,17 @@ public final class FsrsScheduler {
                         retrievability(stability, card.lastReview(), now), rating);
             }
             difficulty = nextDifficulty(difficulty, rating);
-        } else if (state == CardState.STATE_REVIEW) {
+        } else if (config.enableShortTerm() && state == CardState.STATE_REVIEW) {
             if (sameDay) {
                 stability = shortTermStability(stability, rating);
             } else {
                 stability = nextStability(difficulty, stability,
                         retrievability(stability, card.lastReview(), now), rating);
             }
+            difficulty = nextDifficulty(difficulty, rating);
+        } else if (!config.enableShortTerm() && (state == CardState.STATE_LEARNING || state == CardState.STATE_RELEARNING || state == CardState.STATE_REVIEW)) {
+            stability = nextStability(difficulty, stability,
+                    retrievability(stability, card.lastReview(), now), rating);
             difficulty = nextDifficulty(difficulty, rating);
         }
 
@@ -88,7 +103,8 @@ public final class FsrsScheduler {
         long intervalSeconds;
 
         if (state == CardState.STATE_LEARNING) {
-            if (LEARNING_STEPS_COUNT == 0 || (step >= LEARNING_STEPS_COUNT
+            int learningStepsCount = config.learningSteps().length;
+            if (learningStepsCount == 0 || (step >= learningStepsCount
                     && (rating == Rating.HARD || rating == Rating.GOOD || rating == Rating.EASY))) {
                 state = CardState.STATE_REVIEW;
                 step = -1;
@@ -97,25 +113,25 @@ public final class FsrsScheduler {
                 switch (rating) {
                     case AGAIN:
                         step = 0;
-                        intervalSeconds = learningStepDuration(step);
+                        intervalSeconds = learningStepSeconds(step);
                         break;
                     case HARD:
-                        if (step == 0 && LEARNING_STEPS_COUNT == 1) {
-                            intervalSeconds = (long) (learningStepDuration(0) * 1.5);
-                        } else if (step == 0 && LEARNING_STEPS_COUNT >= 2) {
-                            intervalSeconds = (learningStepDuration(0) + learningStepDuration(1)) / 2;
+                        if (step == 0 && learningStepsCount == 1) {
+                            intervalSeconds = (long) (learningStepSeconds(0) * 1.5);
+                        } else if (step == 0 && learningStepsCount >= 2) {
+                            intervalSeconds = (learningStepSeconds(0) + learningStepSeconds(1)) / 2;
                         } else {
-                            intervalSeconds = learningStepDuration(step);
+                            intervalSeconds = learningStepSeconds(step);
                         }
                         break;
                     case GOOD:
-                        if (step + 1 == LEARNING_STEPS_COUNT) {
+                        if (step + 1 == learningStepsCount) {
                             state = CardState.STATE_REVIEW;
                             step = -1;
                             intervalSeconds = nextIntervalDays(stability) * 86400L;
                         } else {
                             step++;
-                            intervalSeconds = learningStepDuration(step);
+                            intervalSeconds = learningStepSeconds(step);
                         }
                         break;
                     case EASY:
@@ -128,14 +144,15 @@ public final class FsrsScheduler {
                 }
             }
         } else if (state == CardState.STATE_REVIEW) {
+            int relearningStepsCount = config.relearningSteps().length;
             switch (rating) {
                 case AGAIN:
-                    if (RELEARNING_STEPS_COUNT == 0) {
+                    if (relearningStepsCount == 0) {
                         intervalSeconds = nextIntervalDays(stability) * 86400L;
                     } else {
                         state = CardState.STATE_RELEARNING;
                         step = 0;
-                        intervalSeconds = RELEARNING_STEP_SECONDS;
+                        intervalSeconds = relearningStepSeconds(0);
                     }
                     break;
                 case HARD:
@@ -147,7 +164,8 @@ public final class FsrsScheduler {
                     throw new IllegalArgumentException("Unknown rating: " + rating);
             }
         } else {
-            if (RELEARNING_STEPS_COUNT == 0 || (step >= RELEARNING_STEPS_COUNT
+            int relearningStepsCount = config.relearningSteps().length;
+            if (relearningStepsCount == 0 || (step >= relearningStepsCount
                     && (rating == Rating.HARD || rating == Rating.GOOD || rating == Rating.EASY))) {
                 state = CardState.STATE_REVIEW;
                 step = -1;
@@ -156,23 +174,23 @@ public final class FsrsScheduler {
                 switch (rating) {
                     case AGAIN:
                         step = 0;
-                        intervalSeconds = RELEARNING_STEP_SECONDS;
+                        intervalSeconds = relearningStepSeconds(0);
                         break;
                     case HARD:
-                        if (step == 0 && RELEARNING_STEPS_COUNT == 1) {
-                            intervalSeconds = (long) (RELEARNING_STEP_SECONDS * 1.5);
+                        if (step == 0 && relearningStepsCount == 1) {
+                            intervalSeconds = (long) (relearningStepSeconds(0) * 1.5);
                         } else {
-                            intervalSeconds = RELEARNING_STEP_SECONDS;
+                            intervalSeconds = relearningStepSeconds(step);
                         }
                         break;
                     case GOOD:
-                        if (step + 1 == RELEARNING_STEPS_COUNT) {
+                        if (step + 1 == relearningStepsCount) {
                             state = CardState.STATE_REVIEW;
                             step = -1;
                             intervalSeconds = nextIntervalDays(stability) * 86400L;
                         } else {
                             step++;
-                            intervalSeconds = RELEARNING_STEP_SECONDS;
+                            intervalSeconds = relearningStepSeconds(step);
                         }
                         break;
                     case EASY:
@@ -186,7 +204,7 @@ public final class FsrsScheduler {
             }
         }
 
-        if (fuzzSource != null && state == CardState.STATE_REVIEW && intervalSeconds >= (long) (2.5 * 86400)) {
+        if (config.enableFuzz() && fuzzSource != null && state == CardState.STATE_REVIEW && intervalSeconds >= (long) (2.5 * 86400)) {
             intervalSeconds = getFuzzedInterval(intervalSeconds / 86400.0, fuzzSource.getAsDouble()) * 86400L;
         }
 
@@ -198,95 +216,123 @@ public final class FsrsScheduler {
         return new CardState(stability, difficulty, state, step, due, reps, lapses, lastReview, elapsedDays, hasStability);
     }
 
-    private static long learningStepDuration(int step) {
-        if (step == 0) return LEARNING_STEP_1_SECONDS;
-        if (step == 1) return LEARNING_STEP_2_SECONDS;
-        return LEARNING_STEP_2_SECONDS;
+    public Map<Rating, CardState> preview(CardState card, Instant now) {
+        Map<Rating, CardState> result = new EnumMap<>(Rating.class);
+        for (Rating rating : Rating.values()) {
+            result.put(rating, repeat(card, rating, now, null));
+        }
+        return result;
     }
 
-    private static double initialStability(Rating rating) {
-        return Math.max(W[rating.pyValue() - 1], STABILITY_MIN);
+    private long learningStepSeconds(int step) {
+        Duration[] steps = config.learningSteps();
+        if (steps.length == 0) return 0;
+        if (step < 0) return steps[0].getSeconds();
+        if (step >= steps.length) return steps[steps.length - 1].getSeconds();
+        return steps[step].getSeconds();
     }
 
-    private static double initialDifficulty(Rating rating, boolean clamp) {
-        double d = W[4] - Math.exp(W[5] * (rating.pyValue() - 1)) + 1;
+    private long relearningStepSeconds(int step) {
+        Duration[] steps = config.relearningSteps();
+        if (steps.length == 0) return 0;
+        if (step < 0) return steps[0].getSeconds();
+        if (step >= steps.length) return steps[steps.length - 1].getSeconds();
+        return steps[step].getSeconds();
+    }
+
+    private double initialStability(Rating rating) {
+        return Math.max(config.weights()[rating.pyValue() - 1], STABILITY_MIN);
+    }
+
+    private double initialDifficulty(Rating rating, boolean clamp) {
+        double[] w = config.weights();
+        double d = w[4] - Math.exp(w[5] * (rating.pyValue() - 1)) + 1;
         if (clamp) d = clampDifficulty(d);
         return d;
     }
 
-    private static double clampDifficulty(double d) {
+    private double clampDifficulty(double d) {
         return Math.max(1.0, Math.min(10.0, d));
     }
 
-    private static double clampStability(double s) {
+    private double clampStability(double s) {
         return Math.max(STABILITY_MIN, s);
     }
 
-    public static double retrievability(CardState card, Instant now) {
+    public double retrievability(CardState card, Instant now) {
         if (card.lastReview() == null) return 0;
         return retrievability(card.stability(), card.lastReview(), now);
     }
 
-    private static double retrievability(double stability, Instant lastReview, Instant now) {
+    private double retrievability(double stability, Instant lastReview, Instant now) {
         if (lastReview == null) return 0;
         double elapsedDays = Duration.between(lastReview, now).getSeconds() / 86400.0;
-        return Math.pow(1 + FACTOR * Math.max(0, elapsedDays) / stability, DECAY);
+        return Math.pow(1 + factor * Math.max(0, elapsedDays) / stability, decay);
     }
 
-    private static int nextIntervalDays(double stability) {
-        double ivl = (stability / FACTOR) * (Math.pow(DESIRED_RETENTION, 1.0 / DECAY) - 1);
+    public static double forgettingCurve(double elapsedDays, double stability, double decay) {
+        double factor = Math.pow(0.9, 1.0 / decay) - 1;
+        return Math.pow(1 + factor * Math.max(0, elapsedDays) / stability, decay);
+    }
+
+    private int nextIntervalDays(double stability) {
+        double ivl = (stability / factor) * (Math.pow(config.desiredRetention(), 1.0 / decay) - 1);
         int days = (int) Math.round(ivl);
         days = Math.max(days, 1);
-        days = Math.min(days, MAXIMUM_INTERVAL);
+        days = Math.min(days, config.maximumInterval());
         return days;
     }
 
-    private static double shortTermStability(double stability, Rating rating) {
-        double increase = Math.exp(W[17] * (rating.pyValue() - 3 + W[18])) * Math.pow(stability, -W[19]);
+    private double shortTermStability(double stability, Rating rating) {
+        double[] w = config.weights();
+        double increase = Math.exp(w[17] * (rating.pyValue() - 3 + w[18])) * Math.pow(stability, -w[19]);
         if (rating == Rating.GOOD || rating == Rating.EASY) {
             increase = Math.max(increase, 1.0);
         }
         return clampStability(stability * increase);
     }
 
-    private static double nextDifficulty(double difficulty, Rating rating) {
+    private double nextDifficulty(double difficulty, Rating rating) {
+        double[] w = config.weights();
         double initEasy = initialDifficulty(Rating.EASY, false);
-        double delta = -(W[6] * (rating.pyValue() - 3));
+        double delta = -(w[6] * (rating.pyValue() - 3));
         double linearDamping = (10.0 - difficulty) * delta / 9.0;
         double arg2 = difficulty + linearDamping;
-        double nextD = W[7] * initEasy + (1 - W[7]) * arg2;
+        double nextD = w[7] * initEasy + (1 - w[7]) * arg2;
         return clampDifficulty(nextD);
     }
 
-    private static double nextStability(double difficulty, double stability, double retrievability, Rating rating) {
+    private double nextStability(double difficulty, double stability, double retrievability, Rating rating) {
         if (rating == Rating.AGAIN) {
             return clampStability(nextForgetStability(difficulty, stability, retrievability));
         }
         return clampStability(nextRecallStability(difficulty, stability, retrievability, rating));
     }
 
-    private static double nextForgetStability(double difficulty, double stability, double retrievability) {
-        double longTerm = W[11]
-                * Math.pow(difficulty, -W[12])
-                * (Math.pow(stability + 1, W[13]) - 1)
-                * Math.exp((1 - retrievability) * W[14]);
-        double shortTerm = stability / Math.exp(W[17] * W[18]);
+    private double nextForgetStability(double difficulty, double stability, double retrievability) {
+        double[] w = config.weights();
+        double longTerm = w[11]
+                * Math.pow(difficulty, -w[12])
+                * (Math.pow(stability + 1, w[13]) - 1)
+                * Math.exp((1 - retrievability) * w[14]);
+        double shortTerm = stability / Math.exp(w[17] * w[18]);
         return Math.min(longTerm, shortTerm);
     }
 
-    private static double nextRecallStability(double difficulty, double stability, double retrievability, Rating rating) {
-        double hardPenalty = rating == Rating.HARD ? W[15] : 1;
-        double easyBonus = rating == Rating.EASY ? W[16] : 1;
+    private double nextRecallStability(double difficulty, double stability, double retrievability, Rating rating) {
+        double[] w = config.weights();
+        double hardPenalty = rating == Rating.HARD ? w[15] : 1;
+        double easyBonus = rating == Rating.EASY ? w[16] : 1;
         return stability * (1
-                + Math.exp(W[8])
+                + Math.exp(w[8])
                 * (11 - difficulty)
-                * Math.pow(stability, -W[9])
-                * (Math.exp((1 - retrievability) * W[10]) - 1)
+                * Math.pow(stability, -w[9])
+                * (Math.exp((1 - retrievability) * w[10]) - 1)
                 * hardPenalty
                 * easyBonus);
     }
 
-    private static long getFuzzedInterval(double intervalDays, double randomValue) {
+    private long getFuzzedInterval(double intervalDays, double randomValue) {
         if (intervalDays < 2.5) return (long) Math.round(intervalDays);
 
         double delta = 1.0;
@@ -297,10 +343,10 @@ public final class FsrsScheduler {
         int minIvl = (int) Math.round(intervalDays - delta);
         int maxIvl = (int) Math.round(intervalDays + delta);
         minIvl = Math.max(2, minIvl);
-        maxIvl = Math.min(maxIvl, MAXIMUM_INTERVAL);
+        maxIvl = Math.min(maxIvl, config.maximumInterval());
         minIvl = Math.min(minIvl, maxIvl);
 
         double fuzzed = randomValue * (maxIvl - minIvl + 1) + minIvl;
-        return (long) Math.min(Math.round(fuzzed), MAXIMUM_INTERVAL);
+        return (long) Math.min(Math.round(fuzzed), config.maximumInterval());
     }
 }

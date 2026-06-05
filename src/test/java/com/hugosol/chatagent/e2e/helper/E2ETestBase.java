@@ -67,6 +67,9 @@ public abstract class E2ETestBase {
     protected TagRepository tagRepository;
 
     @Autowired
+    protected ReviewLogRepository reviewLogRepository;
+
+    @Autowired
     protected UserPreferencesRepository userPreferencesRepository;
 
     private int turnNumber = 0;

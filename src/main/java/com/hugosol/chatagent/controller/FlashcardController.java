@@ -111,6 +111,8 @@ public class FlashcardController {
             map.put("due", card.getDue() != null ? card.getDue().toString() : null);
             map.put("cardState", card.getCardState());
             map.put("step", card.getStep());
+            map.put("reps", card.getReps());
+            map.put("lapses", card.getLapses());
             map.put("createTime", card.getCreateTime() != null ? card.getCreateTime().toString() : null);
             return map;
         });

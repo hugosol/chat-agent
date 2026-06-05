@@ -123,4 +123,18 @@ describe("Header", () => {
     fireEvent.click(getByTestId("nav-menu-btn"));
     expect(getByTestId("nav-sidebar").getAttribute("aria-expanded")).toBe("true");
   });
+
+  it("renders settings nav link with correct href", () => {
+    const { getByTestId } = render(<Header />);
+    const link = getByTestId("nav-settings") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/settings/index.html");
+    expect(link.textContent).toContain("设置");
+  });
+
+  it("highlights Settings link on settings page path", () => {
+    setPath("/settings/index.html");
+    const { getByTestId } = render(<Header />);
+    const link = getByTestId("nav-settings");
+    expect(link.getAttribute("data-active")).toBe("true");
+  });
 });

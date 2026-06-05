@@ -50,4 +50,13 @@ public interface CardRepository extends JpaRepository<Card, String>, JpaSpecific
 
     @Query(value = "SELECT c.* FROM cards c JOIN card_tags ct ON c.id = ct.card_id WHERE ct.tag_id = :deckId ORDER BY RAND() LIMIT 1", nativeQuery = true)
     Optional<Card> findRandomCardByDeckId(@Param("deckId") String deckId);
+
+    @Query(value = "SELECT c.* FROM cards c JOIN card_tags ct ON c.id = ct.card_id WHERE ct.tag_id = :deckId AND c.card_state <> 0 AND c.due <= :now ORDER BY RAND() LIMIT 1", nativeQuery = true)
+    Optional<Card> findRandomDueCardByDeckId(@Param("deckId") String deckId, @Param("now") Instant now);
+
+    @Query(value = "SELECT c.* FROM cards c JOIN card_tags ct ON c.id = ct.card_id WHERE ct.tag_id = :deckId AND c.card_state = 0 ORDER BY RAND() LIMIT 1", nativeQuery = true)
+    Optional<Card> findRandomNewCardByDeckId(@Param("deckId") String deckId);
+
+    @Query("SELECT c.id FROM Card c JOIN c.tags t WHERE t.id = :deckId AND c.userId = :userId")
+    List<String> findByFilteredDeckIds(@Param("deckId") String deckId, @Param("userId") String userId);
 }

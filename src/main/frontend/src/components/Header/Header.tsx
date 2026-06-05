@@ -44,6 +44,7 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
   const isChatPage = currentPath === "/" || currentPath === "/index.html" || currentPath === "";
   const isManagePage = currentPath.startsWith("/manage/");
   const isReviewPage = currentPath.startsWith("/review/");
+  const isSettingsPage = currentPath.startsWith("/settings/");
   const showToken = isChatPage;
   const pct = tokenPercent ?? 0;
 
@@ -121,6 +122,14 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
             data-active={isReviewPage ? "true" : "false"}
           >
             {"\uD83D\uDCDD"} Review
+          </a>
+          <a
+            className={classes.navLink}
+            href="/settings/index.html"
+            data-testid="nav-settings"
+            data-active={isSettingsPage ? "true" : "false"}
+          >
+            {"\u2699"} 设置
           </a>
         </div>
       </div>

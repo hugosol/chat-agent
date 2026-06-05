@@ -9,6 +9,7 @@ interface CardListProps {
   onPageChange: (page: number) => void;
   onCardClick: (card: Card) => void;
   onCardEdit: (card: Card) => void;
+  onCardForget: (card: Card) => void;
   onCardDelete: (card: Card) => void;
 }
 
@@ -19,6 +20,7 @@ function CardList({
   onPageChange,
   onCardClick,
   onCardEdit,
+  onCardForget,
   onCardDelete,
 }: CardListProps): JSX.Element {
   if (cards.length === 0) {
@@ -37,6 +39,7 @@ function CardList({
           card={card}
           onClick={onCardClick}
           onEdit={onCardEdit}
+          onForget={onCardForget}
           onDelete={onCardDelete}
         />
       ))}

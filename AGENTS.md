@@ -167,14 +167,52 @@ Server �?Client:
 
 ## Flashcard Module
 
-- **REST API**: `FlashcardController` is the codebase's first `@RestController` (`POST /api/cards/add`, `GET /api/tags`). Authentication via JSESSIONID cookie (same as WebSocket). `/api/**` is NOT in `permit-all-paths` (requires login), but CSRF is disabled for `/api/**` in `SecurityConfig`.
-- **Card entity**: `Card` (id, userId, front, back, stability, difficulty, cardState, due, reps, lapses, lastReview). `@ManyToMany` with `Tag` via join table `card_tags`. FSRS state initialized via `FsrsScheduler.createInitState()` (stability=2.5, difficulty=0.0, state=0).
-- **Tag entity**: `Tag` (id, name, type=null, userId). `type` field reserved for future Deck concept. `TagRepository.findByNameAndUserId()` for upsert; `TagRepository.findByUserId()` for autocomplete.
-- **FSRS-6**: `FsrsScheduler` (stateless pure functions) �?`initNewCard()` (py-fsrs compatible Learning state for tests), `createInitState()` (PRD-compatible New state for Card entity), `repeat()` (full 4-state machine: Learning→Review→Relearning→Review with learning steps), `retrievability()`. 21 default parameters hardcoded as constants. 12 unit tests covering 8 PRD-specified test vectors + 4 additional from ts-fsrs.
-- **AleaPrng**: Custom Alea PRNG (Johannes Baagøe's algorithm) replacing `java.util.Random` for deterministic cross-implementation fuzz. Used via `DoubleSupplier` in `repeat()`.
-- **Two-stage UI**: Stage 1 — minimal panel (~60px) with front input + "继续" button. Stage 2 — expanded (~70vh max) with back textarea + chip tag input (autocomplete from `GET /api/tags`) + "保存" button. Implemented as React `FlashcardPanel` component. Panel and Debug panel mutually exclusive via `window.activePanel`.
-- **E2E**: `FlashcardIT` extends `E2ETestBase`. No WireMock stubs needed (flashcard doesn't call LLM). `E2ETestBase` autowires `CardRepository` + `TagRepository`.
-- **Batch import/export**: `CardBatchService` (standalone Service with import validation pipeline + `@Transactional` insert + export CSV generation), `CardCsvParser` (CSV parser with header-name-based column matching, BOM compatibility, cardState text mapping), `BatchOperationLog` (audit entity + Repository). New endpoints: `POST /api/cards/import` (multipart/form-data, returns `ImportResult` with `totalRows`/`successCount`/`errors`), `GET /api/cards/export?tagId=` (downloads UTF-8 CSV with full FSRS state). `Apache Commons CSV 1.11.0` dependency added. `spring.servlet.multipart.max-file-size=5MB`. Frontend: `DropdownMenu` (generic dropdown button component), `BatchOperationModal` (three-stage state machine for import/export), `CardToolbar` refactored to use dropdown menus for sort and batch operations.
+### REST API
+- `FlashcardController`: `POST /api/cards/add`, `GET /api/tags`, `POST /api/cards/import`, `GET /api/cards/export`, `POST /api/cards/{id}/forget`, `POST /api/cards/forget?deckId=`. Authenticated via JSESSIONID cookie. `/api/**` requires login, CSRF disabled.
+- `ReviewController`: `GET /api/review/start`, `POST /api/review/next`, `GET /api/review/stats`, `GET /api/review/decks`. Response includes `{card, stats, preview}` — `preview` shows all 4 rating outcomes' due dates. User preferences via `GET/PUT /api/user/preferences`.
+
+### Entities
+- **Card**: (id, userId, front, back, stability, difficulty, cardState, due, reps, lapses, step, lastReview, firstReviewDate). `@ManyToMany` Tag via `card_tags`. FSRS state initialized via `FsrsScheduler.createInitState()`.
+- **Tag**: (id, name, type, userId). `type="deck"` makes a Tag a reviewable Deck.
+- **ReviewLog**: (id, userId, cardId, rating, stateBefore/After, stabilityBefore/After, difficultyBefore/After, stepBefore, scheduledDays, elapsedDays, reviewedAt, firstReview, deckId). Created on every `rateCard()`.
+- **FsrsParameters**: (id, userId, w0-w20, enableShortTerm). System-managed 21 FSRS weights per Learner. Created by DataInitializer; overwritten by FSRS Optimizer. Soft-linked via userId (no FK).
+- **UserPreferences**: (id, userId, newCardDailyLimit, dayStartHour, timezone, lastDeckId, lastMode, learningSteps, relearningSteps, desiredRetention, maximumInterval, enableFuzz, shuffleDueCards). FSRS fields are nullable — null falls back to `FsrsSchedulerConfig.defaults()`.
+
+### FSRS Scheduler (refactored)
+- `FsrsScheduler` is an **instance class** accepting `FsrsSchedulerConfig` (immutable record bundling all 7 parameter categories: W[21], desiredRetention, learningSteps, relearningSteps, maximumInterval, enableFuzz, enableShortTerm).
+- Instance methods: `enchantCard(now)` (prepare for first review; was `initNewCard`), `repeat(card, rating, now, fuzzSource)`, `preview(card, now)` → `Map<Rating, CardState>`, `reschedule(reviewLogs, now)` → `CardState`, `retrievability(card, now)`.
+- Static methods: `createInitState(now)` (brand-new card, state=0, does not depend on config), `forgettingCurve(elapsed, stability, decay)` (pure math).
+- `FsrsSchedulerConfig` has static `defaults()` (FSRS-6 standard) and `merge(FsrsParameters, UserPreferences)` for per-Learner runtime config.
+- 12 unit tests + 5 reschedule tests + 4 preview tests.
+
+### Review Flow
+- `ReviewService.rateCard()`: builds Scheduler from Caffeine-cached `FsrsSchedulerConfig` → calls `scheduler.repeat()` → updates Card → creates ReviewLog.
+- `ReviewService.getNextCard()`: 4 modes (STANDARD/REVIEW_ONLY/NEW_ONLY/CRAM). `shuffleDueCards` toggles random vs chronological due-card order (native `ORDER BY RAND()`).
+- `ReviewService.previewCard()`: returns all 4 rating outcomes (no fuzz) — used by RatingButtons to show "Good · 约15天后" labels.
+- `ReviewService.rescheduleAllCards(userId)`: async replay of all ReviewLogs with current config. Triggered automatically after FSRS Optimizer completes.
+- `ReviewService.forgetCard(cardId)` + `forgetDeck(deckId)`: resets FSRS state to `createInitState` + physically deletes all ReviewLogs. `@Transactional` atomic.
+
+### Caffeine Cache
+- `CaffeineCacheManager` with `expireAfterAccess(24h)` on cache `"fsrsConfig"`.
+- `@Cacheable` on config lookup; `@CacheEvict` on settings save; programmatic `evict()` after optimizer/reschedule.
+- Avoids repeated DB reads of `FsrsParameters` + `UserPreferences` on every `rateCard()`.
+
+### FSRS Optimizer (planned)
+- `FsrsOptimizer`: pure Java, manual Adam + finite-difference numerical gradients (h=1e-4), same algorithm as py-fsrs. Minimizes BCELoss over ReviewLog history.
+- `FsrsOptimizeService`: orchestration layer — reads ReviewLog, calls Optimizer, writes FsrsParameters, evicts cache, triggers reschedule.
+- Triggers: `POST /api/fsrs/optimize` (async + progress polling) + `@Scheduled` weekly.
+- Cross-validated against py-fsrs using 12,580 real Anki review logs.
+
+### Frontend Pages
+- Manage page (`/manage`): CardsTab (CRUD + search + sort + deck filter + detail modal + **forget** button), TagsTab (CRUD), CardToolbar (sort dropdown + batch import/export).
+- Review page (`/review`): DeckPicker → ReviewPage (flip + rate + stats bar). RatingButtons show interval preview. CompletePage shows session summary.
+- Settings page (`/settings`): 9 configurable fields (daily limit, day start, timezone, learning/relearning steps with presets + explanations, desired retention, max interval, fuzz toggle, shuffle toggle). Save validates all fields.
+
+### Other
+- **AleaPrng**: Deterministic PRNG (Johannes Baagøe) for cross-implementation fuzz. Used via `DoubleSupplier` in `repeat()`.
+- **E2E**: `ReviewIT` (9 scenarios — deck/mode selection, flip & rate, stats bar, complete, REVIEW_ONLY, NEW_ONLY, CRAM, limit dialog, preferences). `FlashcardIT`, `FlashcardBatchIT`, `ManagePageIT` (card/tag CRUD + forget scenarios). Rating button clicks use `data-testid` selectors (not text), survives UI text changes.
+- **Two-stage flashcard input**: Stage 1 (~60px front input + "继续") → Stage 2 (~70vh back textarea + chip tag autocomplete + "保存"). FlashcardPanel and Debug panel mutually exclusive.
+- **Batch import/export**: CSV with full FSRS state round-trip. `Apache Commons CSV 1.11.0`. `spring.servlet.multipart.max-file-size=5MB`. Frontend: `BatchOperationModal` three-stage state machine.
 
 ## Logging
 

@@ -6,7 +6,7 @@ import type { Card, Tag, PageResponse } from "../../shared/types";
 const mockCards: Card[] = [
   {
     id: "c1", front: "hello", back: "你好\nexplanation", tags: [],
-    due: "2025-06-15T00:00:00", cardState: 0, createTime: "2025-01-01T00:00:00",
+    due: "2025-06-15T00:00:00", cardState: 0, step: -1, reps: 0, lapses: 0, createTime: "2025-01-01T00:00:00",
   },
 ];
 
@@ -163,6 +163,34 @@ describe("CardsTab", () => {
     fireEvent.click(screen.getByTestId("modal-cancel"));
     await waitFor(() => {
       expect(screen.queryByTestId("modal-overlay")).toBeNull();
+    });
+  });
+
+  it("opens forget modal when forget button is clicked", async () => {
+    render(<CardsTab />);
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-forget-card")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("btn-forget-card"));
+
+    expect(screen.getByTestId("modal-overlay")).toBeInTheDocument();
+    expect(screen.getByText("遗忘卡片")).toBeInTheDocument();
+    expect(screen.getByTestId("modal-save")).toHaveTextContent("确认遗忘");
+  });
+
+  it("sends POST forget request when forget is confirmed", async () => {
+    render(<CardsTab />);
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-forget-card")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("btn-forget-card"));
+    fireEvent.click(screen.getByTestId("modal-save"));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/cards/c1/forget"),
+        expect.objectContaining({ method: "POST" })
+      );
     });
   });
 });
