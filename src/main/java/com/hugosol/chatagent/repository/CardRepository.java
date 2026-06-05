@@ -21,6 +21,9 @@ public interface CardRepository extends JpaRepository<Card, String>, JpaSpecific
     @Query("SELECT LOWER(c.front) FROM Card c WHERE LOWER(c.front) IN (:fronts) AND c.userId = :userId")
     List<String> findExistingFronts(@Param("fronts") List<String> fronts, @Param("userId") String userId);
 
+    @Query("SELECT LOWER(c.front) FROM Card c JOIN c.tags t WHERE LOWER(c.front) IN (:fronts) AND c.userId = :userId AND t.id = :tagId")
+    List<String> findExistingFrontsByTag(@Param("fronts") List<String> fronts, @Param("userId") String userId, @Param("tagId") String tagId);
+
     @Query("SELECT COUNT(c) FROM Card c JOIN c.tags t WHERE t.id = :tagId AND c.lastReview >= :since")
     long countByTagsIdAndLastReviewGreaterThanEqual(@Param("tagId") String tagId, @Param("since") Instant since);
 

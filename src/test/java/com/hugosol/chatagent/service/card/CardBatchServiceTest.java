@@ -51,7 +51,7 @@ class CardBatchServiceTest {
         Tag deckTag = createDeckTag("deck-1", "My Deck", "user-1");
 
         when(tagRepository.findById("deck-1")).thenReturn(Optional.of(deckTag));
-        when(cardRepository.findExistingFronts(List.of("hello", "goodbye"), "user-1"))
+        when(cardRepository.findExistingFrontsByTag(List.of("hello", "goodbye"), "user-1", "deck-1"))
                 .thenReturn(List.of());
         when(cardRepository.saveAll(anyList()))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -117,7 +117,7 @@ class CardBatchServiceTest {
         Tag deckTag = createDeckTag("deck-1", "My Deck", "user-1");
 
         when(tagRepository.findById("deck-1")).thenReturn(Optional.of(deckTag));
-        when(cardRepository.findExistingFronts(List.of("hello"), "user-1"))
+        when(cardRepository.findExistingFrontsByTag(List.of("hello"), "user-1", "deck-1"))
                 .thenReturn(List.of("hello"));
 
         byte[] csvBytes = ("front,back\n" +
@@ -131,6 +131,54 @@ class CardBatchServiceTest {
         assertThat(result.errors().get(0).reason()).isEqualTo("卡片已存在");
 
         verify(cardRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void importCards_sameFrontInDifferentDeck_succeeds() {
+        var service = new CardBatchService(cardRepository, tagRepository, batchOperationLogRepository, cardCsvParser);
+
+        Tag deckTag = createDeckTag("deck-2", "Deck Two", "user-1");
+
+        when(tagRepository.findById("deck-2")).thenReturn(Optional.of(deckTag));
+        when(cardRepository.findExistingFrontsByTag(List.of("hello"), "user-1", "deck-2"))
+                .thenReturn(List.of());
+        when(cardRepository.saveAll(anyList()))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        byte[] csvBytes = ("front,back\n" +
+                "hello,world\n").getBytes(StandardCharsets.UTF_8);
+
+        ImportResult result = service.importCards(csvBytes, "cards.csv", "deck-2", "user-1");
+
+        assertThat(result.totalRows()).isEqualTo(1);
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.errors()).isEmpty();
+
+        verify(cardRepository).saveAll(anyList());
+    }
+
+    @Test
+    void importCards_frontDuplicateInDifferentDeck_succeeds() {
+        var service = new CardBatchService(cardRepository, tagRepository, batchOperationLogRepository, cardCsvParser);
+
+        Tag deckA = createDeckTag("deck-a", "Deck A", "user-1");
+        Tag deckB = createDeckTag("deck-b", "Deck B", "user-1");
+
+        when(tagRepository.findById("deck-b")).thenReturn(Optional.of(deckB));
+        when(cardRepository.findExistingFrontsByTag(List.of("hello"), "user-1", "deck-b"))
+                .thenReturn(List.of());
+        when(cardRepository.saveAll(anyList()))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        byte[] csvBytes = ("front,back\n" +
+                "hello,世界\n").getBytes(StandardCharsets.UTF_8);
+
+        ImportResult result = service.importCards(csvBytes, "cards.csv", "deck-b", "user-1");
+
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.errors()).isEmpty();
+
+        verify(cardRepository).saveAll(anyList());
     }
 
     @Test
@@ -278,7 +326,7 @@ class CardBatchServiceTest {
         Tag deckTag = createDeckTag("deck-1", "My Deck", "user-1");
 
         when(tagRepository.findById("deck-1")).thenReturn(Optional.of(deckTag));
-        when(cardRepository.findExistingFronts(List.of("hello"), "user-1"))
+        when(cardRepository.findExistingFrontsByTag(List.of("hello"), "user-1", "deck-1"))
                 .thenReturn(List.of());
         when(cardRepository.saveAll(anyList()))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -420,7 +468,7 @@ class CardBatchServiceTest {
         assertThat(csvContent).contains("中文\\n多行\\n换行");
 
         when(tagRepository.findById("deck-1")).thenReturn(java.util.Optional.of(deckTag));
-        when(cardRepository.findExistingFronts(java.util.List.of("line1\nline2"), "user-1"))
+        when(cardRepository.findExistingFrontsByTag(java.util.List.of("line1\nline2"), "user-1", "deck-1"))
                 .thenReturn(java.util.List.of());
         when(cardRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
