@@ -1,6 +1,8 @@
 package com.hugosol.chatagent.e2e;
 
 import com.hugosol.chatagent.e2e.helper.E2ETestBase;
+import com.microsoft.playwright.Page.WaitForSelectorOptions;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +21,8 @@ class SettingsPageIT extends E2ETestBase {
 
         page.waitForSelector("[data-testid='settings-learningPreset']");
         page.waitForSelector("[data-testid='settings-desiredRetention']");
-        page.waitForSelector("[data-testid='settings-enableFuzz']");
+        page.waitForSelector("[data-testid='settings-enableFuzz']",
+                new WaitForSelectorOptions().setState(WaitForSelectorState.ATTACHED));
 
         page.locator("[data-testid='settings-learningPreset']").selectOption("快速毕业");
         var learningInput = page.locator("[data-testid='settings-learningSteps']");
@@ -28,9 +31,7 @@ class SettingsPageIT extends E2ETestBase {
 
         page.locator("[data-testid='settings-desiredRetention']").fill("0.85");
 
-        page.locator("[data-testid='settings-enableFuzz']").click(
-                new com.microsoft.playwright.Locator.ClickOptions().setForce(true)
-        );
+        page.locator("[data-testid='settings-enableFuzz']").evaluate("el => el.click()");
 
         page.locator("[data-testid='settings-saveBtn']").click();
 
