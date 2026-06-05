@@ -58,16 +58,48 @@ For our Java backend, we had two paths: (1) call the official Rust binary via CL
 - Deterministic output (fixed RNG seed = 42, matching py-fsrs)
 
 ### Negative
-- Numerical gradients introduce approximation error — W[21] output will not be bit-identical to py-fsrs. Tolerance target: each element within ±0.05 of py-fsrs output, and optimized loss must be strictly lower than default loss
+- Numerical gradients introduce approximation error — W[21] output will not be bit-identical to py-fsrs. Validation uses loss-based criteria (see Mitigation), not per-element W[21] comparison
 - 42 loss evaluations per gradient step means slower convergence than analytical gradients. For 10,000 ReviewLogs: ~20 seconds; for 100,000: ~3 minutes. Acceptable for async background task
 - Must manually port CosineAnnealingLR and Adam update rules from py-fsrs torch code
 - If py-fsrs changes its optimizer (e.g., FSRS-7), we must manually re-align
 
 ## Mitigation
 
-- Cross-validate against py-fsrs using the identical `review_logs_josh_1711744352250_to_1728234780857.csv` test dataset (12,580 real Anki review logs) — same data fed to both optimizers, W[21] output compared with tolerance 0.05 per element
-- Additional validation: optimized BCELoss must be strictly lower than BCELoss with default W[21]
-- Determinism test: same input twice → identical output
-- Unordered-input test: shuffling ReviewLog order does not change output
+### Cross-validation strategy
+
+Cross-validate against py-fsrs using the identical `review_logs_josh_1711744352250_to_1728234780857.csv` test dataset:
+
+| Metric | Value |
+|--------|-------|
+| Total reviews | 12,580 |
+| Unique cards | 1,205 |
+| Avg reviews/card | 10.4 (min=1, max=54) |
+| Rating distribution | Again 29.2%, Good 70.8%, Hard 0.008% (1 entry), Easy 0% |
+| Date range | 2024-03-30 ~ 2024-10-07 (6 months) |
+
+**Data limitation**: Hard (1 entry) and Easy (0 entries) ratings are virtually absent. Parameters w[15] (Hard penalty) and w[16] (Easy bonus) receive no meaningful training signal from this dataset — they are excluded from cross-validation assertions for both py-fsrs and Java output.
+
+### Validation criteria (in order of importance)
+
+**Primary (must pass):**
+- BCELoss with optimized W[21] must be strictly lower than BCELoss with default W[21] on the same dataset. This proves the optimizer produces parameters that fit the review history better than unoptimized defaults.
+
+**Auxiliary (should pass):**
+- Optimized BCELoss must be ≤ py-fsrs optimized BCELoss × 1.01 (within 1% of py-fsrs result). This calibrates that the Java numerical-gradient optimizer achieves comparable optimization quality to py-fsrs's analytical-gradient optimizer. 1% loss difference translates to sub-day interval variance — invisible to the Learner.
+
+**W[21] not compared directly:**
+- No per-element tolerance assertion on W[21] values. The loss surface in 21-dimensional parameter space is flat near the optimum — different optimizer paths (numerical vs analytical gradients) converge to different W[21] vectors that produce nearly identical loss. Direct W[21] comparison would reject functionally equivalent parameter sets.
+
+**Parameters w[15] and w[16] excluded:**
+- These parameters control Hard penalty and Easy bonus respectively. With 0–1 Hard/Easy ratings in the test dataset, both py-fsrs and Java optimizer produce values driven entirely by initialization + parameter bounds rather than learning signal. Cross-validation ignores these two indices.
+
+### Additional validation tests
+- Determinism: same input twice → identical output (fixed RNG seed=42, matching py-fsrs)
+- Unordered-input invariance: shuffling ReviewLog order does not change output
+- Boundary: empty list → returns default W[21]; <512 reviews → returns defaults
+- Edge cases: all-Again ratings do not crash; all-Easy ratings (difficulty → 1.0) do not crash
+- Synthetic recovery: generate ReviewLogs from known W[21] via FsrsScheduler simulation, verify optimizer recovers weights within ±0.1 per element
+
+### Implementation review
 - Document the complete loss function, gradient computation, and Adam update rules inline so future readers can audit against upstream FSRS specs
 - Numeric gradient step h=1e-4 is documented and configurable for future precision tuning

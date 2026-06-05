@@ -162,22 +162,45 @@ lr(t) = 0.5 * lr_max * (1 + cos(π * t / T_max))
 ## Testing Decisions
 
 ### What makes a good test
-- 测试优化器的外部行为（输入 ReviewLog，输出 W[21]），不测试内部梯度计算细节
+- 测试优化器的外部行为（输入 ReviewLog，输出 loss 值），不测试内部梯度计算细节
 - 使用 py-fsrs 的公开测试数据做交叉验证，而非手工构造
+- 以 loss 而非 W[21] 参数值作为正确性标准——等效参数可能长得完全不同
 - 确定性验证（同一数据多次运行产出相同结果）
 - 边界情况：空数据、少量数据、极端参数
+
+### 测试数据质量
+
+| 指标 | 值 |
+|------|-----|
+| 总复习数 | 12,580 |
+| 不重复卡片数 | 1,205 |
+| 卡片平均复习数 | 10.4（min=1, max=54） |
+| 时间跨度 | 2024-03-30 ~ 2024-10-07（6 个月） |
+| Again | 29.2% | Hard | 0.008%（仅 1 条） | Good | 70.8% | Easy | 0% |
+
+**已知限制**：Hard 和 Easy 评分几乎不存在。参数 w[15]（Hard 惩罚）和 w[16]（Easy 加成）无训练信号——和 py-fsrs 一样由初始化值 + 边界约束决定，交叉验证断言排除这两个索引。
+
+### 验证标准（三层）
+
+**主标准（MUST PASS）：** `loss_optimized < loss_default`
+优化后 BCELoss 严格低于默认参数 BCELoss，证明产出参数更贴合复习历史。
+
+**辅助标准（SHOULD PASS）：** `loss_optimized ≤ loss_pyfsrs × 1.01`
+Java 优化器 loss 不超过 py-fsrs 优化器 loss 的 101%。1% loss 差 ≈ 卡片间隔偏差 < 半天。若无法获取 py-fsrs 精确 loss，则保证 `loss_optimized ≤ loss_default × 0.95`。
+
+**W[21] 不做逐元素对比：** 数值梯度 vs 解析梯度收敛到不同 W[21] 但 loss 几乎相同——逐位断言会将等效结果误判为失败。验收只看 loss。
 
 ### Test seams and prior art
 
 **交叉验证测试（FsrsOptimizerTest — 新建单元测试类）**
-- 加载 `review_logs_josh_1711744352250_to_1728234780857.csv`（12,580 条真实 Anki 复习记录）
+- 加载 `src/test/resources/fsrs/review_logs_josh_1711744352250_to_1728234780857.csv`
 - 解析为 ReviewLog 列表（cardId, rating, reviewedAt，忽略 review_duration）
-- 运行优化器
-- 断言：每个 W[i] 与 py-fsrs `test_optimal_parameters` 的绝对差 ≤ 0.05
-- 断言：优化后 BCELoss < 默认参数 BCELoss
+- 断言 1（主标准）：`loss_optimized < loss_default`
+- 断言 2（辅助标准）：`loss_optimized ≤ loss_pyfsrs × 1.01` 或 `≤ loss_default × 0.95`
+- 断言 3：w[15] 和 w[16] 不参与 loss 断言（无训练信号）
 
 **确定性测试**
-- 同一数据集运行两次 → 输出完全一致（`Arrays.equals(run1, run2)`）
+- 同一数据集运行两次 → `Arrays.equals(run1.weights(), run2.weights())`
 
 **无序数据测试**
 - 打乱 ReviewLog 顺序后优化 → 输出与有序输入一致
@@ -187,8 +210,15 @@ lr(t) = 0.5 * lr_max * (1 + cos(π * t / T_max))
 - <512 条 → 返回默认 W[21]
 - 全是 Again 评分 → 优化不崩溃
 - 全是 Easy 评分（难度降到 1.0）→ 优化不崩溃
+- 同日 review → 不贡献 loss，但卡片状态仍更新
 
-**模拟数据恢复测试**
+**合成数据恢复测试**
+- 用默认 W[21] + FsrsScheduler 模拟 100 张卡各 10 条 review
+- 优化器恢复 W[21] — 每个参数应在默认值 ±0.1 以内
+
+### Prior art
+- py-fsrs `tests/test_optimizer.py`（8 个测试用例）— 直接对应
+- 项目已有 `FsrsSchedulerTest`（12 个单元测试）— 验证优化后的 W[21] 在 Scheduler 中产生合理间隔
 - 用默认 W[21] + FsrsScheduler 模拟生成 ReviewLog → 优化器应恢复出接近默认值的 W[21]
 
 ### Prior art

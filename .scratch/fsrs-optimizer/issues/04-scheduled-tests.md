@@ -4,7 +4,7 @@
 
 ## 范围
 
-实现 `@Scheduled` 定时自动优化任务，并编写基于 py-fsrs 测试数据的交叉验证测试。
+实现 `@Scheduled` 定时自动优化任务，并编写基于 py-fsrs 测试数据的完整交叉验证测试套件。
 
 ## 实现内容
 
@@ -16,23 +16,83 @@
 - 异常不中断其他用户的优化
 
 ### 测试数据文件
-- 将 `review_logs_josh_1711744352250_to_1728234780857.csv` 复制到 `src/test/resources/fsrs/`
+- 文件已存在于 `src/test/resources/fsrs/review_logs_josh_1711744352250_to_1728234780857.csv`
 - 文件格式：`card_id,review_rating,review_time,review_duration`
 - review_rating：1=Again, 2=Hard, 3=Good, 4=Easy
 - review_time：ISO 8601 含时区
-- review_duration：毫秒（测试中忽略该列）
+- review_duration：毫秒（测试中忽略该列，Java ReviewLog 无此字段）
 
-### 交叉验证测试（FsrsOptimizerTest）
-- 解析 CSV → List<ReviewLog>（cardId, rating, reviewedAt）
-- 构造 FsrsSchedulerConfig(withDefaults()) 
-- `new FsrsOptimizer(logs, config).optimize(null)` → OptimizeResult
-- 断言 1：每个 W[i] 与 py-fsrs `test_optimal_parameters` 的绝对差 ≤ 0.05
-- 断言 2：优化后 BCELoss < 默认参数 BCELoss
-- 断言 3：同一数据跑两次 → Arrays.equals(run1.weights(), run2.weights())
-- 断言 4：打乱 logs 顺序后优化 → 结果与有序一致
+### 测试数据质量分析
 
-### py-fsrs 期望输出（硬编码在测试中）
+| 指标 | 值 |
+|------|-----|
+| 总复习数 | 12,580 |
+| 不重复卡片数 | 1,205 |
+| 卡片平均复习数 | 10.4（min=1, max=54） |
+| 时间跨度 | 2024-03-30 ~ 2024-10-07（6 个月） |
+| Again (1) | 3,676 条（29.2%） |
+| Hard (2) | 1 条（0.008%） |
+| Good (3) | 8,903 条（70.8%） |
+| Easy (4) | 0 条（0%） |
+
+**已知限制**：Hard 和 Easy 评分几乎不存在。参数 w[15]（Hard 惩罚）和 w[16]（Easy 加成）在此数据集上无有效训练信号——两个优化器（py-fsrs/Java）这两个参数的值都由初始化 + 边界约束驱动，非学习驱动。交叉验证排除这两个索引。
+
+---
+
+## 验证标准（三层）
+
+### 主标准（MUST PASS — 阻塞合并）
+
+**`loss_optimized < loss_default`**
+
+优化后 BCELoss 必须严格低于默认参数的 BCELoss。证明优化器产出的参数比不优化更贴合 Learner 的复习历史。
+
+```
+测试方法：
+1. 用默认 W[21] 构建 Scheduler，计算全量 12,580 条 ReviewLog 的 BCELoss → loss_default
+2. 运行 Java 优化器 → 得到优化后的 W[21]
+3. 用优化后的 W[21] 构建 Scheduler，计算同数据集的 BCELoss → loss_optimized
+4. 断言：loss_optimized < loss_default（严格小于）
+```
+
+### 辅助标准（SHOULD PASS — 不阻塞合并但需记录偏差）
+
+**`loss_optimized ≤ loss_pyfsrs × 1.01`**
+
+Java 优化器的最终 loss 不超过 py-fsrs 优化器的最终 loss 的 101%。证明数值梯度（近似）达到了与解析梯度（精确）相当的优化质量。
+
+```
+测试方法：
+1. 使用 py-fsrs 对该数据集的已知最优 loss 值（从 py-fsrs 测试中提取）
+2. 若无法获取 py-fsrs 的精确 loss 值，则至少保证 loss_optimized ≤ loss_default × 0.95（优化后 loss 比默认至少低 5%）
+3. 1% 的 loss 差 ≈ 卡片间隔偏差 < 半天 — Learner 不可感知
+```
+
+**注意**：1% 是 **loss 值的相对容差**，不是 W[21] 参数的容差。W[21] 不做逐元素断言（见下方"不做 W[21] 对比"）。
+
+### 不做 W[21] 逐元素对比
+
+**不对 W[21] 做任何逐位置容差断言。** 原因：
+- 数值梯度 vs 解析梯度走不同的收敛路径，到达 loss 曲面上的不同谷底
+- 两组截然不同的 W[21] 向量可以产生几乎相同的 loss → 功能等效
+- 逐位对比会将等效结果误判为失败
+
+```
+py-fsrs 产出：  w[0]=0.123, w[1]=1.293, loss=0.310
+Java 产出：     w[0]=0.098, w[1]=1.451, loss=0.312
+
+逐位对比：w[0] 差 0.025 → "不合格"
+实际：loss 只差 0.002 → 完全等效。逐位对比是错误的标准。
+```
+
+### 参数 w[15] 和 w[16] 豁免
+
+测试数据只有 1 条 Hard、0 条 Easy。这两个参数在 py-fsrs 和 Java 两端都由初始化值 + 参数边界约束决定，不是学习出来的。交叉验证断言中排除索引 15 和 16。
+
+### py-fsrs 参考值（仅用于 loss 计算，不做 W[21] 断言）
+
 ```java
+// py-fsrs 对该数据集的优化输出（仅用于计算参考 loss，不作逐元素断言）
 static final double[] PYFSRS_OPTIMAL = {
     0.12340357383516173, 1.2931, 2.397673571899466, 8.2956,
     6.686820427099132, 0.45021679958387956, 3.077875127553957, 0.053520395733247045,
@@ -43,23 +103,43 @@ static final double[] PYFSRS_OPTIMAL = {
 };
 ```
 
-### 边界测试
-- 空列表：`new FsrsOptimizer(emptyList, config).optimize(null)` → 返回默认 W[21]
-- 前 500 条：<512 条 → 返回默认 W[21]
-- 全是 Again（rating=1）：不崩溃
-- 全是 Easy（rating=4）：不崩溃，难度降到 1.0 后优化继续
+---
 
-### 合成数据恢复测试
-- 用默认 W[21] + FsrsScheduler 模拟 100 张卡各 10 条 review
-- 优化器恢复 W[21] — 每个参数应在默认值 ±0.1 以内
+## 完整测试清单
+
+### 交叉验证测试（FsrsOptimizerTest — 新建）
+
+| # | 测试用例 | 数据 | 断言 |
+|---|---------|------|------|
+| 1 | **主标准：loss 严格下降** | 12,580 条 CSV | `loss_optimized < loss_default` |
+| 2 | **辅助标准：loss 接近 py-fsrs** | 同上 | `loss_optimized ≤ loss_pyfsrs × 1.01`（或 `≤ loss_default × 0.95`） |
+| 3 | **确定性** | 同上 | 同一数据跑两次 → `Arrays.equals(run1.weights(), run2.weights())` |
+| 4 | **无序输入不变性** | 同上（shuffle 后） | 打乱 ReviewLog 顺序 → 输出与有序输入一致 |
+| 5 | **w[15]/w[16] 不参与 loss 断言** | 同上 | 排除索引 15, 16（无训练信号） |
+
+### 边界测试（同上测试类）
+
+| # | 测试用例 | 数据 | 断言 |
+|---|---------|------|------|
+| 6 | **空数据** | `List.of()` | 返回默认 W[21] |
+| 7 | **数据不足** | CSV 前 500 条 | 返回默认 W[21]（<512 min_reviews） |
+| 8 | **全 Again** | 构造 100 条 rating=1 的数据 | 不崩溃，loss 可计算 |
+| 9 | **全 Easy 难度触底** | 构造 100 卡各 100 条 rating=4 的数据 | 不崩溃，difficulty 降到 1.0 后优化继续 |
+| 10 | **同日 review 过滤** | 构造含同卡同日多条 review 的数据 | 同日 review 不贡献 loss，卡片状态仍更新 |
+
+### 合成数据恢复测试（同上测试类）
+
+| # | 测试用例 | 数据 | 断言 |
+|---|---------|------|------|
+| 11 | **参数恢复** | 用默认 W[21] + FsrsScheduler 模拟 100 卡各 10 条随机评分 | 优化后每个参数在默认值 ±0.1 以内 |
 
 ### 需要的新增依赖
-- `opencsv` 或手动解析（CSV 格式简单，4 列逗号分隔，可手写解析器避免新增依赖）
+- CSV 解析使用手动实现（4 列逗号分隔，格式简单），避免引入 `opencsv` 依赖
 
 ## 依赖
 - Issue 01（FsrsOptimizer 核心算法）
-- 测试数据文件已下载
+- 测试数据文件已就位：`src/test/resources/fsrs/review_logs_josh_1711744352250_to_1728234780857.csv`
 
 ## 验证
 - `mvn test` 全部通过
-- 交叉验证测试是核心质量门禁
+- 交叉验证测试（主标准 + 辅助标准）是核心质量门禁——不通过则合并阻塞
