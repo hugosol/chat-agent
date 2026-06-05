@@ -5,6 +5,7 @@ import com.hugosol.chatagent.flashcard.CardState;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
+import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.service.ReviewService;
 import com.hugosol.chatagent.service.ReviewStats;
 import com.hugosol.chatagent.service.UserPreferencesService;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -174,5 +176,84 @@ class ReviewControllerTest {
                 .andExpect(jsonPath("$.totalDeletedReviewCount").value(12));
 
         verify(reviewService).forgetDeck(eq("deck-1"), eq("admin"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void putPreferences_invalidLearningSteps_returns400() throws Exception {
+        mockMvc.perform(put("/api/user/preferences")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"learningSteps\":\"abc\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.learningSteps").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void putPreferences_invalidDesiredRetention_returns400() throws Exception {
+        mockMvc.perform(put("/api/user/preferences")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"desiredRetention\":1.5}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.desiredRetention").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void getPreferences_includesFsrsFields() throws Exception {
+        UserPreferences prefs = new UserPreferences("admin");
+        prefs.setLearningSteps("1m,10m");
+        prefs.setRelearningSteps("10m");
+        prefs.setDesiredRetention(0.9);
+        prefs.setMaximumInterval(36500);
+        prefs.setEnableFuzz(true);
+        prefs.setShuffleDueCards(false);
+        when(preferencesService.get("admin")).thenReturn(prefs);
+
+        mockMvc.perform(get("/api/user/preferences"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.learningSteps").value("1m,10m"))
+                .andExpect(jsonPath("$.relearningSteps").value("10m"))
+                .andExpect(jsonPath("$.desiredRetention").value(0.9))
+                .andExpect(jsonPath("$.maximumInterval").value(36500))
+                .andExpect(jsonPath("$.enableFuzz").value(true))
+                .andExpect(jsonPath("$.shuffleDueCards").value(false));
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void putPreferences_saveFsrsFields() throws Exception {
+        UserPreferences prefs = new UserPreferences("admin");
+        when(preferencesService.get("admin")).thenReturn(prefs);
+
+        mockMvc.perform(put("/api/user/preferences")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"desiredRetention\":0.85,\"enableFuzz\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.desiredRetention").value(0.85))
+                .andExpect(jsonPath("$.enableFuzz").value(false));
+
+        verify(preferencesService).save(prefs);
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void putPreferences_partialUpdate_keepsOldValues() throws Exception {
+        UserPreferences prefs = new UserPreferences("admin");
+        prefs.setLearningSteps("1m,10m");
+        prefs.setDesiredRetention(0.9);
+        when(preferencesService.get("admin")).thenReturn(prefs);
+
+        mockMvc.perform(put("/api/user/preferences")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lastDeckId\":\"deck-1\",\"lastMode\":\"STANDARD\",\"newCardDailyLimit\":30}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastDeckId").value("deck-1"))
+                .andExpect(jsonPath("$.learningSteps").value("1m,10m"))
+                .andExpect(jsonPath("$.desiredRetention").value(0.9));
     }
 }

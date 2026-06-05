@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -179,6 +180,14 @@ public class ReviewController {
     @PutMapping("/user/preferences")
     public ResponseEntity<Map<String, Object>> savePreferences(@RequestBody Map<String, Object> body) {
         String userId = getUserId();
+
+        Map<String, String> errors = validatePreferences(body);
+        if (!errors.isEmpty()) {
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("errors", errors);
+            return ResponseEntity.badRequest().body(errorResult);
+        }
+
         UserPreferences prefs = preferencesService.get(userId);
         if (body.containsKey("lastDeckId")) {
             prefs.setLastDeckId((String) body.get("lastDeckId"));
@@ -252,6 +261,48 @@ public class ReviewController {
             return auth.getName();
         }
         return "anonymous";
+    }
+
+    private Map<String, String> validatePreferences(Map<String, Object> body) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        validateSteps(body, "learningSteps", errors);
+        validateSteps(body, "relearningSteps", errors);
+        validateRetention(body, "desiredRetention", errors);
+        validateMaxInterval(body, "maximumInterval", errors);
+        return errors;
+    }
+
+    private void validateSteps(Map<String, Object> body, String field, Map<String, String> errors) {
+        if (body.containsKey(field)) {
+            Object val = body.get(field);
+            if (val instanceof String s && !s.isEmpty() && !s.matches("^(\\d+[smhd],)*\\d+[smhd]$")) {
+                errors.put(field, "格式错误。如: 1m,10m 或 30s 或留空");
+            }
+        }
+    }
+
+    private void validateRetention(Map<String, Object> body, String field, Map<String, String> errors) {
+        if (body.containsKey(field)) {
+            Object val = body.get(field);
+            if (val != null) {
+                double d = ((Number) val).doubleValue();
+                if (d < 0.01 || d > 0.99) {
+                    errors.put(field, "请输入 0.01 到 0.99 之间的数值");
+                }
+            }
+        }
+    }
+
+    private void validateMaxInterval(Map<String, Object> body, String field, Map<String, String> errors) {
+        if (body.containsKey(field)) {
+            Object val = body.get(field);
+            if (val != null) {
+                int i = ((Number) val).intValue();
+                if (i < 1) {
+                    errors.put(field, "请输入大于等于 1 的整数");
+                }
+            }
+        }
     }
 
     private Map<String, Object> cardToMap(Card card) {
