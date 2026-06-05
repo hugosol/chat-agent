@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { escapeHtml, formatDate, truncate, englishOnly, isSessionActive, deriveStatus } from "../../shared/utils";
+import { escapeHtml, formatDate, truncate, englishOnly, isSessionActive, deriveStatus, formatInterval } from "../../shared/utils";
 
 describe("escapeHtml", () => {
   it("escapes < > and & to HTML entities via DOM textContent", () => {
@@ -138,5 +138,39 @@ describe("deriveStatus", () => {
     const result = deriveStatus("Disconnected", null);
     expect(result.type).toBe("disconnected");
     expect(result.message).toContain("Disconnected");
+  });
+});
+
+describe("formatInterval", () => {
+  const now = new Date("2026-06-05T12:00:00Z");
+
+  it('returns "<1分钟" for less than 60 seconds', () => {
+    const due = new Date("2026-06-05T12:00:30Z").toISOString();
+    expect(formatInterval(due, now)).toBe("<1分钟");
+  });
+
+  it('returns "X分钟" for less than 60 minutes', () => {
+    const due = new Date("2026-06-05T12:10:00Z").toISOString();
+    expect(formatInterval(due, now)).toBe("10分钟");
+  });
+
+  it('returns "X小时" for less than 24 hours', () => {
+    const due = new Date("2026-06-05T20:00:00Z").toISOString();
+    expect(formatInterval(due, now)).toBe("8小时");
+  });
+
+  it('returns "X天" for less than 30 days', () => {
+    const due = new Date("2026-06-10T12:00:00Z").toISOString();
+    expect(formatInterval(due, now)).toBe("5天");
+  });
+
+  it('returns "X个月" for less than 365 days', () => {
+    const due = new Date("2026-08-05T12:00:00Z").toISOString();
+    expect(formatInterval(due, now)).toBe("2个月");
+  });
+
+  it('returns "X年" for 365 days or more', () => {
+    const due = new Date("2027-06-05T12:00:00Z").toISOString();
+    expect(formatInterval(due, now)).toBe("1年");
   });
 });

@@ -331,4 +331,55 @@ class FsrsSchedulerTest {
         assertThat(state.stability()).isCloseTo(2.5, within(TOLERANCE));
         assertThat(state.difficulty()).isCloseTo(0.0, within(TOLERANCE));
     }
+
+    @Test
+    void preview_returnsFourOutcomes() {
+        CardState card = scheduler.initNewCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result = scheduler.preview(card, BASE_TIME);
+
+        assertThat(result).containsKeys(Rating.AGAIN, Rating.HARD, Rating.GOOD, Rating.EASY);
+        assertThat(result.get(Rating.AGAIN)).isNotNull();
+        assertThat(result.get(Rating.HARD)).isNotNull();
+        assertThat(result.get(Rating.GOOD)).isNotNull();
+        assertThat(result.get(Rating.EASY)).isNotNull();
+    }
+
+    @Test
+    void preview_differentRatingsProduceDifferentDue() {
+        CardState card = scheduler.initNewCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result = scheduler.preview(card, BASE_TIME);
+
+        assertThat(result.get(Rating.AGAIN).due()).isNotEqualTo(result.get(Rating.HARD).due());
+        assertThat(result.get(Rating.AGAIN).due()).isNotEqualTo(result.get(Rating.GOOD).due());
+        assertThat(result.get(Rating.AGAIN).due()).isNotEqualTo(result.get(Rating.EASY).due());
+        assertThat(result.get(Rating.EASY).due()).isAfter(result.get(Rating.AGAIN).due());
+    }
+
+    @Test
+    void preview_noFuzzIsDeterministic() {
+        CardState card = scheduler.initNewCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result1 = scheduler.preview(card, BASE_TIME);
+        java.util.Map<Rating, CardState> result2 = scheduler.preview(card, BASE_TIME);
+
+        for (Rating r : Rating.values()) {
+            assertThat(result1.get(r).due()).isEqualTo(result2.get(r).due());
+            assertThat(result1.get(r).stability()).isEqualTo(result2.get(r).stability());
+            assertThat(result1.get(r).difficulty()).isEqualTo(result2.get(r).difficulty());
+        }
+    }
+
+    @Test
+    void preview_newCard_learningStateGraduation() {
+        CardState card = scheduler.initNewCard(BASE_TIME);
+
+        java.util.Map<Rating, CardState> result = scheduler.preview(card, BASE_TIME);
+
+        assertThat(result.get(Rating.GOOD).state()).isEqualTo(CardState.STATE_LEARNING);
+        assertThat(result.get(Rating.EASY).state()).isEqualTo(CardState.STATE_REVIEW);
+        assertThat(result.get(Rating.AGAIN).state()).isEqualTo(CardState.STATE_LEARNING);
+        assertThat(result.get(Rating.AGAIN).step()).isEqualTo(0);
+    }
 }

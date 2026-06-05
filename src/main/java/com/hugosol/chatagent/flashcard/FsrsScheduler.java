@@ -2,6 +2,8 @@ package com.hugosol.chatagent.flashcard;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.function.DoubleSupplier;
 
 public class FsrsScheduler {
@@ -194,6 +196,14 @@ public class FsrsScheduler {
                 : 0.0;
 
         return new CardState(stability, difficulty, state, step, due, reps, lapses, lastReview, elapsedDays, hasStability);
+    }
+
+    public Map<Rating, CardState> preview(CardState card, Instant now) {
+        Map<Rating, CardState> result = new EnumMap<>(Rating.class);
+        for (Rating rating : Rating.values()) {
+            result.put(rating, repeat(card, rating, now, null));
+        }
+        return result;
     }
 
     private long learningStepSeconds(int step) {

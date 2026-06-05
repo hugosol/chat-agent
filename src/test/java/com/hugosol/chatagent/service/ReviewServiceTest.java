@@ -619,6 +619,55 @@ class ReviewServiceTest {
         verify(reviewLogRepository, never()).deleteByCardIdIn(anyList());
     }
 
+    @Test
+    void previewCard_newCard_returnsFourOutcomes() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(2.5);
+        card.setDifficulty(0.0);
+        card.setCardState(0);
+        card.setDue(NOW);
+        card.setReps(0);
+        card.setLapses(0);
+        card.setLastReview(null);
+
+        java.util.Map<com.hugosol.chatagent.flashcard.Rating, com.hugosol.chatagent.flashcard.CardState> result =
+                reviewService.previewCard(card, NOW);
+
+        assertThat(result).containsKeys(
+                com.hugosol.chatagent.flashcard.Rating.AGAIN,
+                com.hugosol.chatagent.flashcard.Rating.HARD,
+                com.hugosol.chatagent.flashcard.Rating.GOOD,
+                com.hugosol.chatagent.flashcard.Rating.EASY);
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.GOOD)).isNotNull();
+    }
+
+    @Test
+    void previewCard_reviewedCard_differentIntervals() {
+        Card card = new Card("user-1", "hello", "你好");
+        card.setId("card-1");
+        card.setStability(2.5);
+        card.setDifficulty(3.0);
+        card.setCardState(2);
+        card.setDue(Instant.parse("2026-06-03T10:00:00Z"));
+        card.setReps(2);
+        card.setLapses(0);
+        card.setLastReview(Instant.parse("2026-06-01T10:00:00Z"));
+        card.setFirstReviewDate(Instant.parse("2026-06-01T10:00:00Z"));
+
+        java.util.Map<com.hugosol.chatagent.flashcard.Rating, com.hugosol.chatagent.flashcard.CardState> result =
+                reviewService.previewCard(card, NOW);
+
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due())
+                .isNotEqualTo(result.get(com.hugosol.chatagent.flashcard.Rating.HARD).due());
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due())
+                .isNotEqualTo(result.get(com.hugosol.chatagent.flashcard.Rating.GOOD).due());
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due())
+                .isNotEqualTo(result.get(com.hugosol.chatagent.flashcard.Rating.EASY).due());
+        assertThat(result.get(com.hugosol.chatagent.flashcard.Rating.EASY).due())
+                .isAfter(result.get(com.hugosol.chatagent.flashcard.Rating.AGAIN).due());
+    }
+
     private UserPreferences defaultPreferences() {
         UserPreferences prefs = new UserPreferences("user-1");
         prefs.setNewCardDailyLimit(20);

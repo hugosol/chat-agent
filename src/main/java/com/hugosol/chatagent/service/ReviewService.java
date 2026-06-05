@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -58,15 +59,7 @@ public class ReviewService {
         FsrsSchedulerConfig config = fsrsConfigService.getConfig(userId);
         FsrsScheduler scheduler = new FsrsScheduler(config);
 
-        CardState inputState;
-        if (card.getCardState() == 0) {
-            inputState = scheduler.initNewCard(now);
-        } else {
-            inputState = new CardState(
-                    card.getStability(), card.getDifficulty(), card.getCardState(),
-                    card.getStep(), card.getDue(), card.getReps(), card.getLapses(), card.getLastReview(),
-                    0.0, true);
-        }
+        CardState inputState = buildCardState(card, scheduler, now);
 
         CardState result = scheduler.repeat(inputState, rating, now,
                 new AleaPrng(now.toEpochMilli())::next);
@@ -108,6 +101,23 @@ public class ReviewService {
         reviewLogRepository.save(log);
 
         return card;
+    }
+
+    public Map<Rating, CardState> previewCard(Card card, Instant now) {
+        FsrsSchedulerConfig config = fsrsConfigService.getConfig(card.getUserId());
+        FsrsScheduler scheduler = new FsrsScheduler(config);
+        CardState cardState = buildCardState(card, scheduler, now);
+        return scheduler.preview(cardState, now);
+    }
+
+    private CardState buildCardState(Card card, FsrsScheduler scheduler, Instant now) {
+        if (card.getCardState() == 0) {
+            return scheduler.initNewCard(now);
+        }
+        return new CardState(
+                card.getStability(), card.getDifficulty(), card.getCardState(),
+                card.getStep(), card.getDue(), card.getReps(), card.getLapses(), card.getLastReview(),
+                0.0, true);
     }
 
     @Transactional

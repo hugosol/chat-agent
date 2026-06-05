@@ -3,6 +3,7 @@ package com.hugosol.chatagent.controller;
 import com.hugosol.chatagent.dto.ForgetDeckResult;
 import com.hugosol.chatagent.dto.RateRequest;
 import com.hugosol.chatagent.dto.TagResponse;
+import com.hugosol.chatagent.flashcard.CardState;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
@@ -59,7 +60,13 @@ public class ReviewController {
         var stats = reviewService.computeReviewStats(request.deckId(), request.mode(), userId);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("card", card.map(this::cardToMap).orElse(null));
+        if (card.isPresent()) {
+            response.put("card", cardToMap(card.get()));
+            Map<Rating, CardState> preview = reviewService.previewCard(card.get(), Instant.now());
+            response.put("preview", previewToMap(preview));
+        } else {
+            response.put("card", null);
+        }
         response.put("stats", statsToMap(stats));
         return ResponseEntity.ok(response);
     }
@@ -118,6 +125,8 @@ public class ReviewController {
         Map<String, Object> result = new HashMap<>();
         if (card.isPresent()) {
             result.put("card", cardToMap(card.get()));
+            Map<Rating, CardState> preview = reviewService.previewCard(card.get(), Instant.now());
+            result.put("preview", previewToMap(preview));
         } else {
             result.put("card", null);
         }
@@ -274,6 +283,28 @@ public class ReviewController {
         map.put("learnedToday", stats.learnedToday());
         map.put("dailyLimit", stats.dailyLimit());
         map.put("nextDueAt", stats.nextDueAt() != null ? stats.nextDueAt().toString() : null);
+        return map;
+    }
+
+    private Map<String, Object> previewToMap(Map<Rating, CardState> preview) {
+        Map<String, Object> result = new HashMap<>();
+        for (Map.Entry<Rating, CardState> entry : preview.entrySet()) {
+            result.put(entry.getKey().name(), cardStateToMap(entry.getValue()));
+        }
+        return result;
+    }
+
+    private Map<String, Object> cardStateToMap(CardState state) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("stability", state.stability());
+        map.put("difficulty", state.difficulty());
+        map.put("state", state.state());
+        map.put("step", state.step());
+        map.put("due", state.due().toString());
+        map.put("reps", state.reps());
+        map.put("lapses", state.lapses());
+        map.put("lastReview", state.lastReview() != null ? state.lastReview().toString() : null);
+        map.put("elapsedDays", state.elapsedDays());
         return map;
     }
 }

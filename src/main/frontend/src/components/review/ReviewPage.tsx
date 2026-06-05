@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { CardDisplay } from "./CardDisplay";
 import { RatingButtons, RatingValue } from "./RatingButtons";
 import { StatsBar } from "./StatsBar";
-import type { DeckInfo, ReviewMode, ReviewCard, ReviewStats, CardResponse } from "./reviewTypes";
+import type { DeckInfo, ReviewMode, ReviewCard, ReviewStats, CardResponse, PreviewInfo } from "./reviewTypes";
 import styles from "./ReviewPage.module.css";
 
 type PageState = "start" | "review" | "submit";
@@ -18,6 +18,7 @@ interface Props {
 export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): React.ReactElement {
   const [card, setCard] = useState<ReviewCard | null>(null);
   const [flipped, setFlipped] = useState(false);
+  const [preview, setPreview] = useState<PreviewInfo | null>(null);
   const [stats, setStats] = useState<ReviewStats>({
     reviewedToday: 0, remaining: 0, learnedToday: 0, dailyLimit: limit, nextDueAt: null,
   });
@@ -35,6 +36,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
         if (data.card) {
           setCard(data.card);
           setFlipped(false);
+          setPreview(data.preview ?? null);
           setPageState("review");
         } else {
           onComplete(data.stats);
@@ -70,6 +72,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
         if (data.card) {
           setCard(data.card);
           setFlipped(false);
+          setPreview(data.preview ?? null);
           setPageState("review");
         } else {
           onComplete(data.stats);
@@ -110,7 +113,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
       </div>
 
       {flipped && (
-        <RatingButtons onRate={handleNextCard} disabled={pageState === "submit"} />
+        <RatingButtons onRate={handleNextCard} disabled={pageState === "submit"} preview={preview} />
       )}
 
       <StatsBar stats={stats} />

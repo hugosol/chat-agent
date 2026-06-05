@@ -34,7 +34,20 @@ export interface ReviewCard {
   createTime: string | null;
 }
 
+export type PreviewInfo = Record<string, {
+  stability: number;
+  difficulty: number;
+  state: number;
+  step: number;
+  due: string;
+  reps: number;
+  lapses: number;
+  lastReview: string | null;
+  elapsedDays: number;
+}>;
+
 export interface CardResponse {
   card: ReviewCard | null;
   stats: ReviewStats;
+  preview?: PreviewInfo;
 }
