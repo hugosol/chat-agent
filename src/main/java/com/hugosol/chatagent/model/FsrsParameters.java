@@ -148,6 +148,30 @@ public class FsrsParameters extends BaseEntity {
     public void setW19(double w19) { this.w19 = w19; }
     public double getW20() { return w20; }
     public void setW20(double w20) { this.w20 = w20; }
+    public void setWeights(double[] weights) {
+        this.w0 = weights[0];
+        this.w1 = weights[1];
+        this.w2 = weights[2];
+        this.w3 = weights[3];
+        this.w4 = weights[4];
+        this.w5 = weights[5];
+        this.w6 = weights[6];
+        this.w7 = weights[7];
+        this.w8 = weights[8];
+        this.w9 = weights[9];
+        this.w10 = weights[10];
+        this.w11 = weights[11];
+        this.w12 = weights[12];
+        this.w13 = weights[13];
+        this.w14 = weights[14];
+        this.w15 = weights[15];
+        this.w16 = weights[16];
+        this.w17 = weights[17];
+        this.w18 = weights[18];
+        this.w19 = weights[19];
+        this.w20 = weights[20];
+    }
+
     public boolean isEnableShortTerm() { return enableShortTerm; }
     public void setEnableShortTerm(boolean enableShortTerm) { this.enableShortTerm = enableShortTerm; }
 }
