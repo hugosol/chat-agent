@@ -34,6 +34,50 @@ mvn spring-boot:run
 
 > **Note**: Frontend has been **fully migrated** to React + TypeScript (built with Vite). Chat page (`index.html`) and Manage page (`manage/index.html`) are 100% React. All WebSocket messages are handled by `ChatProvider` (React Context + useReducer). All vanilla JS files (`app.js`, `flashcard.js`, `card.js`, `tag.js`, `modal.js`, `style.css`) have been deleted. Only `login/main.js` (10-line error display) remains as vanilla. `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development. See `docs/frontend-notes.md` for design patterns and conventions.
 
+## Docker 部署
+
+### 普通用户（直接用镜像）
+
+```bash
+# 1. Clone 仓库
+git clone <repo-url>
+cd chat-agent
+
+# 2. 编辑 docker/docker-compose.yml，替换以下 4 个值：
+#    - image: 用户名替换为你的 GitHub 用户名
+#    - DEEPSEEK_API_KEY: 你的 DeepSeek 密钥
+#    - INITIAL_USER_PASSWORD: 你想要的初始密码
+#    - volumes: 你的 VPS 上存放数据的路径
+#    - ports: 如端口冲突改一下
+
+# 3. 启动
+docker compose -f docker/docker-compose.yml up -d
+
+# 4. 浏览器打开 http://你的VPS:18080
+#    默认用户名 admin，密码是你设的 INITIAL_USER_PASSWORD
+```
+
+### 开发者（自己构建镜像）
+
+```bash
+# 1. 编译 jar
+mvn package -DskipTests
+
+# 2. 构建镜像
+docker build -f docker/Dockerfile -t ghcr.io/你的用户名/chat-agent:latest .
+
+# 3. 推送到 GitHub Container Registry
+docker login ghcr.io
+docker push ghcr.io/你的用户名/chat-agent:latest
+```
+
+### Nginx Proxy Manager 配置
+
+在 NPM 面板添加 Proxy Host：
+- **Domain**: `你的域名`
+- **Scheme**: `http`，**Forward Hostname**: `127.0.0.1`，**Forward Port**: `18080`
+- **SSL**: 开启，Let's Encrypt 自动签发证书
+
 ## How to Use
 
 | Step | Action |

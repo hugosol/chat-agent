@@ -1,0 +1,20 @@
+server:
+  forward-headers-strategy: native
+  servlet:
+    session:
+      cookie:
+        secure: true
+
+spring:
+  h2:
+    console:
+      enabled: false
+  datasource:
+    url: jdbc:h2:file:./data/englishcoach;DB_CLOSE_DELAY=-1
+    username: sa
+    password: chatagent-db
+
+app:
+  initial-users:
+    - username: admin
+      password: ${INITIAL_USER_PASSWORD}
