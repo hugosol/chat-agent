@@ -327,7 +327,10 @@ App-level configuration in `application.yml`:
 - [x] RAG-based MemoryCue retrieval (ONNX vector embeddings, semantic similarity search)
 - [x] 闪卡录入模块（FSRS-6 初始化 + 两阶段面板 + chip 标签 + REST API）
 - [x] 闪卡批量导入导出（CSV）
-- [ ] 闪卡复习功能（FSRS-6 repeat + 评分按钮 Again/Hard/Good/Easy + 每日复习队列）
+- [x] 闪卡复习功能（FSRS-6 repeat + 评分按钮 Again/Hard/Good/Easy + 四级评分间隔预览 + ReviewLog 审计 + 4 种复习模式 + 每日统计）
+- [x] 闪卡遗忘功能（单卡/Deck 批量重置 + ReviewLog 清理）
+- [ ] FSRS 参数优化器（Adam 梯度下降 + 自动 W[21] 优化 + 定时任务）
+- [ ] FSRS 学习设置页（learning/relearning steps 可配置 + desired_retention + 洗牌/fuzz 开关）
 - [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)
