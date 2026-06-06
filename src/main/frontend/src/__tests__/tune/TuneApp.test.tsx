@@ -22,6 +22,10 @@ describe("TuneApp", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        json: () => Promise.resolve({ username: "testuser", admin: false }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ count: 850, threshold: 512 }),
       })
       .mockResolvedValueOnce({
@@ -45,7 +49,11 @@ describe("TuneApp", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([{ username: "admin" }, { username: "user1" }]),
+        json: () => Promise.resolve({ username: "admin", admin: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ username: "user1" }]),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -61,12 +69,18 @@ describe("TuneApp", () => {
       });
 
     const { findByText } = render(<TuneApp />);
-    const select = (await findByText("admin")).closest("select");
+    const select = (await findByText("admin")).closest("select") as HTMLSelectElement;
     expect(select).not.toBeNull();
+    expect(select.options.length).toBe(2);
+    expect(select.options[0].value).toBe("admin");
   });
 
   it("shows Optimize and Reschedule section titles", async () => {
     (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ username: "testuser", admin: false }),
+      })
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ username: "testuser", admin: false }),

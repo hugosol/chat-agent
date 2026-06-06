@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Header } from "../Header/Header";
 import classes from "./TuneApp.module.css";
 
 interface ReviewCount {
@@ -52,7 +53,7 @@ function TuneApp(): JSX.Element {
       fetch("/api/admin/users")
         .then((r) => r.json())
         .then((data: { username: string }[]) => {
-          setAllUsers(data.map((u) => u.username));
+          setAllUsers([userId, ...data.map((u) => u.username)]);
         })
         .catch(() => setAllUsers([]))
         .finally(() => setLoadingUsers(false));
@@ -96,6 +97,8 @@ function TuneApp(): JSX.Element {
   };
 
   return (
+    <div>
+      <Header />
     <div className={classes.root}>
       <div className={classes.topBar}>
         <span className={classes.title}>Tune</span>
@@ -199,6 +202,7 @@ function TuneApp(): JSX.Element {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
