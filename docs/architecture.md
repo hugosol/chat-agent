@@ -18,7 +18,7 @@
 | 4 | 交付形态 | Web 应用 (Spring Boot + 浏览器) |
 | 5 | LLM 提供商 | DeepSeek V4 FAST，LangChain4j 抽象层保证可替换 |
 | 6 | 输入方式 | 文本输入框，iOS 用户可借助键盘原生听写。浏览器 SpeechSynthesis 做 TTS 输出（需用户手势触发） |
-| 7 | Agent 核心能力 | 角色扮演 + 自然纠错 + 对话后报告 + 学习进度追踪 + 跨会话记忆（User Memory + MemoryCue 双轨） |
+| 7 | Agent 核心能力 | 角色扮演 + 自然纠错 + 对话后报告 + 学习进度追踪 + 跨会话记忆（LearningProfile + MemoryCue RAG 检索） |
 | 8 | 纠错机制 | Agent 口头自然纠正（融入对话不打断） |
 | 9 | LangGraph 深度 | 深度：HITL + Checkpoint + 持久化 |
 | 10 | Agent 架构 | 五 Agent 协作：Conversation + Correction + Report + Learning + MemoryCue，同步 Agent 统一委托 TaskRunner |
@@ -46,8 +46,8 @@
 | 32 | E2E 认证绕过 | `application-e2e.yml` 设 `permit-all-paths: [/**]` 全放行；`requireUserId` fallback 返回 `"anonymous"` |
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
-| 35 | Topic Memory 模式隔离 | `UserLearningProfile` 新增可空 `mode` 字段：`LEARNING_PROFILE` 记 null（跨模式共享）。模式越多行数越多，但避免了引入 `TOPIC_SUMMARY_DAILY_TALK` 等新 LearningType |
-| 36 | 双轨记忆系统 | User Memory（Topic 直接写入最新版本 + Learning Profile LLM 合并，注入 System Prompt，首轮生效）与 MemoryCue（结构化 topic/summary，独立 `memory_cues` 表）并存。MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，完成后由 EmbeddingService 向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。messageId ≤ 1 注入 User Memory，messageId ≥ 2 通过 MemoryCueQueue（LRU 队列，capacity topK+1，跨 Turn 存活于 ChatState，去重刷新驱逐）管理 RAG 语义检索结果，编号列表注入 System Prompt |
+| 35 | ~~Topic Memory 模式隔离~~（已过时） | Topic Memory 已被 MemoryCue 替代。MemoryCue 生成时就携带 `mode` 字段实现模式隔离，RAG 检索时通过 `userId × AgentMode` 双重过滤。详见 ADR `mode-scoped-topic-memory.md`（弃用标记） |
+| 36 | 双轨记忆系统（已统一） | 原始设计为 User Memory（摘要注入）+ MemoryCue（RAG 检索）双轨并存。实施中 Topic Memory 的 Summary 直写被移除，整个记忆系统统一在 MemoryCue 管道：MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。RAG 语义检索通过 MemoryCueQueue（LRU 队列，capacity topK+1，跨 Turn 存活于 ChatState，去重刷新驱逐）管理，每轮注入 System Prompt。LearningProfile 在首轮独立注入。不再有独立的 Topic Memory 管道 |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `TaskRunner` 统一管理 LLM 调用生命周期与日志，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
 | 40 | TaskRunner 同步 Agent 模式 | 抽取 `TaskRunner` 深模块统一管理同步 Agent 的 LLM 调用生命周期。Agent 构造时通过 `runner.register(name, task)` 注册 `TaskDefinition`（模板 + paramBuilder + parser + errorStrategy），运行时通过 `runner.requestModel(name, params, ctx)` 触发 LLM 调用。`TaskName` 枚举管理 5 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）。删除 `LoggableChatModel` 包装层，日志能力由 TaskRunner 内生提供，含完整 sessionId/userId/agentType/mode 上下文字段。`MemoryAgent` 重命名为 `LearningAgent`（职责退化，仅保留 learningProfile 合并）。
 | 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `ChatMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/LearningProfileService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
@@ -57,14 +57,14 @@
 | 43 | LLM max output tokens 按 Agent 配置 | 新增 `app.llm.max-output-tokens` 配置，支持按 Agent 类型独立设置最大输出 token 数。默认 2048，ReportAgent 使用 4096（报告需更长输出）。`LangChain4jConfig` 创建独立的 `ChatLanguageModel` bean（default / report），`TaskRunner` 按 `TaskName.REPORT` 路由到对应模型。`MaxOutputTokens` 通过 `@ConfigurationProperties` 绑定，未配置的 Agent 自动回退到 default。 |
 | 44 | MemoryCueQueue LRU 淘汰设计 | `MemoryCueQueue` 为有容量上限的 LRU 有序集合（capacity = topK+1），跨 Turn 存活于 ChatState。首次加载（队列空）search topK+1 条，后续 search topK 条。push 时去重：同 cueId 刷新到队头；满容时淘汰队尾（最久未访问）。fallback anchor（最新 completed session 的 last cue）生命周期约 1 轮——下一轮被 RAG 结果替代。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。 |
 | 45 | 闪卡模块解耦 | 独立 JPA 实体 (Card, Tag) + REST API (`FlashcardController`) + React 前端 `FlashcardPanel.tsx`。闪卡模块与现有聊天功能完全解耦——不依赖 WebSocket，不依赖 Practice session。Tag 有可空 `type` 字段，为未来 Deck 概念预留。 |
-| 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~300 行），无 JNI 依赖。`FsrsScheduler` 为**实例类**，通过 `FsrsSchedulerConfig` 接受可配置参数（W[21] 权重、desired_retention、learning/relearning steps、fuzz 开关等）。`enchantCard()`（原 `initNewCard`）准备首次复习的 Learning 状态；`createInitState()` 静态方法创建全新卡片。实例方法：`repeat()`（完整 4 状态机）、`preview()`（返回 4 种评分的 CardState）、`reschedule()`（从 ReviewLog 重放历史重建状态）、`retrievability()`（记忆概率）。配置通过 `FsrsSchedulerConfig.merge(FsrsParameters, UserPreferences)` 合并系统参数与用户偏好。Fuzz 使用自研 `AleaPrng`（Johannes Baagøe 算法 Java 端口）。12+ 单元测试。 |
+| 46 | FSRS-6 调度算法 | 纯 Java 重写 FSRS-6（21 参数，~500 行），`FsrsScheduler` 实例类 + `FsrsSchedulerConfig` 不可变配置。→ 详见 `docs/fsrs.md` |
 | 47 | REST API 模式引入 | `FlashcardController` 为代码库首个 `@RestController`（`POST /api/cards/add` + `GET /api/tags`）。认证走 JSESSIONID cookie（与 WebSocket 一致），`/api/**` 不走 `permit-all-paths`（需要认证），CSRF 对 `/api/**` 在 `SecurityConfig` 中禁用。 |
 | 48 | React 渐进迁移 | 引入 Vite + React 18 + TypeScript 作为前端构建工具链。Phase 1：Header.tsx + CorrectionSidebar 迁入 React。Phase 2：WebSocket 服务层 + `useReducer + context` 集中状态管理。Phase 3：MessageList + ChatInput + Footer 迁入 React，`useChatWebSocket` 移除。**Phase 4 完成**：StatusBar、ReportModal、DebugPanel、FlashcardPanel 全部迁入 React；`app.js`、`flashcard.js`、`style.css` 及 manage 页面 vanilla JS 文件全部删除；Chat 页面单根渲染（无 Portal）；`ChatProvider` 直接处理所有 WS 消息（无 vanilla bridge）。React 本地托管在 `static/shared/`，CSS Modules 隔离样式，Vitest 做组件测试，E2E 测试使用 `data-testid` 属性选择器。不引入路由/状态管理库，不做 SPA。详见 ADR `frontend-react-migration.md`。 |
 | 49 | Chat 页面 React 集中状态管理 | 四期路线图：Phase 1（CorrectionSidebar 独立模块）→ Phase 2（WebSocket 服务层 + `useReducer + context`）→ Phase 3（MessageList + ChatInput + Footer）→ **Phase 4 完成**（StatusBar + ReportModal + DebugPanel + FlashcardPanel）。Phase 4 成果：`app.js` 完全删除，Chat 页面单根 `ChatPage` 组件渲染；`ChatProvider` 统一处理所有 WS 消息类型（SESSION_REPORT, ERROR, TOKEN_WARNING, STATE_UPDATE, WS_CLOSED 全部通过 `dispatch(action)` 进入 reducer）；`appStatus` 替代 `sessionStatus`，覆盖完整生命周期（Connecting→Connected→UserTurn→Processing→Warning→Error→Disconnected）；组件依赖关系完全通过 `useChatContext()`。详见 ADR `centralized-chat-state.md`。 |
-| 50 | CSV 批量导入导出设计决策 | 选择 Apache Commons CSV（RFC 4180 兼容、流式解析、轻量依赖）作为 CSV 解析库。限定单 deck tag 导入/导出（简化数据模型，CSV 不含 tags 列避免多对多序列化复杂度）。导入采用"前置全量校验 + 整体事务"策略：tagId 校验 → 逐行校验 → 内存去重 → SQL 查重全部在内存完成，全部通过后才 @Transactional 批量插入。cardState 使用文本映射（New/Learning/Review/Relearning）保证 CSV 跨系统可读性。parser 按名称匹配列（非列序号），缺失列自动留空、多余列忽略——兼容各种编辑器生成或手动调整的 CSV。新增 BatchOperationLog 表记录所有批量操作历史（审计追溯）。前端工具栏重构：排序和批量操作合并为两个 DropdownMenu 按钮，BatchOperationModal 共享导入/导出两种模式。 |
-| 51 | Review 模块：双端点架构 | 复习模块不引入 WebSocket，使用两个 REST 端点完成完整复习循环：① `GET /api/review/start?deckId=X&mode=Y`（获取首张卡片，按 Mode 策略选卡）；② `POST /api/review/next {cardId, rating, deckId, mode}`（评分当前卡 → 更新 FSRS 状态 + ReviewLog，controller 层统一调用 `computeReviewStats` + `getNextCard`，返回 `{card, stats, preview}`——统一使用 `card` 字段，不区分首卡/下一卡）。`preview` 字段包含四种评分（Again/Hard/Good/Easy）的 CardState，前端评分按钮展示"Good · 约15天后"间隔信息（不含 fuzz，确定性预览）。前端在收到 `card` 后原地替换当前卡片展示，不单独再次请求。此设计让 ReviewPage 只需管理当前卡片和翻面状态，无需跨请求状态同步。 |
-| 52 | ReviewStats：日累计 + 后端全量计算 | `ReviewStats` 不做"复习轮次"追踪（Review Session 是瞬时 UI 状态机，无持久化实体），统一使用**日累计**语义：`reviewedToday` = COUNT cards 里 `lastReview >= todayStart`，`learnedToday` = COUNT cards 里 `firstReviewDate >= todayStart`（`todayStart` 由 Learner 的 timezone + dayStartHour 算得）。`remaining` = COUNT `cardState ≠ 0 AND due ≤ now`（用于 StatsBar "剩余"），`nextDueAt` = MIN cards 里 `due > now`（用于结算页"下一张卡片约 X 小时后到期"）。所有数字完全由后端数据库实时 COUNT/MIN 查询计算——前端不累积、不传参，仅负责渲染。与 `GET /api/review/stats`（DeckPicker 进场前调一次）共享同一套 `todayStart` 计算逻辑。 |
-| 53 | 每日新卡上限后端化 | `newCardDailyLimit` 存储在 `UserPreferences` 表，由后端 `ReviewService.getNextCard()` 和 `computeReviewStats()` 统一读取。DeckPicker 点击"开始"时通过 `PUT /api/user/preferences` 将用户输入的上限值保存到数据库；后续 `GET /api/review/start` 和 `POST /api/review/next` 请求不再携带 `limit` 参数——后端自行从 `prefs.getNewCardDailyLimit()` 读取。此前 `computeStats()` 将 `dailyLimit` 硬编码为 20 且使用错误的 `Instant.now()` 阈值（非 `todayStart`）导致 StatsBar 和结算页数字错误——本次一并修正。 |
+| 50 | CSV 批量导入导出 | Apache Commons CSV，单 deck tag 导入/导出，前置全量校验+整体事务，cardState 文本映射。→ 详见 `docs/fsrs.md` |
+| 51 | Review 模块：双端点架构 | `GET /api/review/start` + `POST /api/review/next`，统一返回 `{card, stats, preview}`。→ 详见 `docs/fsrs.md` |
+| 52 | ReviewStats：日累计 | 后端 COUNT/MIN 实时查询，`todayStart` 按用户时区。→ 详见 `docs/fsrs.md` |
+| 53 | 每日新卡上限后端化 | 存储于 `UserPreferences`，后端 `ReviewService` 统一读取。→ 详见 `docs/fsrs.md` |
 
 ---
 
@@ -439,10 +439,10 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 | **持久化存储** | H2 逐条存 Message + ErrorRecord | `saveSession` 节点在会话结束时批量写入 JPA。跨会话通过 Session 关联 |
 | **Checkpoint / 恢复** | MemorySaver | `CompileConfig.builder().checkpointSaver(new MemorySaver())`，每个会话 `threadId`，刷新页面恢复 |
 | **前端展示** | 全部消息 + 折叠旧消息 | 可滚动聊天区，顶部 token 进度条，旧消息折叠到 "Show earlier" 后 |
-| **写入时机** | 会话结束时统一持久化 | `SessionComplete.complete()` 内部串联 `reportAgent.generate()` → `sessionStore.completeSession()` → `memoryService.generateMemoryAsync()` + `memoryCueService.generateCuesAsync()` |
+| **写入时机** | 会话结束时统一持久化 | `SessionComplete.complete()` 内部串联 `reportAgent.generate()` → `sessionStore.completeSession()` → `learningProfileService.generateMemoryAsync()` + `memoryCueService.generateCuesAsync()` |
 | **日志写入** | LLM 调用时即时异步写入 | `TaskRunner.requestModel()`（同步 Agent）在调用点内生写入完整上下文字段；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
 | **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
-| **记忆写入** | LearningProfileService + MemoryCueService 异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Topic 直接写入 + Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
+| **记忆写入** | LearningProfileService + MemoryCueService 异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Learning Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
 | **RAG 检索** | TurnProcessor Round 2+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，userId×AgentMode 隔离。结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载 search topK+1 条，后续 search topK 条，去重刷新驱逐，按 tail→head 编号列表注入 System Prompt `{memoryCues}` |
 
 ### 会话生命周期
@@ -450,7 +450,7 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 ```
 [对话中]
   AgentState.messages (MemorySaver checkpoint)  ← 只在内存
-  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 1 注入 User Memory, messageId ≥ 2 触发 MemoryCueQueue 管理的 RAG 检索)
+  TurnProcessor → ConversationAgent.generateStream(messageId ≤ 1 注入 LearningProfile + MemoryCue 回退锚点, messageId ≥ 2 触发 MemoryCueQueue 管理的 RAG 检索)
   UI token bar 实时更新
 
 [用户点击 End Session]
@@ -460,7 +460,7 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
   SessionComplete.complete(sessionId, messages, corrections, userId, mode)
     ├── reportAgent.generate() → ReportResult（失败则降级）
     ├── sessionStore.completeSession() → H2（null report → FAILED）
-    ├── memoryService.generateMemoryAsync() → Topic + Profile
+    ├── learningProfileService.generateMemoryAsync() → Profile Merge
     └── memoryCueService.generateCuesAsync() → MemoryCue 生成
   ↓
   SessionService.remove() → 释放 state
@@ -469,7 +469,7 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 [用户重新打开]
   从 H2 加载历史会话列表（只读）
   新建会话 → 新 threadId → 新 MemorySaver checkpoint
-  加载最新 User Memory → 注入首轮 System Prompt
+  加载最新 UserLearningProfile → 注入首轮 System Prompt
 ```
 
 ---
@@ -560,16 +560,18 @@ chat-agent/
 │   │   └── nodes/
 │   │       └── CorrectionNode.java         // 调用 CorrectionAgent（仅存的图节点）
 │   │
-│   ├── flashcard/                          // 闪卡模块核心
-│   │   ├── FsrsScheduler.java             // FSRS-6 实例调度器（enchantCard + createInitState + repeat + preview + reschedule + retrievability）
-│   │   ├── FsrsSchedulerConfig.java        // 不可变运行时参数 record（W[21] + desired_retention + steps + fuzz）+ merge() + parseSteps()
-│   │   ├── AleaPrng.java                   // 确定性 fuzz PRNG
-│   │   ├── CardState.java                 // 卡片状态记录（Learning/Review/Relearning 状态机 + step + hasStability）
-│   │   ├── Rating.java                    // AGAIN/HARD/GOOD/EASY（pyValue 1-4 映射，匹配 py-fsrs 索引）
-│   │   └── AleaPrng.java                  // Alea PRNG（Johannes Baagøe 算法，替代 java.util.Random 用于确定性 fuzz）
+│   │   ├── flashcard/                          // 闪卡模块核心 + 优化器
+│   │   │   ├── FsrsScheduler.java             // FSRS-6 实例调度器
+│   │   │   ├── FsrsSchedulerConfig.java        // 不可变运行时参数 record
+│   │   │   ├── FsrsOptimizer.java              // 纯 Java Adam + 数值梯度优化器
+│   │   │   ├── AleaPrng.java                   // 确定性 fuzz PRNG
+│   │   │   ├── CardState.java                 // 卡片状态记录
+│   │   │   └── Rating.java                    // AGAIN/HARD/GOOD/EASY
 │   │
-│   ├── controller/                         // REST API（首次引入 @RestController）
-│   │   └── FlashcardController.java       // POST /api/cards/add + GET /api/tags + POST /api/cards/import + GET /api/cards/export
+│   ├── controller/                         // REST API
+│   │   ├── FlashcardController.java       // POST /api/cards/add, GET /api/tags, import/export, forget
+│   │   ├── ReviewController.java          // GET /api/review/start, POST /api/review/next, stats, forget, preferences
+│   │   └── FsrsOptimizeController.java    // POST /api/fsrs/optimize (async + progress polling)
 │   │
 │   ├── agent/                              // Agent 调用封装
 │   │   ├── common/                         // 横切关注点：TaskRunner 公共模块
@@ -620,7 +622,7 @@ chat-agent/
 │   │   ├── ErrorRecord.java
 │   │   ├── SessionReport.java
 │   │   ├── UserProgress.java               // 学习进度（含 userId unique，每用户一行）
-│   │   ├── UserLearningProfile.java                 // 跨会话记忆（Topic Memory + Learning Profile，含 sessionId 追溯）
+│   │   ├── UserLearningProfile.java                 // Learning Profile 合并记录（含 version + sessionId 追溯）
 │   │   ├── MemoryCue.java                  // 结构化话题记忆（topic/summary，含状态追踪）
 │   │   ├── LlmCallLog.java                 // LLM API 调用日志（prompt/response/tokens/duration/status）
 │   │   ├── BatchOperationLog.java          // 批量操作日志（导入/导出审计）
@@ -632,7 +634,7 @@ chat-agent/
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED / FAILED
 │   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP (含 displayName + templatePath)
 │   │
-│   ├── repository/                         // Spring Data JPA（14 个）
+│   ├── repository/                         // Spring Data JPA（15 个）
 │   │   ├── UserRepository.java             // findByUsername
 │   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
@@ -640,11 +642,12 @@ chat-agent/
 │   │   ├── TagRepository.java              // findByNameAndUserId + findByUserId + findByUserIdAndType
 │   │   ├── ReviewLogRepository.java         // findByUserIdAndCardId + deleteByCardId + deleteByCardIdIn
 │   │   ├── FsrsParametersRepository.java    // findByUserId
+│   │   ├── UserPreferencesRepository.java   // findByUserId
 │   │   ├── BatchOperationLogRepository.java // 批量操作日志 CRUD
 │   │   ├── ErrorRecordRepository.java
 │   │   ├── SessionReportRepository.java
 │   │   ├── UserProgressRepository.java     // findByUserId
-│   │   ├── UserMemoryRepository.java       // findByUserIdAndTypeAndModeOrderByVersionDesc
+│   │   ├── UserLearningProfileRepository.java // findByUserIdAndTypeAndModeOrderByVersionDesc
 │   │   ├── MemoryCueRepository.java        // findBySessionId, findAllByStatus
 │   │   └── LlmCallLogRepository.java       // deleteByCreateTimeBefore
 │   │
@@ -654,11 +657,11 @@ chat-agent/
 │   │   ├── FlashcardService.java           // 闪卡创建（FSRS 初始化 + Tag upsert）+ 标签查询
 │   │   ├── ReviewService.java               // 复习核心（rateCard 含 FSRS 调度 + ReviewLog 记录 + rescheduleAllCards + forgetCard/Deck）
 │   │   ├── UserPreferencesService.java      // 用户偏好读写（含 FSRS 参数 + 缓存清除）
-│   │   ├── FsrsOptimizeService.java         // 优化器编排（planned，读 ReviewLog→优化→写参数→reschedule）
+│   │   ├── FsrsOptimizeService.java         // 优化器编排（Adam 梯度下降 + reschedule + @Scheduled 每周定时）
 │   │   ├── CardBatchService.java            // 批量导入/导出编排
 │   │   ├── SessionComplete.java            // 会话结束管线 (report+persist+async memory)
 │   │   ├── SessionDbStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
-│   │   ├── LearningProfileService.java              // 异步保存 Topic 摘要 + Learning Profile 合并（含 sessionId 追溯）
+│   │   ├── LearningProfileService.java              // 异步 Learning Profile 合并（含 sessionId 追溯）
 │   │   ├── MemoryCueService.java           // 异步 MemoryCue 生成（话题分割 + 分段摘要 → EmbeddingService.indexAsync）
 │   │   ├── EmbeddingService.java            // ONNX 向量化 + InMemoryEmbeddingStore 管理（init/search/indexAsync/saveToDisk）
 │   │   ├── LlmCallLogService.java          // 异步 LLM 调用日志写入 + 启动时清理 3 天前记录
@@ -668,15 +671,12 @@ chat-agent/
 │   │   └── card/                           // 闪卡批量操作
 │   │       ├── CardCsvParser.java           // CSV 解析器（按名称匹配列，BOM 兼容，cardState 文本映射）
 │   │       └── CardBatchService.java        // 批量导入/导出编排（校验 + 事务 + CSV 生成）
-│   │   └── optimizer/                       // FSRS 优化器（planned）
-│   │       ├── FsrsOptimizer.java           // 纯 Java Adam + 数值梯度优化器
-│   │       └── FsrsOptimizeService.java     // 优化编排（读 ReviewLog→优化→写 FsrsParameters→reschedule→清除缓存）
 │   │
 │   └── config/                             // 配置类
 │       ├── LangChain4jConfig.java          // DeepSeek (OpenAiChatModel + OpenAiStreamingChatModel) Bean 配置
 │       ├── SecurityConfig.java             // Spring Security filter chain + 登录事件日志
 │       ├── WebSocketConfig.java            // WebSocket Handler 注册（同源策略）
-│       ├── AsyncConfig.java                // llmRequestExecutor + llmLogExecutor + embeddingExecutor 线程池配置
+│       ├── AsyncConfig.java                // llmRequestExecutor + llmLogExecutor + optimizerExecutor + embeddingExecutor 线程池配置
 │       ├── AppProperties.java              // @ConfigurationProperties(prefix="app") 包含 security.permit-all-paths
 │       ├── PasswordEncoderConfig.java      // BCryptPasswordEncoder bean（独立配置，非 web 环境可用）
 │       ├── DataInitializer.java            // CommandLineRunner：从 app.initial-users 种子用户
@@ -697,7 +697,6 @@ chat-agent/
 │       │   └── rules.txt
 │       ├── correction.txt
 │       ├── report.txt
-│       ├── memory-topic.txt
 │       ├── memory-profile.txt
 │       ├── memory-cue-split.txt
 │       └── memory-cue-entry.txt
@@ -824,11 +823,11 @@ src/main/frontend/
 |---|-------------|----|
 | **场景** | 职场英语 (Standup) + 日常闲聊 (Daily Talk) | 技术演讲练习 + 更多 AgentMode |
 | **Agent** | 五 Agent 全协作（Conversation + Correction + Report + Memory + MemoryCue） | 场景自动切换 |
-| **记忆** | 双轨：User Memory (摘要注入, Round 1) + MemoryCue (RAG 向量检索, Round 2+) | 可探索条件边 + 子图 |
+| **记忆** | MemoryCue (RAG 向量检索, Round 2+) + LearningProfile (首轮注入) | 长期记忆增强 |
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
 | **TTS** | 浏览器 SpeechSynthesis（🔊 按钮手动触发） | OpenAI TTS（自然度更高） |
-| **闪卡** | 录入 + 批量 CSV + 复习（4 模式 + 评分预览 + ReviewLog + forget） | FSRS 优化器 + 学习设置页 |
+| **闪卡** | 录入 + 批量 CSV + 复习（4 模式 + 评分预览 + ReviewLog + forget）+ FSRS 优化器 + 学习设置页 | Leech 挂起 + 更多 Review 增强 |
 | **LangGraph** | 1 节点线性图（仅 correction） | 可探索条件边 + 子图 |
 | **持久化** | H2 File | H2 File（不变） |
 | **恢复** | MemorySaver | 可升级到 Postgres/Redis Saver |

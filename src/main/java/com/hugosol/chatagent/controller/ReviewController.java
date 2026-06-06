@@ -81,7 +81,7 @@ public class ReviewController {
             map.put("id", deck.getId());
             map.put("name", deck.getName());
             map.put("type", deck.getType());
-            map.put("cardCount", cardRepository.countByTagsId(deck.getId()));
+            map.put("cardCount", cardRepository.countByTagsId(deck.getId(), userId));
             return map;
         }).toList();
         return ResponseEntity.ok(result);
@@ -102,10 +102,10 @@ public class ReviewController {
         Instant now = Instant.now();
         Instant todayStart = computeTodayStart(prefs);
 
-        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart);
-        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart);
-        long remaining = cardRepository.countDueCardsByTagsId(deckId, now);
-        Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now);
+        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart, userId);
+        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
+        long remaining = cardRepository.countDueCardsByTagsId(deckId, now, userId);
+        Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now, userId);
 
         Map<String, Object> result = new HashMap<>();
         result.put("reviewedToday", reviewedToday);

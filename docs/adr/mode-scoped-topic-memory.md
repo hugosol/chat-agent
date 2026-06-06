@@ -1,6 +1,8 @@
 # ADR: Mode-Scoped Topic Memory Isolation
 
-**Status:** Accepted
+> ⚠️ **已过时（2026-06）**：Topic Memory 已被 MemoryCue 体系取代。MemoryCue 在生成阶段就携带 `mode` 字段实现模式隔离，RAG 检索时通过 `userId × AgentMode` 双重过滤。本文档保留作为历史决策记录。
+
+**Status:** Accepted (superseded)
 
 **Date:** 2026-05-24
 

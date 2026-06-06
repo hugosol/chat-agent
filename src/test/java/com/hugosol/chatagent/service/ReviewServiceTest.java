@@ -76,7 +76,7 @@ class ReviewServiceTest {
         }).when(optimizerExecutor).execute(any(Runnable.class));
         reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository,
                 fsrsConfigService, cacheManager, optimizerExecutor);
-        lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0))).thenReturn(1000L);
+        lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0), anyString())).thenReturn(1000L);
     }
 
     @Test
@@ -262,7 +262,7 @@ class ReviewServiceTest {
         card.setDue(NOW.minusSeconds(3600));
 
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class))).thenReturn(Optional.of(card));
+        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class), anyString())).thenReturn(Optional.of(card));
 
         var result = reviewService.getNextCard("deck-1", "STANDARD", "user-1");
 
@@ -272,14 +272,14 @@ class ReviewServiceTest {
 
     @Test
     void getNextCard_standard_fallsBackToNewCard() {
-        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class))).thenReturn(Optional.empty());
+        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class), anyString())).thenReturn(Optional.empty());
 
         Card newCard = new Card("user-1", "new", "新");
         newCard.setId("card-2");
         newCard.setCardState(0);
 
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.findFirstNewCardByDeckId("deck-1")).thenReturn(Optional.of(newCard));
+        when(cardRepository.findFirstNewCardByDeckId(eq("deck-1"), anyString())).thenReturn(Optional.of(newCard));
 
         var result = reviewService.getNextCard("deck-1", "STANDARD", "user-1");
 
@@ -289,12 +289,12 @@ class ReviewServiceTest {
 
     @Test
     void getNextCard_standard_limitReached_skipsNewCard() {
-        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class))).thenReturn(Optional.empty());
+        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class), anyString())).thenReturn(Optional.empty());
 
         UserPreferences prefs = defaultPreferences();
         prefs.setNewCardDailyLimit(5);
         when(preferencesService.get("user-1")).thenReturn(prefs);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(5L);
 
         var result = reviewService.getNextCard("deck-1", "STANDARD", "user-1");
@@ -310,7 +310,7 @@ class ReviewServiceTest {
         card.setDue(NOW.minusSeconds(3600));
 
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class))).thenReturn(Optional.of(card));
+        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class), anyString())).thenReturn(Optional.of(card));
 
         var result = reviewService.getNextCard("deck-1", "REVIEW_ONLY", "user-1");
 
@@ -325,7 +325,7 @@ class ReviewServiceTest {
         newCard.setCardState(0);
 
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.findFirstNewCardByDeckId("deck-1")).thenReturn(Optional.of(newCard));
+        when(cardRepository.findFirstNewCardByDeckId(eq("deck-1"), anyString())).thenReturn(Optional.of(newCard));
 
         var result = reviewService.getNextCard("deck-1", "NEW_ONLY", "user-1");
 
@@ -338,7 +338,7 @@ class ReviewServiceTest {
         UserPreferences prefs = defaultPreferences();
         prefs.setNewCardDailyLimit(3);
         when(preferencesService.get("user-1")).thenReturn(prefs);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(3L);
 
         var result = reviewService.getNextCard("deck-1", "NEW_ONLY", "user-1");
@@ -352,7 +352,7 @@ class ReviewServiceTest {
         card.setId("card-1");
 
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.findRandomCardByDeckId("deck-1")).thenReturn(Optional.of(card));
+        when(cardRepository.findRandomCardByDeckId(eq("deck-1"), anyString())).thenReturn(Optional.of(card));
 
         var result = reviewService.getNextCard("deck-1", "CRAM", "user-1");
 
@@ -361,9 +361,9 @@ class ReviewServiceTest {
 
     @Test
     void getNextCard_noCards_returnsEmpty() {
-        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class))).thenReturn(Optional.empty());
+        when(cardRepository.findFirstDueCardByDeckId(eq("deck-1"), any(Instant.class), anyString())).thenReturn(Optional.empty());
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.findFirstNewCardByDeckId("deck-1")).thenReturn(Optional.empty());
+        when(cardRepository.findFirstNewCardByDeckId(eq("deck-1"), anyString())).thenReturn(Optional.empty());
 
         var result = reviewService.getNextCard("deck-1", "STANDARD", "user-1");
 
@@ -413,13 +413,13 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_standard_returnsDueCountPlusNewQuota() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(2L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(3L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(5L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "STANDARD", "user-1");
@@ -433,13 +433,13 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_reviewOnly_returnsDueCountOnly() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(1L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(4L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "REVIEW_ONLY", "user-1");
@@ -451,11 +451,11 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_newOnly_returnsNewQuotaOnly() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(3L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(8L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
@@ -467,11 +467,11 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_cram_returnsNegativeSentinel() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(10L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(5L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "CRAM", "user-1");
@@ -483,14 +483,14 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_standard_capsNewCardRemainingByActualCount() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(2L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(5L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndCardState("deck-1", 0)).thenReturn(3L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndCardState(eq("deck-1"), eq(0), anyString())).thenReturn(3L);
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "STANDARD", "user-1");
@@ -501,12 +501,12 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_newOnly_capsNewCardRemainingByActualCount() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(3L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndCardState("deck-1", 0)).thenReturn(2L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class)))
+        when(cardRepository.countByTagsIdAndCardState(eq("deck-1"), eq(0), anyString())).thenReturn(2L);
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");

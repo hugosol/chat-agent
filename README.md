@@ -121,7 +121,7 @@ E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari view
 |-----------|-----------------|
 | `ChatAgentSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
 | `ChatAgentResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
-| `ChatAgentMemoryIT` | Two sessions back-to-back → Topic Memory v1→v2 direct write → Learning Profile v1→v2 merge → topic memory mode-scoped isolation → learning profile cross-mode sharing |
+| `ChatAgentMemoryIT` | Two sessions back-to-back → Learning Profile v1→v2 merge → RAG MemoryCue retrieval → mode-scoped memory → cross-mode learning profile sharing |
 | `DailyTalkIT` | DAILY_TALK mode → 3-turn casual conversation → teaching-style corrections → mode-scoped memory |
 | `ChatAgentMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
 | `ManagePageIT` | Manage page full flow: nav sidebar → tag CRUD → card CRUD → search → sort → deck chip filtering → pagination → detail modal → orphan alert → delete cascade |
@@ -196,7 +196,7 @@ ChatWebSocketHandler  ──►  ChatMessageHandler  ──►  TurnProcessor  �
     │                              │
     │                              ├── SessionService (runtime state + token tracking)
     │                              ├── ReportAgent → DeepSeek (session-end)
-    │                              ├── LearningProfileService (Topic direct write + Profile merge) ──► MemoryAgent → DeepSeek
+    │                              ├── LearningProfileService (Profile merge) ──► LearningAgent → DeepSeek
     │                              ├── MemoryCueService (async topic split + segment cues) ──► MemoryCueAgent → DeepSeek
     │                              │       └── EmbeddingService.indexAsync() → ONNX vectorization → embedding-store.json
     │                              ├── EmbeddingService (RAG search + index + disk persistence)
@@ -222,7 +222,7 @@ AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
 | **ConversationAgent** | Role-plays according to the selected AgentMode (scenario + persona combined), generates natural English dialogue |
 | **CorrectionAgent** | Analyzes user input for 5 error types: grammar, word choice, Chinglish, pronunciation hints, fluency |
 | **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, key takeaway |
-| **MemoryAgent** | Saves session topic summary directly as a new User Memory version. Merges new session error data with existing Learning Profile via LLM into an updated summary. |
+| **LearningAgent** | Merges new session error data with existing Learning Profile via LLM into an updated summary. |
 | **MemoryCueAgent** | Two-step post-session LLM: detects topic switch points in conversation, then generates structured `(topic, summary)` pairs per segment. Each completed entry is asynchronously vectorized by `EmbeddingService` for RAG semantic retrieval. |
 
 ### LangGraph State Machine (Per-Turn)
@@ -233,7 +233,7 @@ START → CorrectionNode → END
 
 The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
 
-Every round performs RAG semantic search via `EmbeddingService.search()` against historical MemoryCue entries (top-2, cosine ≥ 0.6). On round 1, if RAG returns no matches, a fallback loads the most recent session's last COMPLETED MemoryCue from H2 as a conversation continuity anchor with a time label. LearningProfile is injected on round 1 only. There is no dual-track switching between Topic Memory and RAG — all memory retrieval is unified through the embedding pipeline. At session end, `LearningProfileService` directly saves the new Topic Memory as a new version and fires an async LLM merge for Learning Profile, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `memoryExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
+Every round performs RAG semantic search via `EmbeddingService.search()` against historical MemoryCue entries (top-2, cosine ≥ 0.6). On round 1, if RAG returns no matches, a fallback loads the most recent session's last COMPLETED MemoryCue from H2 as a conversation continuity anchor with a time label. LearningProfile is injected on round 1 only. All memory retrieval is unified through the embedding pipeline. At session end, `LearningProfileService` fires an async LLM merge for Learning Profile, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `llmRequestExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
 
 ## Project Structure
 
@@ -258,7 +258,7 @@ chat-agent/
 │   │   ├── ConversationAgent.java
 │   │   ├── CorrectionAgent.java
 │   │   ├── ReportAgent.java
-│   │   ├── MemoryAgent.java
+│   │   ├── LearningAgent.java
 │   │   └── MemoryCueAgent.java
 │   ├── websocket/
 │   │   ├── ChatWebSocketHandler.java
@@ -366,15 +366,15 @@ App-level configuration in `application.yml`:
 
 - [ ] OpenAI Whisper for server-side voice input
 - [x] Additional AgentMode values (DAILY_TALK with Chris persona — casual friend+tutor chat)
-- [x] Cross-session memory (Topic Memory + Learning Profile dual memory system)
+- [x] Cross-session memory (LearningProfile + MemoryCue RAG retrieval)
 - [x] Structured MemoryCue (topic segmentation + tagged memory entries, write-only in v1)
 - [x] RAG-based MemoryCue retrieval (ONNX vector embeddings, semantic similarity search)
 - [x] 闪卡录入模块（FSRS-6 初始化 + 两阶段面板 + chip 标签 + REST API）
 - [x] 闪卡批量导入导出（CSV）
 - [x] 闪卡复习功能（FSRS-6 repeat + 评分按钮 Again/Hard/Good/Easy + 四级评分间隔预览 + ReviewLog 审计 + 4 种复习模式 + 每日统计）
 - [x] 闪卡遗忘功能（单卡/Deck 批量重置 + ReviewLog 清理）
-- [ ] FSRS 参数优化器（Adam 梯度下降 + 自动 W[21] 优化 + 定时任务）
-- [ ] FSRS 学习设置页（learning/relearning steps 可配置 + desired_retention + 洗牌/fuzz 开关）
+- [x] FSRS 参数优化器（Adam 梯度下降 + 自动 W[21] 优化 + 定时任务）
+- [x] FSRS 学习设置页（learning/relearning steps 可配置 + desired_retention + 洗牌/fuzz 开关）
 - [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
 - [ ] Technical presentation practice scenario
 - [ ] Progress trend charts (error reduction over time)
