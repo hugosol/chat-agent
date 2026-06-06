@@ -90,6 +90,13 @@ export function CardDisplay({ front, back, cardId, onCardUpdated, onEditingChang
           </div>
           {flipped && !editing && (
             <div className={styles.cardBack} data-testid="card-back">
+              <button
+                data-testid="edit-btn"
+                className={styles.ttsBtn}
+                onClick={handleEdit}
+              >
+                {"\u270E"}
+              </button>
               <span className={styles.cardText}>{renderText(back)}</span>
               {showTtsBack && (
                 <button
@@ -134,15 +141,6 @@ export function CardDisplay({ front, back, cardId, onCardUpdated, onEditingChang
           <p className={styles.tapHint}>Tap to reveal</p>
         )}
       </div>
-      {flipped && !editing && (
-        <button
-          data-testid="edit-btn"
-          className={styles.editBtn}
-          onClick={handleEdit}
-        >
-          {"\u270E"} Edit
-        </button>
-      )}
     </div>
   );
 }
