@@ -2,7 +2,7 @@
 
 本文档描述 Chat Agent 中 FSRS（Free Spaced Repetition Scheduler v6）模块的算法、配置、调度、优化和复习功能的完整技术细节。
 
-> 术语表见 `CONTEXT.md` § Flashcard 模块。设计决策见 `docs/adr/scheduler-config-two-layer.md`、`docs/adr/scheduler-static-to-instance.md`、`docs/adr/fsrs-optimizer-pure-java.md`。
+> 术语表见 [CONTEXT.md](../CONTEXT.md) 中 Flashcard 相关条目。设计决策见 [docs/adr/scheduler-config-two-layer.md](adr/scheduler-config-two-layer.md)、[docs/adr/scheduler-static-to-instance.md](adr/scheduler-static-to-instance.md)、[docs/adr/fsrs-optimizer-pure-java.md](adr/fsrs-optimizer-pure-java.md)。测试清单见 [docs/tests.md](tests.md)。
 
 ---
 

@@ -1,5 +1,7 @@
 # CONTEXT — Chat Agent
 
+> 架构细节见 [docs/architecture.md](docs/architecture.md)，前端规范见 [docs/frontend-notes.md](docs/frontend-notes.md)，FSRS 算法见 [docs/fsrs.md](docs/fsrs.md)，测试清单见 [docs/tests.md](docs/tests.md)。
+
 Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（UserLearningProfile）。
 
 ## People and Identity

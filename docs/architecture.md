@@ -369,6 +369,8 @@ Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AF
 
 ### Flashcard 模块数据模型
 
+> FSRS 算法、调度器、优化器详解见 [docs/fsrs.md](fsrs.md)。术语定义见 [CONTEXT.md](../CONTEXT.md) 中 Flashcard 相关条目。
+
 闪卡模块独立于聊天会话，拥有自己的 JPA 实体和表：
 
 ```
@@ -473,6 +475,8 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 ```
 
 ---
+
+> 前端实现规范与浏览器兼容处理见 [docs/frontend-notes.md](frontend-notes.md)。前端架构决策见 [docs/adr/frontend-react-migration.md](adr/frontend-react-migration.md)。
 
 ## 九、前端 UI 布局（实现版本）
 

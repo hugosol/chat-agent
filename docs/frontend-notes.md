@@ -1,5 +1,7 @@
 # Frontend Notes
 
+> 前端架构决策见 [docs/adr/frontend-react-migration.md](adr/frontend-react-migration.md)，中心化状态管理见 [docs/adr/centralized-chat-state.md](adr/centralized-chat-state.md)，测试清单见 [docs/tests.md](tests.md)。
+
 Chat Agent 前端实现笔记：浏览器兼容性问题、CSS 模式、可复用惯例。与 `docs/architecture.md`（架构决策）和 `docs/adr/`（架构决策记录）互补——本文档记录实现层面的模式和陷阱，而非架构选择。
 
 ---
