@@ -6,7 +6,7 @@
         </encoder>
     </appender>
 
-    <springProfile name="local">
+    <springProfile name="local,prd">
         <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>logs/chat-agent.log</file>
             <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">

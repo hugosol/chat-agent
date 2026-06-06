@@ -572,10 +572,11 @@ chat-agent/
 │   │   │   ├── CardState.java                 // 卡片状态记录
 │   │   │   └── Rating.java                    // AGAIN/HARD/GOOD/EASY
 │   │
-│   ├── controller/                         // REST API
-│   │   ├── FlashcardController.java       // POST /api/cards/add, GET /api/tags, import/export, forget
-│   │   ├── ReviewController.java          // GET /api/review/start, POST /api/review/next, stats, forget, preferences
-│   │   └── FsrsOptimizeController.java    // POST /api/fsrs/optimize (async + progress polling)
+    │   ├── controller/                         // REST API
+    │   │   ├── FlashcardController.java       // POST /api/cards/add, GET /api/tags, import/export, forget, PATCH back
+    │   │   ├── ReviewController.java          // GET /api/review/start, POST /api/review/next, stats, forget, preferences
+    │   │   ├── FsrsOptimizeController.java    // POST /api/fsrs/optimize (async + progress polling)
+    │   │   └── TuneController.java            // GET /api/tune/review-count, optimize-logs, reschedule-logs
 │   │
 │   ├── agent/                              // Agent 调用封装
 │   │   ├── common/                         // 横切关注点：TaskRunner 公共模块
@@ -789,17 +790,18 @@ src/main/frontend/
     │       ├── TagTable.module.css
     │       ├── TabBar.tsx                   // Cards / Tags 切换 Tab
     │       └── TabBar.module.css
-    │   ├── settings/                        // Settings 页面（planned）
-    │   │   ├── SettingsPage.tsx             // 9 个字段的统一设置页面
-    │   │   └── SettingsPage.module.css
     │   ├── review/                          // Review 页面组件
     │       ├── ReviewApp.tsx                // Review 入口容器
     │       ├── DeckPicker.tsx               // 牌组/模式/上限选择
-    │       ├── ReviewPage.tsx               // 复习主流程（翻面 + 评分 + 统计栏）
-    │       ├── CardDisplay.tsx              // 卡片正面/背面展示
+    │       ├── ReviewPage.tsx               // 复习主流程（翻面 + 评分 + 统计栏 + 背面对应编辑）
+    │       ├── CardDisplay.tsx              // 卡片正面/背面展示（翻转后内联编辑 back）
     │       ├── RatingButtons.tsx            // 四级评分按钮（含间隔预览）
     │       ├── StatsBar.tsx                 // 实时复习统计
     │       └── CompletePage.tsx             // 复习完成页
+    │   ├── tune/                            // Tune 页面（FSRS 参数变迁追踪）
+    │   │   ├── TuneApp.tsx                  // ReviewLog 总数 + Optimize/Reschedule 日志列表
+    │   │   └── TuneApp.module.css
+    │   ├── settings/                        // Settings 页面
     ├── state/                               // React 状态管理
     │   ├── chatState.ts                     (ChatState, Message, AppStatus, Action, initialState)
     │   ├── chatReducer.ts                   (纯函数 reducer，11 种 Action)
@@ -807,13 +809,21 @@ src/main/frontend/
     ├── entry/                               // Vite Library Mode 入口
     │   ├── header-entry.tsx                 (挂载到 window.ChatAgent.mountHeader)
     │   ├── chat-entry.tsx                   (挂载到 window.ChatAgent.mountChatAgent)
-    │   └── manage-entry.tsx                 (挂载到 window.ChatAgent.mountManageApp)
-    └── __tests__/                           // Vitest 单元测试（195 tests）
+    │   ├── manage-entry.tsx                 (挂载到 window.ChatAgent.mountManageApp)
+    │   ├── review-entry.tsx                 (挂载到 window.ChatAgent.mountReviewApp)
+    │   ├── settings-entry.tsx               (挂载到 window.ChatAgent.mountSettingsApp)
+    │   ├── profile-entry.tsx                (挂载到 window.ChatAgent.mountProfileApp)
+    │   └── tune-entry.tsx                   (挂载到 window.ChatAgent.mountTuneApp)
+    └── __tests__/                           // Vitest 单元测试（294 tests）
         ├── chat/                            (ChatInput, MessageList, Footer, StatusBar, ReportModal, DebugPanel, FlashcardPanel)
         ├── manage/                          (ManageApp, CardsTab, TagsTab, CardList, CardBlock, CardToolbar, TagTable, TabBar)
         ├── shared/                          (Modal, Toast, ChipInput, Pagination, utils, tts, useTagAutocomplete)
         ├── state/                           (chatReducer)
         ├── header/                          (Header)
+        ├── review/                          (ReviewApp, CardDisplay, RatingButtons, DeckPicker, CompletePage, StatsBar)
+        ├── tune/                            (TuneApp)
+        ├── settings/                        (SettingsPage)
+        ├── profile/                         (ProfileApp, UserManagement, PasswordChangeForm)
         └── correction-sidebar/              (CorrectionSidebar)
 ```
 
@@ -831,7 +841,7 @@ src/main/frontend/
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
 | **TTS** | 浏览器 SpeechSynthesis（🔊 按钮手动触发） | OpenAI TTS（自然度更高） |
-| **闪卡** | 录入 + 批量 CSV + 复习（4 模式 + 评分预览 + ReviewLog + forget）+ FSRS 优化器 + 学习设置页 | Leech 挂起 + 更多 Review 增强 |
+| **闪卡** | 录入 + 批量 CSV + 复习（4 模式 + 评分预览 + ReviewLog + forget + 内联编辑 back）+ FSRS 优化器 + 学习设置页 + Tune 日志页 | Leech 挂起 + 更多 Review 增强 |
 | **LangGraph** | 1 节点线性图（仅 correction） | 可探索条件边 + 子图 |
 | **持久化** | H2 File | H2 File（不变） |
 | **恢复** | MemorySaver | 可升级到 Postgres/Redis Saver |

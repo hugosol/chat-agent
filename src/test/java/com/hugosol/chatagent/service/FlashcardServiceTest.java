@@ -188,4 +188,55 @@ class FlashcardServiceTest {
 
         verify(cardRepository, never()).save(any());
     }
+
+    @Test
+    void updateCardBack_updatesBackAndReturnsCard() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+        Card card = new Card("user-1", "hello", "old back");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Card result = service.updateCardBack("user-1", "card-1", "new back");
+
+        assertThat(result.getBack()).isEqualTo("new back");
+        assertThat(result.getFront()).isEqualTo("hello");
+        verify(cardRepository).save(card);
+    }
+
+    @Test
+    void updateCardBack_emptyBack_throws422() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        assertThatThrownBy(() -> service.updateCardBack("user-1", "card-1", "   "))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        verify(cardRepository, never()).save(any());
+    }
+
+    @Test
+    void updateCardBack_cardNotFound_throws404() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+        when(cardRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateCardBack("user-1", "nonexistent", "new back"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void updateCardBack_wrongUser_throws404() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+        Card card = new Card("other-user", "hello", "old back");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        assertThatThrownBy(() -> service.updateCardBack("user-1", "card-1", "new back"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
 }

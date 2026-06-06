@@ -179,7 +179,8 @@ FSRS 中 lapses 是**连续犯错计数**：在 Review 状态点 Again 时 +1，
 2. **异步执行**: `@Async("optimizerExecutor")`，进度通过 `taskId` 轮询
 3. **损失比较**: 仅当优化后 loss < 默认参数 loss 时才保存
 4. **参数保存**: 写入 `FsrsParameters` 表，清除 `fsrsConfig` 缓存
-5. **重调度**: 调用 `ReviewService.rescheduleAllCards(userId)`，异步重放所有 ReviewLog
+5. **重调度**: 调用 `rescheduleCards()`，异步重放所有 ReviewLog
+6. **审计记录**: 每次优化和重调度调用都会写入 `fsrs_optimize_logs` 和 `fsrs_reschedule_logs` 表，包含 loss 变化、数据量、迭代次数、耗时、触发方式（手动/定时）等信息。Tune 页面（`/tune`）展示这些日志。
 
 ### 4.3 API 端点
 
@@ -254,7 +255,8 @@ FSRS 中 lapses 是**连续犯错计数**：在 Review 状态点 Again 时 +1，
 |------|------|------|
 | `POST` | `/api/cards/add` | 创建卡片（front/back/tagIds），FSRS 自动初始化 |
 | `GET` | `/api/cards?search=&deckId=&page=&size=` | 分页列表，支持搜索和牌组筛选 |
-| `PUT` | `/api/cards/{id}` | 编辑卡片 |
+| `PUT` | `/api/cards/{id}` | 编辑卡片（front、back、tags） |
+| `PATCH` | `/api/cards/{id}/back` | 编辑卡片背面（仅 back，review 页内联编辑） |
 | `DELETE` | `/api/cards/{id}` | 删除卡片 |
 | `GET` | `/api/tags?type=` | 列出标签（可过滤 type） |
 | `POST` | `/api/tags` | 创建标签 |
@@ -298,6 +300,17 @@ UserPreferences ── userId (unique)
   │ newCardDailyLimit, learningSteps, relearningSteps,
   │ desiredRetention, maximumInterval, enableFuzz, shuffleDueCards,
   │ dayStartHour, timezone, lastDeckId, lastMode
+
+FsrsOptimizeLog ── userId
+  │ triggerType (MANUAL/SCHEDULED), status (SUCCESS/FAILED/SKIPPED),
+  │ totalReviewLogs, nonSameDayReviews, cardSequences, epochs, iterations,
+  │ finalLoss, defaultLoss, lossImprovement, paramsUpdated,
+  │ weightsBefore/After (JSON), errorMessage, startTime, endTime, durationMs
+
+FsrsRescheduleLog ── userId, optimizeLogId (ref)
+  │ triggerType, status (SUCCESS/FAILED),
+  │ totalCardsWithHistory, rescheduledCards,
+  │ errorMessage, startTime, endTime, durationMs
 ```
 
 ### 6.4 服务层依赖
@@ -312,7 +325,13 @@ ReviewController → ReviewService → CardRepository, ReviewLogRepository
 
 FsrsOptimizeController → FsrsOptimizeService → FsrsOptimizer
                                              → FsrsParametersRepository
-                                             → ReviewService.rescheduleAllCards
+                                             → FsrsOptimizeLogRepository
+                                             → FsrsRescheduleLogRepository
+                                             → rescheduleCards
+
+TuneController → ReviewLogRepository
+               → FsrsOptimizeLogRepository
+               → FsrsRescheduleLogRepository
 ```
 
 ### 6.5 线程池
@@ -338,7 +357,11 @@ FsrsOptimizeController → FsrsOptimizeService → FsrsOptimizer
 | `ReviewServiceTest` | rateCard/forgetCard/getNextCard/computeStats 26+ |
 | `CardBatchServiceTest` | 导入/导出 CSV + 校验 + 错误处理 |
 | `ReviewControllerTest` | MockMvc 端点测试 |
-| `FlashcardControllerTest` | MockMvc 端点测试 |
+| `FlashcardControllerTest` | MockMvc 端点测试（含 PATCH back） |
+| `TuneControllerTest` | MockMvc 端点测试（review-count, optimize-logs, reschedule-logs） |
+| `FsrsOptimizeServiceTest` | 优化日志写入验证（SKIPPED/SUCCESS/FAILED + triggerType） |
+| `FsrsOptimizeLogRepositoryTest` | DataJpaTest：实体持久化、分页、用户隔离 |
+| `FsrsRescheduleLogRepositoryTest` | DataJpaTest：同上 |
 
 ### 7.2 E2E 测试
 

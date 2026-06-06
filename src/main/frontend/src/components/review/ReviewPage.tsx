@@ -19,6 +19,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
   const [card, setCard] = useState<ReviewCard | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [preview, setPreview] = useState<PreviewInfo | null>(null);
+  const [editing, setEditing] = useState(false);
   const [stats, setStats] = useState<ReviewStats>({
     reviewedToday: 0, remaining: 0, learnedToday: 0, dailyLimit: limit, nextDueAt: null,
   });
@@ -85,6 +86,10 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
     }
   };
 
+  const handleCardUpdated = (updated: ReviewCard) => {
+    setCard(updated);
+  };
+
   if (pageState === "start") {
     return <div className={styles.container}>Loading...</div>;
   }
@@ -108,12 +113,19 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
         </span>
       </div>
 
-      <div className={styles.content} onClick={!flipped ? handleFlip : undefined}>
-        <CardDisplay key={card.id} front={card.front} back={card.back} />
+      <div className={styles.content} onClick={!flipped && !editing ? handleFlip : undefined}>
+        <CardDisplay
+          key={card.id}
+          front={card.front}
+          back={card.back}
+          cardId={card.id}
+          onCardUpdated={handleCardUpdated}
+          onEditingChange={setEditing}
+        />
       </div>
 
       {flipped && (
-        <RatingButtons onRate={handleNextCard} disabled={pageState === "submit"} preview={preview} />
+        <RatingButtons onRate={handleNextCard} disabled={pageState === "submit" || editing} preview={preview} />
       )}
 
       <StatsBar stats={stats} />

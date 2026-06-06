@@ -226,6 +226,22 @@ public class FlashcardService {
     }
 
     @Transactional
+    public Card updateCardBack(String userId, String cardId, String back) {
+        if (back == null || back.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片背面不能为空");
+        }
+
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!card.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        card.setBack(back.trim());
+        return cardRepository.save(card);
+    }
+
+    @Transactional
     public void deleteCard(String userId, String cardId) {
         Card card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));

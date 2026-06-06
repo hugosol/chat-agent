@@ -4,6 +4,7 @@ import com.hugosol.chatagent.dto.AddCardRequest;
 import com.hugosol.chatagent.dto.AddCardResponse;
 import com.hugosol.chatagent.dto.CreateTagRequest;
 import com.hugosol.chatagent.dto.ImportResult;
+import com.hugosol.chatagent.dto.PatchCardBackRequest;
 import com.hugosol.chatagent.dto.TagResponse;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
@@ -17,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -124,6 +126,13 @@ public class FlashcardController {
     public ResponseEntity<AddCardResponse> updateCard(@PathVariable String id, @RequestBody AddCardRequest request) {
         String userId = getUserId();
         Card card = flashcardService.updateCard(userId, id, request.front(), request.back(), request.tagIds());
+        return ResponseEntity.ok(toAddCardResponse(card));
+    }
+
+    @PatchMapping("/cards/{id}/back")
+    public ResponseEntity<AddCardResponse> patchCardBack(@PathVariable String id, @RequestBody PatchCardBackRequest request) {
+        String userId = getUserId();
+        Card card = flashcardService.updateCardBack(userId, id, request.back());
         return ResponseEntity.ok(toAddCardResponse(card));
     }
 
