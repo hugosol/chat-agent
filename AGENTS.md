@@ -22,7 +22,7 @@ mvn spring-boot:run
 # H2 console (for debugging data, local profile opens without auth)
 # http://localhost:8080/h2-console — jdbc:h2:file:./data/englishcoach — sa / (empty)
 
-# File logs (only with local profile, written to ./logs/)
+# File logs (with local or prd profile, written to ./logs/)
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
@@ -48,8 +48,9 @@ com.hugosol.chatagent/
 │   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName, TaskContext, ErrorStrategy
 ├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
-├── controller/      # FlashcardController — REST API (Cards CRUD + Tags CRUD + Import/Export, 10 endpoints)
+├── controller/      # FlashcardController — REST API (Cards CRUD + Tags CRUD + Import/Export + Back patch, 11 endpoints)
 │                     # ReviewController — Review API (start, next, stats, decks)
+│                     # TuneController — Tune API (review-count, optimize-logs, reschedule-logs)
 ├── protocol/        # ClientMessage/ServerMessage sealed types, ProtocolDispatcher, MessageHandler
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 │                   # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
@@ -125,11 +126,11 @@ Server → Client:
 > 完整 FSRS 参考见 [docs/fsrs.md](docs/fsrs.md)
 > 术语定义见 [CONTEXT.md](CONTEXT.md) 中 Flashcard 相关条目
 
-- **REST API**: `FlashcardController` (cards CRUD, import/export) + `ReviewController` (start, next, stats, decks). Authenticated via JSESSIONID cookie.
+- **REST API**: `FlashcardController` (cards CRUD, import/export, back patch) + `ReviewController` (start, next, stats, decks). `PATCH /api/cards/{id}/back` allows editing card back text during review. Authenticated via JSESSIONID cookie.
 - **FSRS Scheduler**: instance class, `FsrsSchedulerConfig` runtime record. 4 review modes (STANDARD/REVIEW_ONLY/NEW_ONLY/CRAM).
-- **FSRS Optimizer**: pure Java, Adam + finite-difference gradients (h=1e-4). Triggered via `POST /api/fsrs/optimize` or `@Scheduled` weekly.
+- **FSRS Optimizer**: pure Java, Adam + finite-difference gradients (h=1e-4). Triggered via `POST /api/fsrs/optimize` or `@Scheduled` weekly. Every invocation is logged to `fsrs_optimize_logs` and `fsrs_reschedule_logs` tables for audit.
 - **Caffeine Cache**: `expireAfterAccess(24h)` on `fsrsConfig` cache.
-- **Frontend pages**: `/manage` (CardsTab/TagsTab), `/review` (DeckPicker → ReviewPage → CompletePage), `/settings` (preferences).
+- **Frontend pages**: `/manage` (CardsTab/TagsTab), `/review` (DeckPicker → ReviewPage → CompletePage, with inline back edit), `/tune` (FSRS optimizer/rescheduler task logs + review count), `/settings` (preferences).
 
 ## Environment
 
@@ -138,13 +139,14 @@ Server → Client:
 | `DEEPSEEK_API_KEY` | *(required by default)* | Bypass with `local` profile: place key in `application-local.yml` |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | |
 | `DEEPSEEK_MODEL` | `deepseek-v4-flash` | Config in `application.yml` |
-| `LOG_DIR` | `./logs/` | File log output directory (local profile only) |
+| `LOG_DIR` | `./logs/` | File log output directory (local and prd profiles) |
 
 No `.env` file support — use `local` profile (`application-local.yml`, gitignored) or set vars directly in shell.
 
 ## Logging
 
-- **File logs**: Only active with `local` profile. Daily rolling, 3-day retention. `./logs/chat-agent.YYYY-MM-DD.log`.
+- **File logs**: Active with `local` and `prd` profiles. Daily rolling, 3-day retention. `./logs/chat-agent.YYYY-MM-DD.log`.
+- **FSRS Task Log**: Optimizer and rescheduler invocations are persisted in `fsrs_optimize_logs` and `fsrs_reschedule_logs` tables. Query: `SELECT * FROM fsrs_optimize_logs ORDER BY start_time DESC`.
 - **LLM Call Log**: Persisted asynchronously in `llm_call_logs` table via `llmLogExecutor` thread pool (core=2, max=4). Records older than 3 days cleaned up on startup. Query: `SELECT * FROM llm_call_logs ORDER BY create_time DESC`.
 
 ## Agent Skills
