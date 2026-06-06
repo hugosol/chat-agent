@@ -6,6 +6,7 @@ services:
       - "127.0.0.1:18080:8080"
     volumes:
       - /你的宿主机数据路径:/app/data
+      - /你的宿主机日志路径:/app/logs
     environment:
       - SPRING_PROFILES_ACTIVE=prd
       - DEEPSEEK_API_KEY=请替换为你的DeepSeek密钥

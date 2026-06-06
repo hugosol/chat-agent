@@ -1,0 +1,109 @@
+.root {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-top: env(safe-area-inset-top, 16px);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.userSelect {
+  padding: 4px 8px;
+  background: #16213e;
+  color: #e0e0e0;
+  border: 1px solid #2a4070;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.countSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #16213e;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.countLabel {
+  color: #888;
+  font-size: 14px;
+}
+
+.countValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3498db;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.section h3 {
+  font-size: 15px;
+  font-weight: 500;
+  color: #aab;
+  margin: 0 0 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: #888;
+  border-bottom: 1px solid #2a4070;
+  font-weight: 500;
+}
+
+.table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #16213e;
+  color: #ccc;
+}
+
+.empty {
+  text-align: center;
+  color: #666;
+  padding: 16px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #aab;
+}
+
+.pager button {
+  padding: 4px 12px;
+  background: #16213e;
+  color: #e0e0e0;
+  border: 1px solid #2a4070;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

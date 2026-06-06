@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && vite build --config vite.config.chat.ts && vite build --config vite.config.manage.ts && vite build --config vite.config.review.ts && vite build --config vite.config.settings.ts && vite build --config vite.config.profile.ts",
+    "build": "vite build && vite build --config vite.config.chat.ts && vite build --config vite.config.manage.ts && vite build --config vite.config.review.ts && vite build --config vite.config.settings.ts && vite build --config vite.config.profile.ts && vite build --config vite.config.tune.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -22,3 +22,4 @@
     "vitest": "^3.2.4"
   }
 }
+

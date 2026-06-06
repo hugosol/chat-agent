@@ -8,11 +8,18 @@ import com.hugosol.chatagent.flashcard.FsrsScheduler;
 import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.FsrsParameters;
+import com.hugosol.chatagent.model.FsrsOptimizeLog;
+import com.hugosol.chatagent.model.FsrsRescheduleLog;
+import com.hugosol.chatagent.model.OptimizeStatus;
+import com.hugosol.chatagent.model.RescheduleStatus;
 import com.hugosol.chatagent.model.ReviewLog;
+import com.hugosol.chatagent.model.TriggerType;
 import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.model.User;
 import com.hugosol.chatagent.repository.CardRepository;
+import com.hugosol.chatagent.repository.FsrsOptimizeLogRepository;
 import com.hugosol.chatagent.repository.FsrsParametersRepository;
+import com.hugosol.chatagent.repository.FsrsRescheduleLogRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
 import com.hugosol.chatagent.repository.UserRepository;
 
@@ -27,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -46,6 +54,8 @@ public class FsrsOptimizeService {
     private final FsrsConfigService fsrsConfigService;
     private final CacheManager cacheManager;
     private final ExecutorService optimizerExecutor;
+    private final FsrsOptimizeLogRepository optimizeLogRepository;
+    private final FsrsRescheduleLogRepository rescheduleLogRepository;
     private final UserRepository userRepository;
 
     private final ConcurrentHashMap<String, OptimizeProgress> progressMap = new ConcurrentHashMap<>();
@@ -58,6 +68,8 @@ public class FsrsOptimizeService {
                                FsrsConfigService fsrsConfigService,
                                CacheManager cacheManager,
                                @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor,
+                               FsrsOptimizeLogRepository optimizeLogRepository,
+                               FsrsRescheduleLogRepository rescheduleLogRepository,
                                UserRepository userRepository) {
         this.reviewLogRepository = reviewLogRepository;
         this.paramsRepository = paramsRepository;
@@ -66,6 +78,8 @@ public class FsrsOptimizeService {
         this.fsrsConfigService = fsrsConfigService;
         this.cacheManager = cacheManager;
         this.optimizerExecutor = optimizerExecutor;
+        this.optimizeLogRepository = optimizeLogRepository;
+        this.rescheduleLogRepository = rescheduleLogRepository;
         this.userRepository = userRepository;
     }
 
@@ -78,6 +92,10 @@ public class FsrsOptimizeService {
     }
 
     public String startOptimize(String userId) {
+        return startOptimize(userId, TriggerType.MANUAL);
+    }
+
+    public String startOptimize(String userId, TriggerType triggerType) {
         String runningTaskId = userTaskMap.get(userId);
         if (runningTaskId != null && isRunning(runningTaskId)) {
             return runningTaskId;
@@ -86,7 +104,7 @@ public class FsrsOptimizeService {
         String taskId = UUID.randomUUID().toString();
         progressMap.put(taskId, OptimizeProgress.pending());
         userTaskMap.put(userId, taskId);
-        executeOptimize(userId, taskId);
+        executeOptimize(userId, taskId, triggerType);
         return taskId;
     }
 
@@ -96,7 +114,8 @@ public class FsrsOptimizeService {
     }
 
     @Async("optimizerExecutor")
-    public CompletableFuture<OptimizeResult> executeOptimize(String userId, String taskId) {
+    public CompletableFuture<OptimizeResult> executeOptimize(String userId, String taskId, TriggerType triggerType) {
+        long startTime = System.currentTimeMillis();
         try {
             List<ReviewLog> logs = reviewLogRepository.findByUserIdOrderByReviewedAtAsc(userId);
             int totalLogs = logs.size();
@@ -105,6 +124,18 @@ public class FsrsOptimizeService {
                 String reason = "insufficient_data: " + totalLogs + " < " + MIN_REVIEWS;
                 progressMap.put(taskId, OptimizeProgress.skipped(reason));
                 log.info("FSRS optimize skipped for user {}: {}", userId, reason);
+
+                FsrsOptimizeLog optLog = new FsrsOptimizeLog();
+                optLog.setUserId(userId);
+                optLog.setTriggerType(triggerType);
+                optLog.setStatus(OptimizeStatus.SKIPPED);
+                optLog.setTotalReviewLogs(totalLogs);
+                optLog.setErrorMessage(reason);
+                optLog.setStartTime(Instant.ofEpochMilli(startTime));
+                optLog.setEndTime(Instant.now());
+                optLog.setDurationMs(System.currentTimeMillis() - startTime);
+                optimizeLogRepository.save(optLog);
+
                 userTaskMap.remove(userId);
                 return CompletableFuture.completedFuture(null);
             }
@@ -124,6 +155,19 @@ public class FsrsOptimizeService {
             if (result.iterations() == 0) {
                 String reason = "insufficient_data: " + optimizer.totalNonSameDayReviews() + " non-same-day reviews < " + MIN_REVIEWS;
                 progressMap.put(taskId, OptimizeProgress.skipped(reason));
+
+                FsrsOptimizeLog optLog = new FsrsOptimizeLog();
+                optLog.setUserId(userId);
+                optLog.setTriggerType(triggerType);
+                optLog.setStatus(OptimizeStatus.SKIPPED);
+                optLog.setTotalReviewLogs(totalLogs);
+                optLog.setNonSameDayReviews(optimizer.totalNonSameDayReviews());
+                optLog.setErrorMessage(reason);
+                optLog.setStartTime(Instant.ofEpochMilli(startTime));
+                optLog.setEndTime(Instant.now());
+                optLog.setDurationMs(System.currentTimeMillis() - startTime);
+                optimizeLogRepository.save(optLog);
+
                 userTaskMap.remove(userId);
                 return CompletableFuture.completedFuture(null);
             }
@@ -132,10 +176,31 @@ public class FsrsOptimizeService {
             FsrsOptimizer defaultOptimizer = new FsrsOptimizer(logs, defaultConfig);
             double defaultLoss = defaultOptimizer.computeLoss(defaultConfig.weights());
 
+            String weightsBeforeJson = Arrays.toString(config.weights());
+
             if (result.finalLoss() >= defaultLoss) {
                 log.warn("FSRS optimize for user {}: optimized loss {} >= default loss {}, keeping old params",
                         userId, result.finalLoss(), defaultLoss);
                 progressMap.put(taskId, OptimizeProgress.completed(result));
+
+                FsrsOptimizeLog optLog = new FsrsOptimizeLog();
+                optLog.setUserId(userId);
+                optLog.setTriggerType(triggerType);
+                optLog.setStatus(OptimizeStatus.SUCCESS);
+                optLog.setTotalReviewLogs(totalLogs);
+                optLog.setNonSameDayReviews(optimizer.totalNonSameDayReviews());
+                optLog.setEpochs(5);
+                optLog.setIterations(result.iterations());
+                optLog.setFinalLoss(result.finalLoss());
+                optLog.setDefaultLoss(defaultLoss);
+                optLog.setLossImprovement(defaultLoss - result.finalLoss());
+                optLog.setParamsUpdated(false);
+                optLog.setWeightsBefore(weightsBeforeJson);
+                optLog.setStartTime(Instant.ofEpochMilli(startTime));
+                optLog.setEndTime(Instant.now());
+                optLog.setDurationMs(System.currentTimeMillis() - startTime);
+                optimizeLogRepository.save(optLog);
+
                 userTaskMap.remove(userId);
                 return CompletableFuture.completedFuture(result);
             }
@@ -144,9 +209,33 @@ public class FsrsOptimizeService {
 
             cacheManager.getCache("fsrsConfig").evict(userId);
 
-            rescheduleCards(userId, result.weights(), config);
+            String optimizeLogId = UUID.randomUUID().toString();
+            rescheduleCards(userId, result.weights(), config, optimizeLogId, triggerType);
 
             progressMap.put(taskId, OptimizeProgress.completed(result));
+
+            String weightsAfterJson = Arrays.toString(result.weights());
+
+            FsrsOptimizeLog optLog = new FsrsOptimizeLog();
+            optLog.setId(optimizeLogId);
+            optLog.setUserId(userId);
+            optLog.setTriggerType(triggerType);
+            optLog.setStatus(OptimizeStatus.SUCCESS);
+            optLog.setTotalReviewLogs(totalLogs);
+            optLog.setNonSameDayReviews(optimizer.totalNonSameDayReviews());
+            optLog.setEpochs(5);
+            optLog.setIterations(result.iterations());
+            optLog.setFinalLoss(result.finalLoss());
+            optLog.setDefaultLoss(defaultLoss);
+            optLog.setLossImprovement(defaultLoss - result.finalLoss());
+            optLog.setParamsUpdated(true);
+            optLog.setWeightsBefore(weightsBeforeJson);
+            optLog.setWeightsAfter(weightsAfterJson);
+            optLog.setStartTime(Instant.ofEpochMilli(startTime));
+            optLog.setEndTime(Instant.now());
+            optLog.setDurationMs(System.currentTimeMillis() - startTime);
+            optimizeLogRepository.save(optLog);
+
             userTaskMap.remove(userId);
 
             log.info("FSRS optimize completed for user {}: loss={} (default={}), iterations={}, durationMs={}",
@@ -157,6 +246,17 @@ public class FsrsOptimizeService {
         } catch (Exception e) {
             log.error("FSRS optimize failed for user {}", userId, e);
             progressMap.put(taskId, OptimizeProgress.failed(e.getMessage()));
+
+            FsrsOptimizeLog optLog = new FsrsOptimizeLog();
+            optLog.setUserId(userId);
+            optLog.setTriggerType(triggerType);
+            optLog.setStatus(OptimizeStatus.FAILED);
+            optLog.setErrorMessage(e.getMessage());
+            optLog.setStartTime(Instant.ofEpochMilli(startTime));
+            optLog.setEndTime(Instant.now());
+            optLog.setDurationMs(System.currentTimeMillis() - startTime);
+            optimizeLogRepository.save(optLog);
+
             userTaskMap.remove(userId);
             return CompletableFuture.failedFuture(e);
         }
@@ -175,7 +275,7 @@ public class FsrsOptimizeService {
                             userId, reviewCount, MIN_REVIEWS);
                     continue;
                 }
-                startOptimize(userId);
+                startOptimize(userId, TriggerType.SCHEDULED);
                 log.info("Scheduled FSRS optimize started for user {}", userId);
             } catch (Exception e) {
                 log.error("Scheduled FSRS optimize failed for user {}", user.getUsername(), e);
@@ -195,50 +295,94 @@ public class FsrsOptimizeService {
     }
 
     @Transactional
-    void rescheduleCards(String userId, double[] weights, FsrsSchedulerConfig baseConfig) {
+    void rescheduleCards(String userId, double[] weights, FsrsSchedulerConfig baseConfig,
+                         String optimizeLogId, TriggerType triggerType) {
+        long startTime = System.currentTimeMillis();
         List<String> cardIds = reviewLogRepository.findDistinctCardIdsByUserId(userId);
-        if (cardIds.isEmpty()) {
-            return;
-        }
+        int totalCardsWithHistory = cardIds.size();
 
-        FsrsSchedulerConfig config = new FsrsSchedulerConfig(
-                weights,
-                baseConfig.desiredRetention(),
-                baseConfig.learningSteps(),
-                baseConfig.relearningSteps(),
-                baseConfig.maximumInterval(),
-                baseConfig.enableFuzz(),
-                baseConfig.enableShortTerm()
-        );
-
-        FsrsScheduler scheduler = new FsrsScheduler(config);
-        List<Card> cards = cardRepository.findAllById(cardIds);
-        List<Card> updatedCards = new ArrayList<>();
-        Instant now = Instant.now();
-
-        for (Card card : cards) {
-            List<ReviewLog> logs = reviewLogRepository.findByUserIdAndCardIdOrderByReviewedAtAsc(userId, card.getId());
-            if (logs.isEmpty()) {
-                continue;
+        try {
+            if (cardIds.isEmpty()) {
+                FsrsRescheduleLog resLog = new FsrsRescheduleLog();
+                resLog.setUserId(userId);
+                resLog.setOptimizeLogId(optimizeLogId);
+                resLog.setTriggerType(triggerType);
+                resLog.setStatus(RescheduleStatus.SUCCESS);
+                resLog.setTotalCardsWithHistory(0);
+                resLog.setRescheduledCards(0);
+                resLog.setStartTime(Instant.ofEpochMilli(startTime));
+                resLog.setEndTime(Instant.now());
+                resLog.setDurationMs(System.currentTimeMillis() - startTime);
+                rescheduleLogRepository.save(resLog);
+                return;
             }
-            CardState result = scheduler.reschedule(logs, now);
 
-            card.setStability(result.stability());
-            card.setDifficulty(result.difficulty());
-            card.setCardState(result.state());
-            card.setDue(result.due());
-            card.setReps(result.reps());
-            card.setLapses(result.lapses());
-            card.setStep(result.step());
-            card.setLastReview(result.lastReview());
+            FsrsSchedulerConfig config = new FsrsSchedulerConfig(
+                    weights,
+                    baseConfig.desiredRetention(),
+                    baseConfig.learningSteps(),
+                    baseConfig.relearningSteps(),
+                    baseConfig.maximumInterval(),
+                    baseConfig.enableFuzz(),
+                    baseConfig.enableShortTerm()
+            );
 
-            updatedCards.add(card);
+            FsrsScheduler scheduler = new FsrsScheduler(config);
+            List<Card> cards = cardRepository.findAllById(cardIds);
+            List<Card> updatedCards = new ArrayList<>();
+            Instant now = Instant.now();
+
+            for (Card card : cards) {
+                List<ReviewLog> logs = reviewLogRepository.findByUserIdAndCardIdOrderByReviewedAtAsc(userId, card.getId());
+                if (logs.isEmpty()) {
+                    continue;
+                }
+                CardState result = scheduler.reschedule(logs, now);
+
+                card.setStability(result.stability());
+                card.setDifficulty(result.difficulty());
+                card.setCardState(result.state());
+                card.setDue(result.due());
+                card.setReps(result.reps());
+                card.setLapses(result.lapses());
+                card.setStep(result.step());
+                card.setLastReview(result.lastReview());
+
+                updatedCards.add(card);
+            }
+
+            if (!updatedCards.isEmpty()) {
+                cardRepository.saveAll(updatedCards);
+            }
+
+            FsrsRescheduleLog resLog = new FsrsRescheduleLog();
+            resLog.setUserId(userId);
+            resLog.setOptimizeLogId(optimizeLogId);
+            resLog.setTriggerType(triggerType);
+            resLog.setStatus(RescheduleStatus.SUCCESS);
+            resLog.setTotalCardsWithHistory(totalCardsWithHistory);
+            resLog.setRescheduledCards(updatedCards.size());
+            resLog.setStartTime(Instant.ofEpochMilli(startTime));
+            resLog.setEndTime(Instant.now());
+            resLog.setDurationMs(System.currentTimeMillis() - startTime);
+            rescheduleLogRepository.save(resLog);
+
+            log.info("FSRS optimize rescheduled {} cards for user {}", updatedCards.size(), userId);
+
+        } catch (Exception e) {
+            log.error("FSRS reschedule failed for user {}", userId, e);
+
+            FsrsRescheduleLog resLog = new FsrsRescheduleLog();
+            resLog.setUserId(userId);
+            resLog.setOptimizeLogId(optimizeLogId);
+            resLog.setTriggerType(triggerType);
+            resLog.setStatus(RescheduleStatus.FAILED);
+            resLog.setTotalCardsWithHistory(totalCardsWithHistory);
+            resLog.setErrorMessage(e.getMessage());
+            resLog.setStartTime(Instant.ofEpochMilli(startTime));
+            resLog.setEndTime(Instant.now());
+            resLog.setDurationMs(System.currentTimeMillis() - startTime);
+            rescheduleLogRepository.save(resLog);
         }
-
-        if (!updatedCards.isEmpty()) {
-            cardRepository.saveAll(updatedCards);
-        }
-
-        log.info("FSRS optimize rescheduled {} cards for user {}", updatedCards.size(), userId);
     }
 }

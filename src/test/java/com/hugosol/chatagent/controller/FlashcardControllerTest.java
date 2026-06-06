@@ -360,6 +360,45 @@ class FlashcardControllerTest {
 
     @Test
     @WithMockUser(username = "admin")
+    void patchCardBack_updatesBackAndReturnsCard() throws Exception {
+        Card card = new Card("admin", "yesterday", "updated back");
+        card.setId("card-1");
+        card.setCardState(0);
+        card.setDue(Instant.parse("2026-05-30T10:00:00Z"));
+
+        when(flashcardService.updateCardBack(eq("admin"), eq("card-1"), eq("new back")))
+                .thenReturn(card);
+
+        String requestJson = """
+                {"back":"new back"}""";
+
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/cards/card-1/back")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.back").value("updated back"))
+                .andExpect(jsonPath("$.id").value("card-1"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void patchCardBack_emptyBack_returns422() throws Exception {
+        when(flashcardService.updateCardBack(eq("admin"), eq("card-1"), eq("")))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片背面不能为空"));
+
+        String requestJson = """
+                {"back":""}""";
+
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/cards/card-1/back")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
     void deleteCard_notFound_returns404() throws Exception {
         doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND))
                 .when(flashcardService).deleteCard(any(), any());

@@ -195,4 +195,19 @@ describe("Header", () => {
     const link = await findByTestId("nav-profile-link");
     expect(link.getAttribute("data-active")).toBe("true");
   });
+
+  it("renders Tune nav link with correct href", async () => {
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    const link = (await findByTestId("nav-tune-link")) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/tune/index.html");
+    expect(link.textContent).toContain("Tune");
+  });
+
+  it("highlights Tune link on tune page path", async () => {
+    setPath("/tune/index.html");
+    const { findByTestId } = render(<Header />);
+    const link = await findByTestId("nav-tune-link");
+    expect(link.getAttribute("data-active")).toBe("true");
+  });
 });
