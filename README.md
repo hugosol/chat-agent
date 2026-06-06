@@ -1,382 +1,127 @@
 # Chat Agent
 
-AI-powered English speaking practice tool for Chinese developers.  
-Uses **LangChain4j** + **langgraph4j** + **DeepSeek** to run 5 AI agents that role-play conversations, correct English errors in real-time, generate session reports, and maintain cross-session memory with structured topic cues.
+AI 英语口语练习工具，兼具聊天练习和闪卡复习两大功能。通过 AI Agent 角色扮演进行实时英文对话，自动纠正语法/措辞错误，生成学习报告，并内置 FSRS-6 间隔重复算法管理词汇复习。
 
 ## Quick Start
 
+### 环境依赖
+
+- **Java 17+** / **Maven 3.9+**
+- **DeepSeek API Key**（[获取](https://platform.deepseek.com/api_keys)）
+
+### 本地启动
+
 ```bash
-# 1. Clone
 git clone <repo-url>
 cd chat-agent
 
-# 2. Set DeepSeek API key (pick one):
-#    Option A: Create application-local.yml and set the key there, then run with local profile
-#    Option B: Set environment variable
-
-#    Option A — local profile:
-#    Create src/main/resources/application-local.yml with:
-#      langchain4j.openai.chat-model.api-key: sk-your-deepseek-api-key
+# 方式 A：local profile（推荐，key 写入 gitignored 文件）
+# 创建 src/main/resources/application-local.yml，写入：
+#   langchain4j.openai.chat-model.api-key: sk-your-key
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 
-#    Option B — environment variable (Windows):
-set DEEPSEEK_API_KEY=sk-your-deepseek-api-key
+# 方式 B：环境变量
+# Windows:
+set DEEPSEEK_API_KEY=sk-your-key
+# macOS / Linux:
+export DEEPSEEK_API_KEY=sk-your-key
 mvn spring-boot:run
-
-#    Option B — environment variable (macOS / Linux):
-export DEEPSEEK_API_KEY=sk-your-deepseek-api-key
-mvn spring-boot:run
-
-# 4. Open browser → http://localhost:8080
-#    Default login: admin / admin123
-#    (credentials configurable via app.initial-users in application.yml)
 ```
 
-> **Note**: Frontend has been **fully migrated** to React + TypeScript (built with Vite). Chat page (`index.html`) and Manage page (`manage/index.html`) are 100% React. All WebSocket messages are handled by `ChatProvider` (React Context + useReducer). All vanilla JS files (`app.js`, `flashcard.js`, `card.js`, `tag.js`, `modal.js`, `style.css`) have been deleted. Only `login/main.js` (10-line error display) remains as vanilla. `src/main/frontend/` has its own `package.json` and uses npm for frontend build. Build output (JS/CSS) is placed in `src/main/resources/static/shared/`. Node.js is required for local development. See `docs/frontend-notes.md` for design patterns and conventions.
+浏览器打开 http://localhost:8080，默认账号 `admin` / `admin123`。
 
-## Docker 部署
+### Docker 部署
 
-### 普通用户（直接用镜像）
+**使用已发布镜像：**
 
 ```bash
-# 1. Clone 仓库
 git clone <repo-url>
 cd chat-agent
-
-# 2. 编辑 docker/docker-compose.yml，替换以下 4 个值：
-#    - image: 用户名替换为你的 GitHub 用户名
-#    - DEEPSEEK_API_KEY: 你的 DeepSeek 密钥
-#    - INITIAL_USER_PASSWORD: 你想要的初始密码
-#    - volumes: 你的 VPS 上存放数据的路径
-#    - ports: 如端口冲突改一下
-
-# 3. 启动
+# 编辑 docker/docker-compose.yml，替换 DEEPSEEK_API_KEY 和 INITIAL_USER_PASSWORD
 docker compose -f docker/docker-compose.yml up -d
-
-# 4. 浏览器打开 http://你的VPS:18080
-#    默认用户名 admin，密码是你设的 INITIAL_USER_PASSWORD
 ```
 
-### 开发者（自己构建镜像）
+**自行构建镜像：**
 
 ```bash
-# 1. 编译 jar
 mvn package -DskipTests
-
-# 2. 构建镜像
 docker build -f docker/Dockerfile -t ghcr.io/你的用户名/chat-agent:latest .
-
-# 3. 推送到 GitHub Container Registry
-docker login ghcr.io
 docker push ghcr.io/你的用户名/chat-agent:latest
 ```
 
-### Nginx Proxy Manager 配置
+部署后配置 Nginx Proxy Manager 反向代理，开启 SSL（Let's Encrypt 自动签发）。
 
-在 NPM 面板添加 Proxy Host：
-- **Domain**: `你的域名`
-- **Scheme**: `http`，**Forward Hostname**: `127.0.0.1`，**Forward Port**: `18080`
-- **SSL**: 开启，Let's Encrypt 自动签发证书
+## 技术栈
 
-## How to Use
+| 技术 | 版本 | 用途 | Reference |
+|------|------|------|-----------|
+| Java | 17 | 主语言 | — |
+| Spring Boot | 3.4.7 | Web 框架，整合 Spring Security / Data JPA | [architecture.md](docs/architecture.md) |
+| LangChain4j | 1.0.0-beta2 | LLM 调用封装（OpenAI 兼容适配器连接 DeepSeek） | [architecture.md](docs/architecture.md#二完整决策日志) |
+| langgraph4j | 1.8.16 | Agent 状态图编排 | [architecture.md](docs/architecture.md#四langgraph-状态机) |
+| H2 | — | 嵌入式文件数据库 | [architecture.md](docs/architecture.md#六数据模型) |
+| WebSocket | — | 客户端-服务端实时双向通信（JSON 协议） | [architecture.md](docs/architecture.md#七websocket-协议) |
+| React + TypeScript | 18 | 前端 UI（Vite Library Mode，CSS Modules） | [frontend-notes.md](docs/frontend-notes.md) |
+| ONNX Runtime | — | RAG 语义检索（all-MiniLM-L6-v2，384 维向量化） | [architecture.md](docs/architecture.md) |
+| FSRS-6 | — | 间隔重复调度算法，决定卡片何时复习 | [fsrs.md](docs/fsrs.md) |
 
-| Step | Action |
-|------|--------|
-| 1 | Log in with username and password at the login page |
-| 2 | Select **mode** (e.g. Standup Meeting, Daily Talk) from the dropdown |
-| 3 | Click **Start Session** |
-| 4 | Type your English message → press **Enter** or click **Send** |
-| 5 | Agent replies with natural English + embedded corrections |
-| 6 | Correction summary appears below your message in chat; tap the **⚠️ N ◂** floating badge at screen center-right to expand the correction sidebar with detailed items |
-| 7 | Click **🔊** on any Agent message to hear TTS playback |
-| 8 | Click **End & Report** to get a fluency score + error summary |
-| — | In Manage page Cards tab, click 📄 button in toolbar → "导出" to download a deck's CSV backup, or "导入" to upload CSV for bulk card entry (including FSRS review progress) |
-| 9 | Click **Logout** in header to sign out |
+## 核心模块
 
-> **iOS tip**: The keyboard microphone (🎤) can be used for system-level dictation — the recognized text appears in the input field, then press Send.
+| 模块 | 解决什么问题 | Reference |
+|------|-------------|-----------|
+| 聊天页面 | 实时 WebSocket 流式对话、异步语法纠错、多轮 RAG 记忆注入 | [architecture.md](docs/architecture.md) |
+| MemoryCue | 跨会话语义记忆，RAG 检索 + 向量化存储，跨回合上下文注入 | [architecture.md](docs/architecture.md) / [CONTEXT.md](CONTEXT.md) |
+| FSRS 调度器 | 间隔重复算法，决定每张闪卡的下次复习时间 | [fsrs.md](docs/fsrs.md) |
+| FSRS 优化器 | 基于复习历史自动调参，Adam 梯度下降优化 W[21] | [fsrs.md](docs/fsrs.md) |
+| 多 Tab 会话管理 | 页面切换自动恢复，防旧数据干扰，一 Session 一 Tab 绑定 | [frontend-notes.md](docs/frontend-notes.md) |
 
-## Profiles
+## 测试与参与开发
 
-| Profile | Config File | Login Required? | H2 Console |
-|---------|------------|:---:|:---:|
-| `default` | `application.yml` | ✅ Yes | Authenticated only |
-| `local` | `application-local.yml` | ✅ Yes | Open (no auth) |
-| `e2e` | `application-e2e.yml` (test only) | ❌ No | Disabled |
+### 覆盖范围
 
-Profiles control authentication via `app.security.permit-all-paths` — a list of URL patterns that bypass login. The `e2e` profile sets `[/**]` to allow unrestricted access for automated tests.
+- **后端单元测试** — Mockito + Spring Test，覆盖 Agent / Service / Config / Controller / Repository 等层
+- **前端单元测试** — Vitest + React Testing Library，覆盖 Chat / Manage / Review / Settings 全部页面组件
+- **E2E 集成测试** — Playwright (Java) + WireMock，模拟完整浏览器-服务端交互流程
 
-## Testing
+### 回归命令
 
 ```bash
-# Unit tests only
+# 后端单元测试 + 前端 Vitest 测试
 mvn test
 
-# E2E regression tests (first run downloads Chromium ~150MB)
+# E2E 回归测试（首次运行需下载 Chromium ~150MB）
 mvn verify
+
+# 仅前端测试
+cd src/main/frontend && npm test
 ```
 
-E2E tests use **Playwright** (Java) with headless Chromium in mobile Safari viewport (390×844), and **WireMock** (fixed port `19090`) to mock DeepSeek API responses at the HTTP layer. DOM-based assertions verify the full browser-to-server-to-browser flow:
+> 测试清单与规范详见 [docs/tests.md](docs/tests.md)
 
-| Test Class | What It Verifies |
-|-----------|-----------------|
-| `ChatAgentSessionIT` | Complete session: Start → 3-turn conversation → corrections in sidebar → End & Report → H2 data persistence |
-| `ChatAgentResumeIT` | Page reload → `localStorage` sessionId survives → all messages + corrections restored in DOM |
-| `ChatAgentMemoryIT` | Two sessions back-to-back → Learning Profile v1→v2 merge → RAG MemoryCue retrieval → mode-scoped memory → cross-mode learning profile sharing |
-| `DailyTalkIT` | DAILY_TALK mode → 3-turn casual conversation → teaching-style corrections → mode-scoped memory |
-| `ChatAgentMemoryCueIT` | Session end → MemoryCue two-step LLM (topic split + per-segment summarization) → `memory_cues` table COMPLETED records |
-| `ManagePageIT` | Manage page full flow: nav sidebar → tag CRUD → card CRUD → search → sort → deck chip filtering → pagination → detail modal → orphan alert → delete cascade |
-| `FlashcardIT` | 闪卡录入：两阶段面板 → chip 标签创建 → 保存 → H2 数据验证（不依赖 WireMock，闪卡不调 LLM） |
-| `FlashcardBatchIT` | 闪卡批量导入/导出：完整往返流程 → 导出 CSV → 删卡 → 导入 CSV → FSRS 状态还原 → H2 数据验证（不依赖 WireMock） |
+## 文档结构
 
-Test resources: `src/test/resources/wiremock/` (mock response files for conversation, correction, report, memory merge, and memory cue), `src/test/resources/application-e2e.yml` (in-memory H2, permit all paths).
+| 文档 | 职责 |
+|------|------|
+| [README.md](README.md) | 项目概览、快速上手、Roadmap |
+| [CONTEXT.md](CONTEXT.md) | 领域术语表 |
+| [docs/architecture.md](docs/architecture.md) | 架构蓝图与设计决策 |
+| [docs/frontend-notes.md](docs/frontend-notes.md) | 前端实现规范与浏览器兼容 |
+| [docs/fsrs.md](docs/fsrs.md) | FSRS 算法、调度器、优化器参考 |
+| [docs/tests.md](docs/tests.md) | 测试清单与规范 |
+| [AGENTS.md](AGENTS.md) | AI Agent 工作手册 |
+| [docs/adr/](docs/adr/) | 架构决策记录（历史参考，以代码为准） |
 
-## H2 Database Console
+## Roadmap
 
-The app uses an embedded H2 file database. Access the console for debugging:
-
-```
-URL:      http://localhost:8080/h2-console
-JDBC URL: jdbc:h2:file:./data/englishcoach
-Username: sa
-Password: (leave empty)
-```
-
-> H2 console is open by default with the `local` profile. With the `default` profile, you must log in first.
-
-## Logging
-
-**File logs** (`logback-spring.xml`, local profile only):
-
-```bash
-# Activate local profile to enable file logging
-mvn spring-boot:run -Dspring-boot.run.profiles=local
-
-# Logs written to: ./logs/chat-agent.YYYY-MM-DD.log
-# Console: INFO level — File: DEBUG level, 3-day rolling retention
-```
-
-**LLM Call Log** (`llm_call_logs` table): Every LLM API call (prompt, response, token usage, duration, status) is persisted asynchronously in H2. Query via H2 console:
-
-```sql
-SELECT * FROM llm_call_logs ORDER BY create_time DESC;
-```
-
-Records older than 3 days are automatically cleaned up on startup.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Language | Java 17 |
-| Framework | Spring Boot 3.4 |
-| Security | Spring Security (form login, remember-me, BCrypt) |
-| LLM | DeepSeek V4 FAST (via LangChain4j OpenAI-compatible adapter) |
-| Agent orchestration | langgraph4j 1.8.16 (`org.bsc.langgraph4j`) |
-| Database | H2 (file mode) + Spring Data JPA |
-| Communication | WebSocket (JSON protocol) |
-| Frontend | React 18 + TypeScript (Vite Library Mode), CSS Modules |
-| TTS | Browser SpeechSynthesis (user-gesture triggered for iOS support) |
-| Embedding & RAG | ONNX all-MiniLM-L6-v2 (384-dim, ~200MB heap) + InMemoryEmbeddingStore (JSON disk persistence) |
-
-## Architecture
-
-```
-Browser (login page → chat page with 🔊 TTS)
-    │  HTTP + WebSocket JSON
-    ▼
-Spring Security  ──►  /login  ──►  /index.html  ──►  /ws/chat
-    │
-    ▼
-ChatWebSocketHandler  ──►  ChatMessageHandler  ──►  TurnProcessor  ──►  LangGraph (1 node: correction)
-    │                              │                        │
-     │                              │                        ├── EmbeddingService.search() → RAG MemoryCue (every round)
-     │                              │                        ├── LearningProfile + last MemoryCue fallback (round 1 only)
-    │                              │                        ├── Future A: ConversationAgent → DeepSeek (streaming)
-    │                              │                        └── Future B: CorrectionNode → CorrectionAgent → DeepSeek
-    │                              │
-    │                              ├── SessionService (runtime state + token tracking)
-    │                              ├── ReportAgent → DeepSeek (session-end)
-    │                              ├── LearningProfileService (Profile merge) ──► LearningAgent → DeepSeek
-    │                              ├── MemoryCueService (async topic split + segment cues) ──► MemoryCueAgent → DeepSeek
-    │                              │       └── EmbeddingService.indexAsync() → ONNX vectorization → embedding-store.json
-    │                              ├── EmbeddingService (RAG search + index + disk persistence)
-    │                              └── SessionDbStore → H2 (JPA)
-    │
-    ▼
-AGENT_STREAM_DELTA / AGENT_STREAM_END / CORRECTION_RESULT / SESSION_REPORT
-```
-
-### Authentication & User Module
-
-- **Spring Security** form login with HTTP session cookie + remember-me (14 days).
-- **User data isolation**: `Session` entity has `userId` field. All per-session queries (find by sessionId UUID) are naturally isolated. Only cross-session queries (history, progress) filter by user.
-- **Runtime user context**: `ChatState` stores `userId` as a langgraph channel, accessible to all async processing threads.
-- **Logout**: Explicit logout clears all active sessions via `SessionCleanupLogoutHandler`. Tab close without logout preserves sessions for resume.
-- **Multi-tab**: `sessionToWs` map is one-to-one (sessionId → wsId). Page Visibility API triggers auto-resume on tab activation, keeping UI fresh across tabs.
-- **Config-driven auth**: `app.security.permit-all-paths` controls which URL patterns skip authentication. No conditional annotations on SecurityConfig.
-
-### 5 AI Agents
-
-| Agent | Responsibility |
-|-------|---------------|
-| **ConversationAgent** | Role-plays according to the selected AgentMode (scenario + persona combined), generates natural English dialogue |
-| **CorrectionAgent** | Analyzes user input for 5 error types: grammar, word choice, Chinglish, pronunciation hints, fluency |
-| **ReportAgent** | Generates end-of-session summary: fluency score, error breakdown, key takeaway |
-| **LearningAgent** | Merges new session error data with existing Learning Profile via LLM into an updated summary. |
-| **MemoryCueAgent** | Two-step post-session LLM: detects topic switch points in conversation, then generates structured `(topic, summary)` pairs per segment. Each completed entry is asynchronously vectorized by `EmbeddingService` for RAG semantic retrieval. |
-
-### LangGraph State Machine (Per-Turn)
-
-```
-START → CorrectionNode → END
-```
-
-The Service layer manages the session loop. ConversationAgent is invoked in parallel via `TurnProcessor` with streaming WebSocket push. `SessionService` manages runtime state and token tracking. `MemorySaver` checkpoints state per `threadId` — survives page refresh, lost on server restart.
-
-Every round performs RAG semantic search via `EmbeddingService.search()` against historical MemoryCue entries (top-2, cosine ≥ 0.6). On round 1, if RAG returns no matches, a fallback loads the most recent session's last COMPLETED MemoryCue from H2 as a conversation continuity anchor with a time label. LearningProfile is injected on round 1 only. All memory retrieval is unified through the embedding pipeline. At session end, `LearningProfileService` fires an async LLM merge for Learning Profile, while `MemoryCueService` concurrently dispatches topic-split and per-segment cue generation, followed by `EmbeddingService.indexAsync()` vectorization — all on the `llmRequestExecutor` thread pool (core=4, max=8) and `embeddingExecutor` (core=2, max=2).
-
-## Project Structure
-
-```
-chat-agent/
-├── pom.xml
-├── src/main/java/com/hugosol/chatagent/
-│   ├── ChatAgentApplication.java
-│   ├── graph/
-│   │   ├── ChatState.java
-│   │   ├── ChatGraphBuilder.java
-│   │   └── nodes/
-│   │       └── CorrectionNode.java
-│   ├── dto/
-│   │   ├── MessageData.java
-│   │   ├── CorrectionData.java
-│   │   ├── MemoryContent.java
-│   │   ├── CueMatch.java
-│   │   ├── ImportResult.java
-│   │   └── ImportError.java
-│   ├── agent/
-│   │   ├── ConversationAgent.java
-│   │   ├── CorrectionAgent.java
-│   │   ├── ReportAgent.java
-│   │   ├── LearningAgent.java
-│   │   └── MemoryCueAgent.java
-│   ├── websocket/
-│   │   ├── ChatWebSocketHandler.java
-│   │   └── ChatMessageHandler.java
-│   ├── protocol/
-│   │   ├── ClientMessage.java
-│   │   ├── ServerMessage.java
-│   │   ├── MessageHandler.java
-│   │   └── ProtocolDispatcher.java
-│   ├── speech/         (预留，V2 按实际需求定义 STT/TTS 接口)
-│   ├── model/          (JPA entities + enums: User, Session, Message, ErrorRecord, SessionReport, UserProgress, UserLearningProfile, MemoryCue, LlmCallLog, MemoryCueStatus, AgentMode, TimeLabel, BatchOperationLog, BatchOperationType, BatchOperationStatus, ...)
-│   ├── repository/     (Spring Data JPA: BatchOperationLogRepository, ...)
-│   ├── service/        (SessionService, TurnProcessor, SessionDbStore, LearningProfileService, MemoryCueService, EmbeddingService, LlmCallLogService, TokenTracker, EntityMapper, SessionCleanupLogoutHandler)
-│   │   └── card/       (CardCsvParser, CardBatchService)
-│   └── config/         (LangChain4jConfig, LoggableChatModel, SecurityConfig, WebSocketConfig, AsyncConfig, AppProperties, PasswordEncoderConfig, DataInitializer, PromptLoader)
-├── src/main/resources/
-│   ├── application.yml
-│   ├── application-local.yml
-│   ├── logback-spring.xml
-│   └── prompts/
-│       ├── conversation-system.txt       ← 骨架模板（{Description} / {Rules} 占位符）
-│       ├── workplace_standup/            ← per-AgentMode 子目录
-│       │   ├── description.txt           ← 身份声明 + 场景描述
-│       │   └── rules.txt                 ← 行为规则
-│       ├── daily_talk/                   ← per-AgentMode 子目录 (Chris)
-│       │   ├── description.txt           ← 身份声明 + 场景描述
-│       │   └── rules.txt                 ← 行为规则
-│       ├── correction.txt
-│       ├── report.txt
-│       ├── memory-profile.txt
-│       ├── memory-cue-split.txt
-│       └── memory-cue-entry.txt
-├── src/main/resources/static/
-│   ├── login/
-│   │   ├── main.html
-│   │   ├── main.js
-│   │   └── main.css
-│   ├── manage/
-│   │   ├── index.html
-│   │   └── manage.css
-│   ├── shared/
-│   │   ├── chat-bundle.js             // React Chat page IIFE bundle (chat-page components)
-│   │   ├── chat-bundle.css            // React Chat page styles (CSS Modules)
-│   │   ├── manage-bundle.js           // React Manage page IIFE bundle (CardsTab + TagsTab + DropdownMenu + BatchOperationModal)
-│   │   ├── manage-bundle.css          // React Manage page styles (CSS Modules)
-│   │   ├── header-bundle.js           // React Header IIFE bundle (nav + token bar)
-│   │   ├── header-bundle.css          // React Header styles (CSS Modules)
-│   │   ├── react.production.min.js    // React 18 UMD (shared, loaded once)
-│   │   ├── react-dom.production.min.js // ReactDOM 18 UMD (shared, loaded once)
-│   │   └── base.css                   // Shared base styles (btn, modal, scrollbar, toast)
-│   └── index.html                     // Chat page (100% React)
-└── src/test/
-    ├── java/com/hugosol/chatagent/e2e/    # E2E regression tests (Playwright + WireMock)
-    │   ├── ChatAgentSessionIT.java
-    │   ├── ChatAgentResumeIT.java
-    │   ├── ChatAgentMemoryIT.java
-    │   ├── DailyTalkIT.java
-    │   ├── ChatAgentMemoryCueIT.java
-    │   └── helper/
-    │       ├── E2ETestBase.java
-    │       └── WireMockStubs.java
-    └── resources/
-        ├── application-e2e.yml           # E2E profile (memory H2, WireMock base-url, permit-all-paths: [/**])
-        ├── prompts/                       # Test prompt overrides (correction, report, memory-cue-split, memory-cue-entry)
-        └── wiremock/                      # Mock response files (SSE streams + JSON for all agents)
-```
-
-## Configuration
-
-Environment variables (set before running):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DEEPSEEK_API_KEY` | *(required)* | Your DeepSeek API key |
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API endpoint |
-| `DEEPSEEK_MODEL` | `deepseek-v4-flash` | Model name |
-
-App-level configuration in `application.yml`:
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `app.initial-users` | `[{username: admin, password: admin123}]` | Initial user accounts (BCrypt-hashed on startup) |
-| `app.security.permit-all-paths` | `[/login/**]` | URL patterns that skip authentication |
-| `app.token-limit` | `128000` | Max LLM tokens per session |
-| `app.token-limit-ratio` | `0.8` | Warning threshold ratio |
-| `app.memory.profile-max-length` | `400` | Learning Profile merged text max characters |
-| `app.memory.cue-topic-max-words` | `7` | MemoryCue topic name max word count |
-| `app.memory.cue-summary-max-sentences` | `4` | MemoryCue summary max sentence count |
-| `app.memory.retrieval.top-k` | `2` | Max RAG search results per turn |
-| `app.memory.retrieval.similarity-threshold` | `0.6` | Minimum cosine similarity for RAG match |
-| `app.llm.max-output-tokens.default` | `2048` | Default max output tokens for all agents |
-| `app.llm.max-output-tokens.report` | `4096` | Max output tokens for ReportAgent (overrides default) |
-
-## Known Limitations
-
-| Limitation | Detail |
-|-----------|--------|
-| **iOS TTS** | Requires clicking 🔊 button on each message (browser blocks auto-play without user gesture) |
-| **Mobile input** | Text-only (SpeechRecognition API not supported by iOS Safari/Chrome). iOS keyboard mic provides system dictation. |
-| **Correction sidebar** | Starts hidden. When corrections arrive, a floating ⚠️ N ◂ badge appears at center-right; click to expand the 260px sidebar. Click ▸ in header to collapse. Opening ☰ nav menu auto-collapses sidebar. |
-| **Token window** | UI shows warning at 80% usage. User must manually end session before overflow. |
-| **ONNX memory** | The all-MiniLM-L6-v2 embedding model consumes ~200MB heap at runtime. |
-
-## V2 Roadmap
-
-- [ ] OpenAI Whisper for server-side voice input
-- [x] Additional AgentMode values (DAILY_TALK with Chris persona — casual friend+tutor chat)
-- [x] Cross-session memory (LearningProfile + MemoryCue RAG retrieval)
-- [x] Structured MemoryCue (topic segmentation + tagged memory entries, write-only in v1)
-- [x] RAG-based MemoryCue retrieval (ONNX vector embeddings, semantic similarity search)
-- [x] 闪卡录入模块（FSRS-6 初始化 + 两阶段面板 + chip 标签 + REST API）
-- [x] 闪卡批量导入导出（CSV）
-- [x] 闪卡复习功能（FSRS-6 repeat + 评分按钮 Again/Hard/Good/Easy + 四级评分间隔预览 + ReviewLog 审计 + 4 种复习模式 + 每日统计）
-- [x] 闪卡遗忘功能（单卡/Deck 批量重置 + ReviewLog 清理）
-- [x] FSRS 参数优化器（Adam 梯度下降 + 自动 W[21] 优化 + 定时任务）
-- [x] FSRS 学习设置页（learning/relearning steps 可配置 + desired_retention + 洗牌/fuzz 开关）
-- [ ] More AgentMode scenarios (e.g. 1-on-1 Meeting, Technical Presentation)
-- [ ] Technical presentation practice scenario
-- [ ] Progress trend charts (error reduction over time)
-- [ ] Redis/Postgres checkpoint saver for session persistence across restarts
-- [ ] Human-in-the-loop correction review
+- [x] 基础对话与流式输出
+- [x] 语法纠错与学习报告
+- [x] 闪卡系统（FSRS-6 调度 + 复习面板 + CSV 导入导出）
+- [x] MemoryCue 跨会话语义记忆（RAG 检索 + 向量化）
+- [x] 多用户与数据隔离
+- [x] DAILY_TALK 闲聊模式 + WORKPLACE_STANDUP 站会模式
+- [x] FSRS 参数优化器（Adam 梯度下降自动调参）
+- [x] 前端全量 React + TypeScript 迁移
+- [ ] STT/TTS 语音交互
+- [ ] 更多 AgentMode 场景
+- [ ] 学习进度趋势图表
+- [ ] Redis/Postgres checkpoint 持久化（跨重启恢复会话）
