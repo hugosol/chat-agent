@@ -54,6 +54,17 @@ public class DataInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.debug("Tags column migration skipped or already applied: {}", e.getMessage());
         }
+
+        migrateEnabledColumn();
+    }
+
+    private void migrateEnabledColumn() {
+        try {
+            jdbcTemplate.execute("UPDATE users SET enabled = true WHERE enabled IS NULL");
+            log.info("Migrated: backfilled enabled column for existing users");
+        } catch (Exception e) {
+            log.debug("Enabled column migration skipped or already applied: {}", e.getMessage());
+        }
     }
 
     private void initFsrsParameters() {

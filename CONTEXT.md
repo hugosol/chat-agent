@@ -10,6 +10,8 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 | **Principal** | Spring Security representation of the authenticated Learner within a request context | Current user, auth context |
 | **Login session** | The Spring Security HTTP session (JSESSIONID cookie) that proves the Learner is authenticated | Auth session, HTTP session |
 | **Remember-Me** | A persistent cookie that survives browser restart and automatically re-establishes a Login session within 14 days | Auto-login, persistent login |
+| **Administrator** | The Learner whose username is `admin`. Possesses the ability to manage other Learner accounts (create, disable, reset passwords) through the Profile page | Admin, system admin |
+| **Enabled** | An attribute of a Learner account that determines whether they can log in. A disabled Learner is rejected at the next login attempt with a generic credential error. Existing sessions are unaffected | Active, account status, locked |
 
 ## Conversation Lifecycle
 

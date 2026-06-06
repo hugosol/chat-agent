@@ -16,11 +16,15 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "enabled", nullable = false, columnDefinition = "BOOLEAN DEFAULT true")
+    private boolean enabled = true;
+
     public User() {}
 
     public User(String username, String password) {
         this.username = username;
         this.password = password;
+        this.enabled = true;
     }
 
     public String getId() { return id; }
@@ -31,4 +35,7 @@ public class User extends BaseEntity {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
 }

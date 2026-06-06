@@ -60,7 +60,7 @@ public class CardBatchService {
             return new ImportResult(0, 0, List.of(error));
         }
 
-        List<ImportError> errors = validateAll(rows, userId);
+        List<ImportError> errors = validateAll(rows, userId, tagId);
 
         if (!errors.isEmpty()) {
             saveLog(userId, null, tag, originalFilename, rows.size(), 0, errors.size(),
@@ -178,7 +178,7 @@ public class CardBatchService {
         return tag;
     }
 
-    List<ImportError> validateAll(List<CardCsvParser.ParsedCardRow> rows, String userId) {
+    List<ImportError> validateAll(List<CardCsvParser.ParsedCardRow> rows, String userId, String tagId) {
         List<ImportError> errors = new ArrayList<>();
 
         Set<String> seenFronts = new HashSet<>();
@@ -254,7 +254,7 @@ public class CardBatchService {
         }
 
         List<String> fronts = rows.stream().map(r -> r.front().toLowerCase()).distinct().toList();
-        Set<String> existingFronts = new HashSet<>(cardRepository.findExistingFronts(fronts, userId));
+        Set<String> existingFronts = new HashSet<>(cardRepository.findExistingFrontsByTag(fronts, userId, tagId));
 
         for (CardCsvParser.ParsedCardRow row : rows) {
             if (existingFronts.contains(row.front().toLowerCase())) {

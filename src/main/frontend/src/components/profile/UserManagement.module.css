@@ -1,0 +1,132 @@
+.root {
+  padding: 16px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: 1rem;
+  color: #e0e0e0;
+  margin: 0;
+}
+
+.createBtn {
+  padding: 6px 14px;
+  background: #e94560;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+
+.createBtn:hover {
+  background: #d63852;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+
+.table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #0f3460;
+  color: #888;
+  font-weight: 500;
+}
+
+.table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #16213e;
+  color: #ccc;
+}
+
+.dateCell {
+  color: #888;
+  font-size: 0.9em;
+}
+
+.actionsCell {
+  display: flex;
+  gap: 6px;
+}
+
+.actionBtn {
+  padding: 3px 8px;
+  background: #0f3460;
+  border: 1px solid #1a5276;
+  border-radius: 3px;
+  color: #aaa;
+  font-size: 0.75em;
+  cursor: pointer;
+}
+
+.actionBtn:hover {
+  color: #e94560;
+  border-color: #e94560;
+}
+
+.modalBody {
+  padding: 8px 0;
+  color: #ccc;
+}
+
+.modalLabel {
+  display: block;
+  font-size: 0.75em;
+  color: #888;
+  margin: 8px 0 4px;
+}
+
+.modalInput {
+  width: 100%;
+  padding: 7px 10px;
+  background: #0f3460;
+  border: 1px solid #1a5276;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 0.9em;
+  box-sizing: border-box;
+}
+
+.modalInput:focus {
+  outline: none;
+  border-color: #e94560;
+}
+
+.passwordRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.togglePwdBtn {
+  padding: 4px 8px;
+  background: #0f3460;
+  border: 1px solid #1a5276;
+  border-radius: 3px;
+  color: #aaa;
+  font-size: 0.75em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.modalError {
+  background: rgba(231, 76, 60, 0.15);
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 0.75em;
+  margin-top: 8px;
+}
