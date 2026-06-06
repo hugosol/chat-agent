@@ -251,41 +251,41 @@ public class ReviewService {
         switch (mode) {
             case "STANDARD" -> {
                 Optional<Card> dueCard = shuffle
-                        ? cardRepository.findRandomDueCardByDeckId(deckId, now)
-                        : cardRepository.findFirstDueCardByDeckId(deckId, now);
+                        ? cardRepository.findRandomDueCardByDeckId(deckId, now, userId)
+                        : cardRepository.findFirstDueCardByDeckId(deckId, now, userId);
                 if (dueCard.isPresent()) {
                     return dueCard;
                 }
-                if (isNewCardLimitExceeded(deckId, prefs)) {
+                if (isNewCardLimitExceeded(deckId, userId, prefs)) {
                     return Optional.empty();
                 }
                 return shuffle
-                        ? cardRepository.findRandomNewCardByDeckId(deckId)
-                        : cardRepository.findFirstNewCardByDeckId(deckId);
+                        ? cardRepository.findRandomNewCardByDeckId(deckId, userId)
+                        : cardRepository.findFirstNewCardByDeckId(deckId, userId);
             }
             case "REVIEW_ONLY" -> {
                 return shuffle
-                        ? cardRepository.findRandomDueCardByDeckId(deckId, now)
-                        : cardRepository.findFirstDueCardByDeckId(deckId, now);
+                        ? cardRepository.findRandomDueCardByDeckId(deckId, now, userId)
+                        : cardRepository.findFirstDueCardByDeckId(deckId, now, userId);
             }
             case "NEW_ONLY" -> {
-                if (isNewCardLimitExceeded(deckId, prefs)) {
+                if (isNewCardLimitExceeded(deckId, userId, prefs)) {
                     return Optional.empty();
                 }
                 return shuffle
-                        ? cardRepository.findRandomNewCardByDeckId(deckId)
-                        : cardRepository.findFirstNewCardByDeckId(deckId);
+                        ? cardRepository.findRandomNewCardByDeckId(deckId, userId)
+                        : cardRepository.findFirstNewCardByDeckId(deckId, userId);
             }
             case "CRAM" -> {
-                return cardRepository.findRandomCardByDeckId(deckId);
+                return cardRepository.findRandomCardByDeckId(deckId, userId);
             }
             default -> throw new IllegalArgumentException("Unknown mode: " + mode);
         }
     }
 
-    private boolean isNewCardLimitExceeded(String deckId, UserPreferences prefs) {
+    private boolean isNewCardLimitExceeded(String deckId, String userId, UserPreferences prefs) {
         Instant todayStart = computeTodayStart(prefs);
-        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart);
+        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
         return learnedToday >= prefs.getNewCardDailyLimit();
     }
 
@@ -310,25 +310,25 @@ public class ReviewService {
         UserPreferences prefs = preferencesService.get(userId);
         Instant todayStart = computeTodayStart(prefs);
         Instant now = Instant.now();
-        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart);
-        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart);
-        long remaining = computeRemaining(deckId, mode, prefs, learnedToday, now);
-        Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now);
+        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart, userId);
+        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
+        long remaining = computeRemaining(deckId, mode, userId, prefs, learnedToday, now);
+        Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now, userId);
         long displayedLearnedToday = "CRAM".equals(mode) ? -1 : learnedToday;
         return new ReviewStats(reviewedToday, remaining, displayedLearnedToday, prefs.getNewCardDailyLimit(), nextDueAt);
     }
 
-    private long computeRemaining(String deckId, String mode, UserPreferences prefs, long learnedToday, Instant now) {
+    private long computeRemaining(String deckId, String mode, String userId, UserPreferences prefs, long learnedToday, Instant now) {
         return switch (mode) {
             case "STANDARD" -> {
-                long dueCount = cardRepository.countDueCardsByTagsId(deckId, now);
-                long actualNewCards = cardRepository.countByTagsIdAndCardState(deckId, 0);
+                long dueCount = cardRepository.countDueCardsByTagsId(deckId, now, userId);
+                long actualNewCards = cardRepository.countByTagsIdAndCardState(deckId, 0, userId);
                 long newQuota = Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
                 yield dueCount + Math.min(newQuota, actualNewCards);
             }
-            case "REVIEW_ONLY" -> cardRepository.countDueCardsByTagsId(deckId, now);
+            case "REVIEW_ONLY" -> cardRepository.countDueCardsByTagsId(deckId, now, userId);
             case "NEW_ONLY" -> {
-                long actualNewCards = cardRepository.countByTagsIdAndCardState(deckId, 0);
+                long actualNewCards = cardRepository.countByTagsIdAndCardState(deckId, 0, userId);
                 long newQuota = Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
                 yield Math.min(newQuota, actualNewCards);
             }

@@ -61,7 +61,7 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 |------|------------|-----------------|
 | **UserLearningProfile** | A persistent summary record in H2 that captures a Learner's conversation topics or learning progress, surviving across Practice sessions | Memory, memory record, profile |
 | **Learning Profile** | A UserLearningProfile of type LEARNING_PROFILE — a 400-character summary of the Learner's English strengths, weaknesses, and improvement trends | Learning summary, skill profile |
-| **Memory Merge** | An LLM-driven process that combines an old Learning Profile (version N) with a newly completed session's Report to produce an updated version (N+1). Topic Memory no longer uses merge — it directly writes the new session's topic summary as a new version. | Incremental update, memory consolidation |
+| **Memory Merge** | An LLM-driven process that combines an old Learning Profile (version N) with a newly completed session's Report to produce an updated version (N+1). Topic summary is handled by MemoryCue — no LLM merge, each new session generates fresh MemoryCue entries directly. | Incremental update, memory consolidation |
 | **Memory Injection** | The unified RAG pipeline that injects historical conversation context into each Turn's System Prompt. On each user message, EmbeddingService performs semantic search against past MemoryCue records. When RAG returns matches, they populate the MemoryCueQueue for cross-turn recall. When RAG returns no matches (cold start or topic gap), a fallback anchor — the most recent session's last completed MemoryCue — is loaded from H2 to provide conversation continuity. This fallback anchor survives approximately one round before eviction. LearningProfile is injected on the first Turn only. | Context injection, memory recall |
 | **Active Engagement** | A System Prompt instruction directing the Agent to proactively bring up unfinished topics and ask questions based on the injected memory | Initiative prompt, engagement instruction |
 | **Memory Version** | A sequential integer on each UserLearningProfile record, starting at 1 and incremented by each Memory Merge operation | Version number, revision counter |
@@ -138,9 +138,9 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 - A **Tab takeover** occurs when a Learner resumes their own Practice session from a different tab, displacing the previous Active Tab.
 - A **Stale Tab** self-heals via a **Visibility resume** that triggers a **State rebuild**.
 - A **Learner** has zero or more **UserLearningProfile** records, each identified by type.
-- A **Practice session** end triggers a direct-write of the new **Topic Memory** (INSERT new version) and one **Memory Merge** for **Learning Profile**, executed asynchronously alongside **MemoryCue** generation.
-- The first **Turn** of a new Practice session includes a **Memory Injection** of the latest Topic Memory and Learning Profile into the Agent's System Prompt (messageId ≤ 1).
-- A **Topic Memory** write reads the latest **Memory Version**, increments it, and inserts a new row directly from the session Report — no LLM merge. A **Learning Profile Merge** uses an LLM call to combine the previous and new profiles before inserting. Old versions remain as immutable history.
+- A **Practice session** end triggers one **Memory Merge** for **Learning Profile** (LLM-based), executed asynchronously alongside **MemoryCue** generation.
+- The first **Turn** of a new Practice session includes a **Memory Injection** of the latest Learning Profile and RAG-retrieved MemoryCue into the Agent's System Prompt.
+- Each completed **MemoryCue** segment uses a version counter to track generation order. Old versions remain as immutable history.
 - Each **UserLearningProfile** record now stores the `session_id` of the **Practice session** that triggered its generation, enabling traceability.
 - A **Practice session** end triggers **Memory Cue Split** to detect topic switch points, then fires one **Memory Cue Entry** per segment in parallel — each producing a **MemoryCue** row with COMPLETED or SEGMENT_FAILED status. After all segments complete, **Tag Consolidation** merges equivalent tags across all historical MemoryCue rows for the same Learner+Mode into canonical forms in-place.
 - A **Learner** has exactly one **UserPreferences** record, storing new card daily limit, timezone, day start hour, last-used deck/mode, and user-configurable FSRS parameters (learning steps, relearning steps, desired retention, maximum interval, fuzz toggle, shuffle toggle).
@@ -181,7 +181,7 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 >
 > **Dev:** "Does the Agent remember what we talked about last week?"
 >
-> **Domain expert:** "Yes — at session end, the new Topic Memory is saved directly as a new version. The Learning Profile runs a Memory Merge that combines the old profile with the new error data. On the next Practice session's first Turn, a Memory Injection puts the latest Topic Memory and Learning Profile into the System Prompt."
+> **Domain expert:** "Yes — at session end, MemoryCue entries are generated from the conversation transcript and vectorized by EmbeddingService. The Learning Profile runs a Memory Merge that combines the old profile with the new error data. On the next Practice session's first Turn, a Memory Injection puts the latest Learning Profile and RAG-retrieved MemoryCue into the System Prompt."
 >
 > **Dev:** "So the Agent just knows 'Hugo went to Japan' without me re-telling it?"
 >

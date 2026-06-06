@@ -1,5 +1,7 @@
 # PRD: Persistent Memory — Cross-Session Context Recall
 
+> ⚠️ **已过时（2026-06）**：本文档描述的 `UserMemory` 实体、`MemoryType.TOPIC_SUMMARY` 枚举、`MemoryService` 类、`MemoryAgent` 类、`CoachState.TOPIC_MEMORY` 通道、`memory-topic.txt` prompt 文件等概念已被替换或删除。当前记忆系统由 MemoryCue（RAG 语义检索）+ LearningProfile（LearningAgent 合并）组成，详见 `CONTEXT.md` 和 `architecture.md`。本文档保留作为原始设计参考。
+
 ## Problem Statement
 
 The English Coach treats every Practice session as a blank slate. The Agent has no memory of what the Learner discussed previously — hobbies, travel plans, ongoing work projects, or language weaknesses identified in prior sessions. Each session starts with generic greetings, wasting the Learner's first few Turns on re-establishing context that the system already possesses in its database. The Learner must manually re-introduce topics they've already covered, which breaks the illusion of a real conversation partner and reduces engagement.

@@ -1,7 +1,9 @@
 # ADR: Dual Memory System — User Memory + MemoryCue Coexistence
 
+> ⚠️ **已过时（2026-06）**：本文档描述的双轨记忆系统（Topic Memory 直接写入 + LearningProfile LLM 合并 + MemoryCue RAG 检索）在实施中已简化。Topic Memory 管道被移除，整个记忆系统统一为 MemoryCue（RAG 语义检索）+ LearningProfile（首轮注入）。本文档保留作为历史决策记录，当前架构详见 `architecture.md` 和 `CONTEXT.md`。
+
 **Date:** 2026-05-25
-**Status:** Accepted
+**Status:** Accepted (superseded)
 
 ## Context
 
