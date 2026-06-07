@@ -111,9 +111,11 @@ public abstract class E2ETestBase {
 
     @BeforeEach
     void setUp(TestInfo testInfo) {
-        var userPrefsCache = cacheManager.getCache("userPreferences");
-        if (userPrefsCache != null) {
-            userPrefsCache.clear();
+        for (String name : cacheManager.getCacheNames()) {
+            var cache = cacheManager.getCache(name);
+            if (cache != null) {
+                cache.clear();
+            }
         }
 
         currentTestMethodName = testInfo.getTestMethod()
