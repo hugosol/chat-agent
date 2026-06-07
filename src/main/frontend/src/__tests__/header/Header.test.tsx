@@ -211,3 +211,103 @@ describe("Header", () => {
     expect(link.getAttribute("data-active")).toBe("true");
   });
 });
+
+describe("Header timezone auto-detection", () => {
+  let originalFetch: typeof global.fetch;
+
+  const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  function setupTzFetch(timezone: string | null) {
+    global.fetch = vi.fn((url: string, init?: RequestInit) => {
+      if (url === "/api/user/me") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ username: "testuser" }),
+        } as Response);
+      }
+      if (url === "/api/user/preferences" && (!init || init.method === undefined)) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ timezone }),
+        } as Response);
+      }
+      if (url === "/api/user/preferences" && init?.method === "PUT") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(JSON.parse(init.body as string)),
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+    });
+  }
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    sessionStorage.removeItem("tz_checked");
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    sessionStorage.removeItem("tz_checked");
+  });
+
+  it("auto-detects timezone and PUTs when timezone is null", async () => {
+    setupTzFetch(null);
+
+    render(<Header />);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/user/preferences",
+      expect.objectContaining({
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone: detectedTz }),
+      })
+    );
+    expect(sessionStorage.getItem("tz_checked")).toBe("1");
+  });
+
+  it("auto-detects timezone and PUTs when timezone is empty string", async () => {
+    setupTzFetch("");
+
+    render(<Header />);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/user/preferences",
+      expect.objectContaining({
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone: detectedTz }),
+      })
+    );
+  });
+
+  it("does not PUT when timezone is already set", async () => {
+    setupTzFetch("Asia/Shanghai");
+
+    render(<Header />);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const putCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (call: [string, RequestInit?]) =>
+        call[0] === "/api/user/preferences" && call[1]?.method === "PUT"
+    );
+    expect(putCalls).toHaveLength(0);
+  });
+
+  it("skips detection when sessionStorage tz_checked is set", async () => {
+    sessionStorage.setItem("tz_checked", "1");
+    setupTzFetch(null);
+
+    render(<Header />);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const putCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (call: [string, RequestInit?]) =>
+        call[0] === "/api/user/preferences" && call[1]?.method === "PUT"
+    );
+    expect(putCalls).toHaveLength(0);
+  });
+});

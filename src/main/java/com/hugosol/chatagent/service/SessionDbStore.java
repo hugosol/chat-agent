@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -61,7 +61,7 @@ public class SessionDbStore {
             session.complete();
         } else {
             session.setStatus(SessionStatus.FAILED);
-            session.setEndTime(LocalDateTime.now());
+            session.setEndTime(Instant.now());
         }
         sessionRepository.save(session);
 

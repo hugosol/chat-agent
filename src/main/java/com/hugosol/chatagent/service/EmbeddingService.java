@@ -30,8 +30,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -117,7 +115,7 @@ public class EmbeddingService {
     }
 
     public CompletableFuture<Void> indexAsync(String cueId, String topic, String summary,
-                                                AgentMode mode, String userId, LocalDateTime createdAt) {
+                                                AgentMode mode, String userId, Instant createdAt) {
         return CompletableFuture.runAsync(() -> {
             try {
                 indexSync(cueId, topic, summary, mode, userId, createdAt);
@@ -134,7 +132,7 @@ public class EmbeddingService {
     }
 
     private void indexSync(String cueId, String topic, String summary, AgentMode mode, String userId,
-                            LocalDateTime createdAt) {
+                            Instant createdAt) {
         String text = (topic != null ? topic : "") + " " + (summary != null ? summary : "");
         Embedding embedding = embeddingModel.embed(text).content();
         TextSegment segment = TextSegment.from(text);
@@ -144,7 +142,7 @@ public class EmbeddingService {
         segment.metadata().add("mode", mode.name());
         segment.metadata().add("userId", userId);
         if (createdAt != null) {
-            segment.metadata().add("createdAt", String.valueOf(createdAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+            segment.metadata().add("createdAt", String.valueOf(createdAt.toEpochMilli()));
         }
         store.add(embedding, segment);
         log.info("EmbeddingService: indexed cue {} topic={} mode={} userId={}", cueId, topic, mode, userId);
@@ -172,13 +170,11 @@ public class EmbeddingService {
             List<CueMatch> matches = new ArrayList<>();
             for (var match : result.matches()) {
                 if (match.score() >= threshold) {
-                    LocalDateTime createdAt = null;
+                    Instant createdAt = null;
                     String createdAtStr = match.embedded().metadata().getString("createdAt");
                     if (createdAtStr != null) {
                         try {
-                            createdAt = LocalDateTime.ofInstant(
-                                    Instant.ofEpochMilli(Long.parseLong(createdAtStr)),
-                                    ZoneId.systemDefault());
+                            createdAt = Instant.ofEpochMilli(Long.parseLong(createdAtStr));
                         } catch (Exception ignored) {
                         }
                     }

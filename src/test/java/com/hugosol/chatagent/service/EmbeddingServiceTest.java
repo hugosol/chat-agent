@@ -19,7 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Executors;
 
@@ -56,7 +56,7 @@ class EmbeddingServiceTest {
 
     @Test
     void indexAsync_addsEntryWithCorrectMetadata() throws Exception {
-        LocalDateTime now = LocalDateTime.of(2026, 5, 28, 10, 0);
+        Instant now = Instant.parse("2026-05-28T10:00:00Z");
         service.indexAsync("cue-1", "Travel Plans", "Discussed Japan trip details",
                 AgentMode.WORKPLACE_STANDUP, "user-1", now).get();
 

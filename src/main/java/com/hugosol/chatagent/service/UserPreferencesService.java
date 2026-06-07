@@ -4,6 +4,7 @@ import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.repository.UserPreferencesRepository;
 
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ public class UserPreferencesService {
         this.preferencesRepository = preferencesRepository;
     }
 
+    @Cacheable(value = "userPreferences", key = "#userId")
     public UserPreferences get(String userId) {
         return preferencesRepository.findByUserId(userId)
                 .orElseGet(() -> {
@@ -25,7 +27,7 @@ public class UserPreferencesService {
     }
 
     @Transactional
-    @CacheEvict(value = "fsrsConfig", key = "#preferences.userId")
+    @CacheEvict(value = "userPreferences", key = "#preferences.userId")
     public UserPreferences save(UserPreferences preferences) {
         return preferencesRepository.save(preferences);
     }

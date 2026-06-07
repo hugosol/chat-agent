@@ -2,8 +2,8 @@ package com.hugosol.chatagent.config;
 
 import com.hugosol.chatagent.model.FsrsParameters;
 import com.hugosol.chatagent.model.User;
-import com.hugosol.chatagent.repository.FsrsParametersRepository;
 import com.hugosol.chatagent.repository.UserRepository;
+import com.hugosol.chatagent.service.FsrsParametersService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -17,18 +17,18 @@ public class DataInitializer implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
     private final UserRepository userRepository;
-    private final FsrsParametersRepository fsrsParametersRepository;
+    private final FsrsParametersService fsrsParametersService;
     private final AppProperties appProperties;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
 
     public DataInitializer(UserRepository userRepository,
-                            FsrsParametersRepository fsrsParametersRepository,
+                            FsrsParametersService fsrsParametersService,
                             AppProperties appProperties,
                             PasswordEncoder passwordEncoder,
                             JdbcTemplate jdbcTemplate) {
         this.userRepository = userRepository;
-        this.fsrsParametersRepository = fsrsParametersRepository;
+        this.fsrsParametersService = fsrsParametersService;
         this.appProperties = appProperties;
         this.passwordEncoder = passwordEncoder;
         this.jdbcTemplate = jdbcTemplate;
@@ -70,9 +70,9 @@ public class DataInitializer implements CommandLineRunner {
     private void initFsrsParameters() {
         var allUsers = userRepository.findAll();
         for (var user : allUsers) {
-            if (fsrsParametersRepository.findByUserId(user.getId()).isEmpty()) {
+            if (fsrsParametersService.get(user.getId()) == null) {
                 FsrsParameters defaults = FsrsParameters.defaults(user.getId());
-                fsrsParametersRepository.save(defaults);
+                fsrsParametersService.save(defaults);
                 log.info("Created default FsrsParameters for user: {}", user.getUsername());
             }
         }

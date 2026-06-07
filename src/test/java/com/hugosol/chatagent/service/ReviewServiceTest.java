@@ -16,8 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -55,12 +53,6 @@ class ReviewServiceTest {
     private FsrsConfigService fsrsConfigService;
 
     @Mock
-    private CacheManager cacheManager;
-
-    @Mock
-    private Cache cache;
-
-    @Mock
     private ExecutorService optimizerExecutor;
 
     private ReviewService reviewService;
@@ -69,13 +61,12 @@ class ReviewServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(fsrsConfigService.getConfig(anyString())).thenReturn(FsrsSchedulerConfig.defaults());
-        lenient().when(cacheManager.getCache("fsrsConfig")).thenReturn(cache);
         lenient().doAnswer(inv -> {
             ((Runnable) inv.getArgument(0)).run();
             return null;
         }).when(optimizerExecutor).execute(any(Runnable.class));
         reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository,
-                fsrsConfigService, cacheManager, optimizerExecutor);
+                fsrsConfigService, optimizerExecutor);
         lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0), anyString())).thenReturn(1000L);
     }
 
@@ -737,7 +728,6 @@ class ReviewServiceTest {
         verify(cardRepository).saveAll(captor.capture());
         List<Card> savedCards = captor.getValue();
         assertThat(savedCards).hasSize(3);
-        verify(cache).evict("user-1");
     }
 
     @Test

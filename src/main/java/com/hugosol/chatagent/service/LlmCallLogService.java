@@ -7,7 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
@@ -64,7 +65,7 @@ public class LlmCallLogService {
     @PostConstruct
     void cleanupOnStartup() {
         CompletableFuture.runAsync(() -> {
-            LocalDateTime threeDaysAgo = LocalDateTime.now().minusDays(3);
+            Instant threeDaysAgo = Instant.now().minus(3, ChronoUnit.DAYS);
             log.info("Cleaning up LLM call logs older than {}", threeDaysAgo);
             repository.deleteByCreateTimeBefore(threeDaysAgo);
         });

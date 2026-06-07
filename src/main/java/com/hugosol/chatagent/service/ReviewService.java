@@ -13,7 +13,6 @@ import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
 
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,18 +39,15 @@ public class ReviewService {
     private final UserPreferencesService preferencesService;
     private final ReviewLogRepository reviewLogRepository;
     private final FsrsConfigService fsrsConfigService;
-    private final CacheManager cacheManager;
     private final ExecutorService optimizerExecutor;
 
     public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService,
                          ReviewLogRepository reviewLogRepository, FsrsConfigService fsrsConfigService,
-                         CacheManager cacheManager,
                          @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor) {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
         this.reviewLogRepository = reviewLogRepository;
         this.fsrsConfigService = fsrsConfigService;
-        this.cacheManager = cacheManager;
         this.optimizerExecutor = optimizerExecutor;
     }
 
@@ -234,8 +230,6 @@ public class ReviewService {
             if (!updatedCards.isEmpty()) {
                 cardRepository.saveAll(updatedCards);
             }
-
-            cacheManager.getCache("fsrsConfig").evict(userId);
         }, optimizerExecutor);
     }
 

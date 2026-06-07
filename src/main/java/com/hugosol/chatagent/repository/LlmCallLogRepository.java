@@ -6,11 +6,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public interface LlmCallLogRepository extends JpaRepository<LlmCallLog, String> {
 
     @Modifying
     @Query("DELETE FROM LlmCallLog WHERE createTime < :cutoff")
-    void deleteByCreateTimeBefore(@Param("cutoff") LocalDateTime cutoff);
+    void deleteByCreateTimeBefore(@Param("cutoff") Instant cutoff);
 }

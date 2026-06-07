@@ -2,8 +2,8 @@ package com.hugosol.chatagent.config;
 
 import com.hugosol.chatagent.model.FsrsParameters;
 import com.hugosol.chatagent.model.User;
-import com.hugosol.chatagent.repository.FsrsParametersRepository;
 import com.hugosol.chatagent.repository.UserRepository;
+import com.hugosol.chatagent.service.FsrsParametersService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,7 +25,7 @@ class DataInitializerTest {
     private UserRepository userRepository;
 
     @Mock
-    private FsrsParametersRepository fsrsParametersRepository;
+    private FsrsParametersService fsrsParametersService;
 
     @Mock
     private AppProperties appProperties;
@@ -79,12 +79,12 @@ class DataInitializerTest {
         existingUser.setId("user-1");
         when(appProperties.getInitialUsers()).thenReturn(List.of());
         when(userRepository.findAll()).thenReturn(List.of(existingUser));
-        when(fsrsParametersRepository.findByUserId("user-1")).thenReturn(Optional.empty());
+        when(fsrsParametersService.get("user-1")).thenReturn(null);
 
         dataInitializer.run();
 
         ArgumentCaptor<FsrsParameters> captor = ArgumentCaptor.forClass(FsrsParameters.class);
-        verify(fsrsParametersRepository).save(captor.capture());
+        verify(fsrsParametersService).save(captor.capture());
         FsrsParameters saved = captor.getValue();
         assertThat(saved.getUserId()).isEqualTo("user-1");
         assertThat(saved.getWeights()).hasSize(21);
@@ -96,11 +96,11 @@ class DataInitializerTest {
         existingUser.setId("user-1");
         when(appProperties.getInitialUsers()).thenReturn(List.of());
         when(userRepository.findAll()).thenReturn(List.of(existingUser));
-        when(fsrsParametersRepository.findByUserId("user-1"))
-                .thenReturn(Optional.of(FsrsParameters.defaults("user-1")));
+        when(fsrsParametersService.get("user-1"))
+                .thenReturn(FsrsParameters.defaults("user-1"));
 
         dataInitializer.run();
 
-        verify(fsrsParametersRepository, never()).save(any(FsrsParameters.class));
+        verify(fsrsParametersService, never()).save(any(FsrsParameters.class));
     }
 }

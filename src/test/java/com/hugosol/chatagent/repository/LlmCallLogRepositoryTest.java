@@ -9,7 +9,8 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,7 +79,7 @@ class LlmCallLogRepositoryTest {
 
     @Test
     void deleteByCreateTimeBefore_removesOldRecords() {
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
 
         LlmCallLog oldLog = new LlmCallLog();
         oldLog.setModel("deepseek-v4-flash");
@@ -90,7 +91,7 @@ class LlmCallLogRepositoryTest {
         // Manually set create_time to 5 days ago via native query
         entityManager.getEntityManager()
                 .createNativeQuery("UPDATE llm_call_logs SET create_time = :cutoff WHERE id = :id")
-                .setParameter("cutoff", now.minusDays(5))
+                .setParameter("cutoff", now.minus(5, ChronoUnit.DAYS))
                 .setParameter("id", oldLog.getId())
                 .executeUpdate();
         entityManager.flush();
@@ -104,7 +105,7 @@ class LlmCallLogRepositoryTest {
         recentLog.setStatus("SUCCESS");
         entityManager.persistFlushFind(recentLog);
 
-        LocalDateTime threeDaysAgo = now.minusDays(3);
+        Instant threeDaysAgo = now.minus(3, ChronoUnit.DAYS);
         repository.deleteByCreateTimeBefore(threeDaysAgo);
         entityManager.flush();
         entityManager.clear();
@@ -123,7 +124,7 @@ class LlmCallLogRepositoryTest {
         log.setStatus("SUCCESS");
         entityManager.persistFlushFind(log);
 
-        LocalDateTime oneDayAgo = LocalDateTime.now().minusDays(1);
+        Instant oneDayAgo = Instant.now().minus(1, ChronoUnit.DAYS);
         repository.deleteByCreateTimeBefore(oneDayAgo);
 
         assertThat(repository.findById(log.getId())).isPresent();

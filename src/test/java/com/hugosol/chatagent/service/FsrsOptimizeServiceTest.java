@@ -22,8 +22,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -53,8 +51,7 @@ class FsrsOptimizeServiceTest {
     @Mock private CardRepository cardRepository;
     @Mock private UserPreferencesService preferencesService;
     @Mock private FsrsConfigService fsrsConfigService;
-    @Mock private CacheManager cacheManager;
-    @Mock private Cache cache;
+    @Mock private FsrsParametersService fsrsParametersService;
     @Mock private ExecutorService optimizerExecutor;
     @Mock private UserRepository userRepository;
     @Mock private FsrsOptimizeLogRepository optimizeLogRepository;
@@ -64,11 +61,9 @@ class FsrsOptimizeServiceTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(cacheManager.getCache(eq("fsrsConfig"))).thenReturn(cache);
-
         service = new FsrsOptimizeService(
                 reviewLogRepository, paramsRepository, cardRepository,
-                preferencesService, fsrsConfigService, cacheManager,
+                preferencesService, fsrsConfigService, fsrsParametersService,
                 optimizerExecutor,
                 optimizeLogRepository, rescheduleLogRepository,
                 userRepository);
