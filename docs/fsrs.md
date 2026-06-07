@@ -106,7 +106,7 @@ public record FsrsSchedulerConfig(
 )
 ```
 
-配置由 `FsrsConfigService.getConfig(userId)` 提供，通过 Caffeine 缓存（24h 过期），`@Cacheable` + `@CacheEvict` 管理。
+`UserPreferences` 和 `FsrsParameters` 实体各自独立缓存（`"userPreferences"` + `"fsrsParameters"`，Caffeine 24h expireAfterAccess）。`FsrsConfigService.getConfig(userId)` 从两个缓存各取实体、现场 merge，自身不缓存。
 
 ---
 
@@ -178,7 +178,7 @@ FSRS 中 lapses 是**连续犯错计数**：在 Review 状态点 Again 时 +1，
 1. **触发**: `POST /api/fsrs/optimize` (手动) 或 `@Scheduled(cron: 每周日 03:00)` (自动)
 2. **异步执行**: `@Async("optimizerExecutor")`，进度通过 `taskId` 轮询
 3. **损失比较**: 仅当优化后 loss < 默认参数 loss 时才保存
-4. **参数保存**: 写入 `FsrsParameters` 表，清除 `fsrsConfig` 缓存
+4. **参数保存**: 写入 `FsrsParameters` 表，`@CacheEvict` 自动清除 `fsrsParameters` 缓存
 5. **重调度**: 调用 `rescheduleCards()`，异步重放所有 ReviewLog
 6. **审计记录**: 每次优化和重调度调用都会写入 `fsrs_optimize_logs` 和 `fsrs_reschedule_logs` 表，包含 loss 变化、数据量、迭代次数、耗时、触发方式（手动/定时）等信息。Tune 页面（`/tune`）展示这些日志。
 
