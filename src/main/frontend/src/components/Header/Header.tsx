@@ -35,12 +35,12 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
     fetch("/api/user/preferences")
       .then((r) => r.json())
       .then((prefs) => {
-        if (prefs.timezone) return;
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (prefs.utcOffset != null) return;
+        const offset = -(new Date().getTimezoneOffset() / 60);
         fetch("/api/user/preferences", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ timezone: tz }),
+          body: JSON.stringify({ utcOffset: offset }),
         });
       })
       .catch(() => {})

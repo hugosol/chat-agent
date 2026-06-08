@@ -210,6 +210,7 @@ class ReviewControllerTest {
         prefs.setMaximumInterval(36500);
         prefs.setEnableFuzz(true);
         prefs.setShuffleDueCards(false);
+        prefs.setUtcOffset(8);
         when(preferencesService.get("admin")).thenReturn(prefs);
 
         mockMvc.perform(get("/api/user/preferences"))
@@ -219,7 +220,8 @@ class ReviewControllerTest {
                 .andExpect(jsonPath("$.desiredRetention").value(0.9))
                 .andExpect(jsonPath("$.maximumInterval").value(36500))
                 .andExpect(jsonPath("$.enableFuzz").value(true))
-                .andExpect(jsonPath("$.shuffleDueCards").value(false));
+                .andExpect(jsonPath("$.shuffleDueCards").value(false))
+                .andExpect(jsonPath("$.utcOffset").value(8));
     }
 
     @Test

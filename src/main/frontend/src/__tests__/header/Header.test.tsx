@@ -215,9 +215,9 @@ describe("Header", () => {
 describe("Header timezone auto-detection", () => {
   let originalFetch: typeof global.fetch;
 
-  const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const detectedOffset = -(new Date().getTimezoneOffset() / 60);
 
-  function setupTzFetch(timezone: string | null) {
+  function setupTzFetch(utcOffset: number | null) {
     global.fetch = vi.fn((url: string, init?: RequestInit) => {
       if (url === "/api/user/me") {
         return Promise.resolve({
@@ -228,7 +228,7 @@ describe("Header timezone auto-detection", () => {
       if (url === "/api/user/preferences" && (!init || init.method === undefined)) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ timezone }),
+          json: () => Promise.resolve({ utcOffset }),
         } as Response);
       }
       if (url === "/api/user/preferences" && init?.method === "PUT") {
@@ -251,7 +251,7 @@ describe("Header timezone auto-detection", () => {
     sessionStorage.removeItem("tz_checked");
   });
 
-  it("auto-detects timezone and PUTs when timezone is null", async () => {
+  it("auto-detects utcOffset and PUTs when utcOffset is null", async () => {
     setupTzFetch(null);
 
     render(<Header />);
@@ -262,14 +262,14 @@ describe("Header timezone auto-detection", () => {
       expect.objectContaining({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timezone: detectedTz }),
+        body: JSON.stringify({ utcOffset: detectedOffset }),
       })
     );
     expect(sessionStorage.getItem("tz_checked")).toBe("1");
   });
 
-  it("auto-detects timezone and PUTs when timezone is empty string", async () => {
-    setupTzFetch("");
+  it("auto-detects utcOffset and PUTs when utcOffset is null", async () => {
+    setupTzFetch(null);
 
     render(<Header />);
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -279,13 +279,13 @@ describe("Header timezone auto-detection", () => {
       expect.objectContaining({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timezone: detectedTz }),
+        body: JSON.stringify({ utcOffset: detectedOffset }),
       })
     );
   });
 
-  it("does not PUT when timezone is already set", async () => {
-    setupTzFetch("Asia/Shanghai");
+  it("does not PUT when utcOffset is already set", async () => {
+    setupTzFetch(8);
 
     render(<Header />);
     await new Promise((resolve) => setTimeout(resolve, 100));

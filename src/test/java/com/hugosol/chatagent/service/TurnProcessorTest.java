@@ -84,7 +84,7 @@ class TurnProcessorTest {
                 .thenReturn("[{\"role\":\"system\",\"content\":\"You are a coach\"},{\"role\":\"user\",\"content\":\"hi\"},{\"role\":\"assistant\",\"content\":\"Hello\"}]");
 
         UserPreferences prefs = new UserPreferences("user1");
-        prefs.setTimezone("Asia/Shanghai");
+        prefs.setUtcOffset(8);
         when(userPreferencesService.get("user1")).thenReturn(prefs);
     }
 

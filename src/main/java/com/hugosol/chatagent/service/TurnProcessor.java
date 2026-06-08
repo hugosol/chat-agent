@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -269,12 +270,12 @@ public class TurnProcessor {
     private ZoneId getZoneId(String userId) {
         try {
             var prefs = userPreferencesService.get(userId);
-            String tz = prefs.getTimezone();
-            if (tz != null && !tz.isEmpty()) {
-                return ZoneId.of(tz);
+            Integer utcOffset = prefs.getUtcOffset();
+            if (utcOffset != null) {
+                return ZoneOffset.ofHours(utcOffset);
             }
         } catch (Exception ignored) {
         }
-        return ZoneId.systemDefault();
+        return ZoneOffset.ofHours(8);
     }
 }

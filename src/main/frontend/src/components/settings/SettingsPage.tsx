@@ -5,7 +5,7 @@ import styles from "./SettingsPage.module.css";
 interface SettingsFields {
   newCardDailyLimit: string;
   dayStartHour: string;
-  timezone: string;
+  utcOffset: string;
   learningSteps: string;
   relearningSteps: string;
   desiredRetention: string;
@@ -17,7 +17,7 @@ interface SettingsFields {
 const DEFAULTS: SettingsFields = {
   newCardDailyLimit: "20",
   dayStartHour: "6",
-  timezone: "",
+  utcOffset: "8",
   learningSteps: "1m,10m",
   relearningSteps: "10m",
   desiredRetention: "0.9",
@@ -68,7 +68,7 @@ function SettingsPage(): JSX.Element {
         const loaded: SettingsFields = {
           newCardDailyLimit: String(prefs.newCardDailyLimit ?? DEFAULTS.newCardDailyLimit),
           dayStartHour: String(prefs.dayStartHour ?? DEFAULTS.dayStartHour),
-          timezone: prefs.timezone ?? "",
+          utcOffset: prefs.utcOffset != null ? String(prefs.utcOffset) : DEFAULTS.utcOffset,
           learningSteps: prefs.learningSteps ?? DEFAULTS.learningSteps,
           relearningSteps: prefs.relearningSteps ?? DEFAULTS.relearningSteps,
           desiredRetention: prefs.desiredRetention != null ? String(prefs.desiredRetention) : DEFAULTS.desiredRetention,
@@ -137,6 +137,11 @@ function SettingsPage(): JSX.Element {
       errs.dayStartHour = "请输入 0 到 23 之间的整数";
     }
 
+
+    const offset = parseInt(fields.utcOffset, 10);
+    if (isNaN(offset) || offset < -12 || offset > 14 || !/^-?\d+$/.test(fields.utcOffset)) {
+      errs.utcOffset = "请输入 -12 到 +14 的整数";
+    }
     if (fields.learningSteps && !STEPS_REGEX.test(fields.learningSteps)) {
       errs.learningSteps = "格式错误。如: 1m,10m 或 30s 或留空";
     }
@@ -170,7 +175,7 @@ function SettingsPage(): JSX.Element {
       const body: Record<string, unknown> = {
         newCardDailyLimit: parseInt(fields.newCardDailyLimit, 10),
         dayStartHour: parseInt(fields.dayStartHour, 10),
-        timezone: fields.timezone || null,
+        utcOffset: fields.utcOffset ? parseInt(fields.utcOffset, 10) : null,
         learningSteps: fields.learningSteps || null,
         relearningSteps: fields.relearningSteps || null,
         desiredRetention: fields.desiredRetention ? parseFloat(fields.desiredRetention) : null,
@@ -265,16 +270,42 @@ function SettingsPage(): JSX.Element {
         </div>
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="timezone">时区</label>
-          <input
-            id="timezone"
-            data-testid="settings-timezone"
-            className={styles.input}
-            type="text"
-            placeholder="Asia/Shanghai"
-            value={fields.timezone}
-            onChange={(e) => updateField("timezone", e.target.value)}
-          />
+          <label className={styles.label}>UTC 偏移</label>
+          <div className={styles.offsetRow}>
+            <button
+              type="button"
+              data-testid="settings-utcOffset-minus"
+              className={styles.offsetBtn}
+              onClick={() => {
+                const v = parseInt(fields.utcOffset, 10) || 0;
+                if (v > -12) updateField("utcOffset", String(v - 1));
+              }}
+            >
+              −
+            </button>
+            <span className={styles.offsetSign}>UTC</span>
+            <input
+              id="utcOffset"
+              data-testid="settings-utcOffset"
+              className={`${styles.input} ${styles.offsetInput} ${errors.utcOffset ? styles.inputError : ""}`}
+              type="text"
+              inputMode="numeric"
+              value={fields.utcOffset}
+              onChange={(e) => updateField("utcOffset", e.target.value)}
+            />
+            <button
+              type="button"
+              data-testid="settings-utcOffset-plus"
+              className={styles.offsetBtn}
+              onClick={() => {
+                const v = parseInt(fields.utcOffset, 10) || 0;
+                if (v < 14) updateField("utcOffset", String(v + 1));
+              }}
+            >
+              +
+            </button>
+          </div>
+          {errors.utcOffset && <p className={styles.error}>{errors.utcOffset}</p>}
         </div>
       </div>
 

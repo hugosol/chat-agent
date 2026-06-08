@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -284,17 +285,15 @@ public class ReviewService {
     }
 
     private Instant computeTodayStart(UserPreferences prefs) {
-        String timezone = prefs.getTimezone() != null ? prefs.getTimezone() : ZoneId.systemDefault().getId();
-        ZoneId zoneId;
-        try {
-            zoneId = ZoneId.of(timezone);
-        } catch (Exception e) {
-            zoneId = ZoneId.systemDefault();
-        }
-        ZonedDateTime nowInZone = ZonedDateTime.now(zoneId);
+        int offsetHours = prefs.getUtcOffset() != null ? prefs.getUtcOffset() : 8;
+        ZoneOffset offset = ZoneOffset.ofHours(offsetHours);
+        ZonedDateTime nowInZone = Instant.now().atZone(offset);
         LocalDate today = nowInZone.toLocalDate();
+        if (nowInZone.getHour() < prefs.getDayStartHour()) {
+            today = today.minusDays(1);
+        }
         LocalDateTime todayStart = today.atStartOfDay().plusHours(prefs.getDayStartHour());
-        return todayStart.atZone(zoneId).toInstant();
+        return todayStart.atZone(offset).toInstant();
     }
 
     private ReviewStats computeStats(String deckId, String mode, String userId) {

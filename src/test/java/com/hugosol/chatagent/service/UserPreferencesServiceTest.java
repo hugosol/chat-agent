@@ -59,7 +59,7 @@ class UserPreferencesServiceTest {
         UserPreferences prefs = new UserPreferences("user-1");
         prefs.setNewCardDailyLimit(30);
         prefs.setDayStartHour(4);
-        prefs.setTimezone("America/New_York");
+        prefs.setUtcOffset(-5);
         prefs.setLastDeckId("deck-1");
         prefs.setLastMode("STANDARD");
 
@@ -68,7 +68,7 @@ class UserPreferencesServiceTest {
         UserPreferences result = service.save(prefs);
 
         assertThat(result.getNewCardDailyLimit()).isEqualTo(30);
-        assertThat(result.getTimezone()).isEqualTo("America/New_York");
+        assertThat(result.getUtcOffset()).isEqualTo(-5);
         verify(preferencesRepository).save(prefs);
     }
 }

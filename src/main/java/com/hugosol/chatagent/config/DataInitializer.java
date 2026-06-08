@@ -56,6 +56,13 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         migrateEnabledColumn();
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE user_preferences DROP COLUMN IF EXISTS timezone");
+            log.info("Migrated: dropped timezone column from user_preferences");
+        } catch (Exception e) {
+            log.debug("Timezone column migration skipped or already applied: {}", e.getMessage());
+        }
     }
 
     private void migrateEnabledColumn() {

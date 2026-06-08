@@ -55,7 +55,7 @@ class ConversationAgentTest {
         latch = new CountDownLatch(1);
 
         UserPreferences prefs = new UserPreferences("test-user");
-        prefs.setTimezone("Asia/Shanghai");
+        prefs.setUtcOffset(8);
         when(userPreferencesService.get("test-user")).thenReturn(prefs);
 
         StubStreamingModel model = new StubStreamingModel() {
