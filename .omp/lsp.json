@@ -1,0 +1,27 @@
+{
+  "idleTimeoutMs": 300000,
+  "servers": {
+    "typescript-language-server": {
+      "command": "E:/Developer/myhub/chat-agent/src/main/frontend/node_modules/.bin/typescript-language-server.cmd",
+      "args": ["--stdio"],
+      "rootMarkers": ["src/main/frontend/package.json", "src/main/frontend/tsconfig.json", ".git"]
+    },
+    "jdtls": {
+      "command": "E:/Developer/tools/jdtls/bin/jdtls.bat",
+      "warmupTimeoutMs": 30000
+    },
+    "vscode-html-language-server": {
+      "command": "E:/Developer/myhub/chat-agent/src/main/frontend/node_modules/.bin/vscode-html-language-server.cmd",
+      "args": ["--stdio"]
+    },
+    "vscode-css-language-server": {
+      "command": "E:/Developer/myhub/chat-agent/src/main/frontend/node_modules/.bin/vscode-css-language-server.cmd",
+      "args": ["--stdio"]
+    },
+    "vscode-json-language-server": {
+      "command": "E:/Developer/myhub/chat-agent/src/main/frontend/node_modules/.bin/vscode-json-language-server.cmd",
+      "args": ["--stdio"]
+    },
+    "yamlls": {}
+  }
+}
