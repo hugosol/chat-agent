@@ -1,7 +1,7 @@
 package com.hugosol.chatagent.dto;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record CueMatch(
 
@@ -9,5 +9,5 @@ public record CueMatch(
         String topic,
         String summary,
         double score,
-        LocalDateTime createdAt) implements Serializable {
+        Instant createdAt) implements Serializable {
 }

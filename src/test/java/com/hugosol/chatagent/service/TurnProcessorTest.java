@@ -13,7 +13,9 @@ import com.hugosol.chatagent.model.AgentMode;
 import com.hugosol.chatagent.model.AgentType;
 import com.hugosol.chatagent.model.ErrorType;
 import com.hugosol.chatagent.model.MessageRole;
+import com.hugosol.chatagent.model.UserPreferences;
 import com.hugosol.chatagent.repository.MemoryCueRepository;
+import com.hugosol.chatagent.service.UserPreferencesService;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.TokenUsage;
@@ -63,6 +65,9 @@ class TurnProcessorTest {
     @Mock
     private MemoryCueRepository memoryCueRepository;
 
+    @Mock
+    private UserPreferencesService userPreferencesService;
+
     private AppProperties appProperties;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -71,12 +76,16 @@ class TurnProcessorTest {
         appProperties = new AppProperties();
         when(sessionService.getMessages(anyString())).thenReturn(List.of());
         when(sessionService.getMode(anyString())).thenReturn("WORKPLACE_STANDUP");
-        when(sessionService.getUserId(anyString())).thenReturn("user-1");
+        when(sessionService.getUserId(anyString())).thenReturn("user1");
         when(sessionService.getCorrectionCount(anyString())).thenReturn(0);
         when(sessionService.getLearningProfile(anyString())).thenReturn("");
         when(sessionService.getMemoryCueQueue(anyString())).thenReturn(new MemoryCueQueue(3));
-        when(conversationAgent.buildPromptJson(any(), any(AgentMode.class), any(MemoryContent.class), anyInt()))
+        when(conversationAgent.buildPromptJson(any(), any(AgentMode.class), any(MemoryContent.class), anyString(), anyInt()))
                 .thenReturn("[{\"role\":\"system\",\"content\":\"You are a coach\"},{\"role\":\"user\",\"content\":\"hi\"},{\"role\":\"assistant\",\"content\":\"Hello\"}]");
+
+        UserPreferences prefs = new UserPreferences("user1");
+        prefs.setUtcOffset(8);
+        when(userPreferencesService.get("user1")).thenReturn(prefs);
     }
 
     @Test
@@ -116,7 +125,7 @@ class TurnProcessorTest {
         verify(sessionService).addMessage("s1", MessageRole.AGENT, "Hi", 1, 6);
         verify(sessionService).recordTokens("s1", AgentType.CONVERSATION, 6);
         verify(llmCallLogService).saveAsync(
-                eq("s1"), eq("user-1"), eq("CONVERSATION"), eq("WORKPLACE_STANDUP"),
+                eq("s1"), eq("user1"), eq("CONVERSATION"), eq("WORKPLACE_STANDUP"),
                 contains("system"), contains("You are a coach"), contains("user"),
                 contains("Hi"), anyInt(), anyInt(), anyLong(), eq("SUCCESS"), isNull());
     }
@@ -124,10 +133,10 @@ class TurnProcessorTest {
     @Test
     void conversationErrorFiresCallback() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(4);
+            StreamingChatResponseHandler handler = inv.getArgument(5);
             handler.onError(new RuntimeException("model down"));
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyInt(), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyString(), anyInt(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -182,15 +191,15 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(embeddingService).search(eq("hi"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+        verify(embeddingService).search(eq("hi"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6));
     }
 
     @Test
     void messageIdFive_callsRagSearch() throws Exception {
         setupConversationAgent("ok", 0);
-        when(embeddingService.search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), anyInt(), anyDouble()))
+        when(embeddingService.search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), anyInt(), anyDouble()))
                 .thenReturn(List.of(new CueMatch("cue-1", "Work Standup", "Discussed login", 0.85,
-                        java.time.LocalDateTime.of(2026, 5, 27, 10, 0))));
+                        java.time.Instant.parse("2026-05-27T10:00:00Z"))));
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -203,7 +212,7 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(embeddingService).search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+        verify(embeddingService).search(eq("tell me about work"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6));
     }
 
     @Test
@@ -259,11 +268,11 @@ class TurnProcessorTest {
     @Test
     void nullChatResponseGuardDoesNotThrow() throws Exception {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(4);
+            StreamingChatResponseHandler handler = inv.getArgument(5);
             handler.onPartialResponse("x");
             handler.onCompleteResponse(null);
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyInt(), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyString(), anyInt(), any());
 
         TurnProcessor processor = newProcessor();
         CountDownLatch latch = new CountDownLatch(1);
@@ -300,12 +309,12 @@ class TurnProcessorTest {
     void messageIdTwo_firstRagLoad_searchesTopK() throws Exception {
         setupConversationAgent("ok", 0);
         var cueA = new CueMatch("a", "Topic A", "Summary A", 0.6,
-                java.time.LocalDateTime.of(2026, 5, 28, 10, 0));
+                java.time.Instant.parse("2026-05-28T10:00:00Z"));
         var cueB = new CueMatch("b", "Topic B", "Summary B", 0.75,
-                java.time.LocalDateTime.of(2026, 5, 28, 10, 0));
+                java.time.Instant.parse("2026-05-28T10:00:00Z"));
         var cueC = new CueMatch("c", "Topic C", "Summary C", 0.9,
-                java.time.LocalDateTime.of(2026, 5, 28, 10, 0));
-        when(embeddingService.search(eq("my input"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6)))
+                java.time.Instant.parse("2026-05-28T10:00:00Z"));
+        when(embeddingService.search(eq("my input"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6)))
                 .thenReturn(List.of(cueA, cueB, cueC));
 
         TurnProcessor processor = newProcessor();
@@ -319,13 +328,13 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(embeddingService).search(eq("my input"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+        verify(embeddingService).search(eq("my input"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6));
     }
 
     @Test
     void messageIdTwo_firstRagLoad_emptyResults_stillCallsSearch() throws Exception {
         setupConversationAgent("ok", 0);
-        when(embeddingService.search(eq("new topic"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6)))
+        when(embeddingService.search(eq("new topic"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6)))
                 .thenReturn(List.of());
 
         TurnProcessor processor = newProcessor();
@@ -339,7 +348,7 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(embeddingService).search(eq("new topic"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+        verify(embeddingService).search(eq("new topic"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6));
     }
 
     @Test
@@ -347,15 +356,15 @@ class TurnProcessorTest {
         setupConversationAgent("ok", 0);
         var nonEmptyQueue = new MemoryCueQueue(3);
         nonEmptyQueue.push(List.of(
-                new CueMatch("a", "A", "A", 0.6, java.time.LocalDateTime.of(2026, 5, 28, 10, 0)),
-                new CueMatch("b", "B", "B", 0.75, java.time.LocalDateTime.of(2026, 5, 28, 10, 0)),
-                new CueMatch("c", "C", "C", 0.9, java.time.LocalDateTime.of(2026, 5, 28, 10, 0))
+                new CueMatch("a", "A", "A", 0.6, java.time.Instant.parse("2026-05-28T10:00:00Z")),
+                new CueMatch("b", "B", "B", 0.75, java.time.Instant.parse("2026-05-28T10:00:00Z")),
+                new CueMatch("c", "C", "C", 0.9, java.time.Instant.parse("2026-05-28T10:00:00Z"))
         ));
         when(sessionService.getMemoryCueQueue("s1")).thenReturn(nonEmptyQueue);
 
-        var cueD = new CueMatch("d", "D", "D", 0.7, java.time.LocalDateTime.of(2026, 5, 29, 10, 0));
-        var cueE = new CueMatch("e", "E", "E", 0.85, java.time.LocalDateTime.of(2026, 5, 29, 10, 0));
-        when(embeddingService.search(eq("follow up"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6)))
+        var cueD = new CueMatch("d", "D", "D", 0.7, java.time.Instant.parse("2026-05-29T10:00:00Z"));
+        var cueE = new CueMatch("e", "E", "E", 0.85, java.time.Instant.parse("2026-05-29T10:00:00Z"));
+        when(embeddingService.search(eq("follow up"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6)))
                 .thenReturn(List.of(cueD, cueE));
 
         TurnProcessor processor = newProcessor();
@@ -369,24 +378,24 @@ class TurnProcessorTest {
         });
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-        verify(embeddingService).search(eq("follow up"), eq(AgentMode.WORKPLACE_STANDUP), eq("user-1"), eq(2), eq(0.6));
+        verify(embeddingService).search(eq("follow up"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6));
     }
 
     private TurnProcessor newProcessor() {
         ChatGraphBuilder builder = new ChatGraphBuilder(correctionNode);
-        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, learningProfileService, memoryCueRepository, appProperties, executor);
+        return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, learningProfileService, memoryCueRepository, appProperties, userPreferencesService, executor);
     }
 
     private void setupConversationAgent(String responseText, int totalTokens) {
         doAnswer(inv -> {
-            StreamingChatResponseHandler handler = inv.getArgument(4);
+            StreamingChatResponseHandler handler = inv.getArgument(5);
             handler.onPartialResponse(responseText);
             handler.onCompleteResponse(ChatResponse.builder()
                     .aiMessage(dev.langchain4j.data.message.AiMessage.from(responseText))
                     .tokenUsage(new TokenUsage(totalTokens / 2, totalTokens / 2, totalTokens))
                     .build());
             return null;
-        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyInt(), any());
+        }).when(conversationAgent).generateStream(any(), any(AgentMode.class), any(MemoryContent.class), anyString(), anyInt(), any());
     }
 
     private static class StubCallback implements TurnProcessor.TurnCallback {

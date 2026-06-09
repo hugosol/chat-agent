@@ -2,7 +2,7 @@ package com.hugosol.chatagent.dto;
 
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -138,11 +138,11 @@ class MemoryCueQueueTest {
     void pushScoreTie_stableSort_byCreatedAtDesc() {
         var queue = new MemoryCueQueue(3);
         var a = new CueMatch("a", "t-a", "s-a", 0.8,
-                LocalDateTime.of(2025, 5, 28, 10, 0));
+                Instant.parse("2025-05-28T10:00:00Z"));
         var b = new CueMatch("b", "t-b", "s-b", 0.8,
-                LocalDateTime.of(2025, 5, 27, 10, 0));
+                Instant.parse("2025-05-27T10:00:00Z"));
         var c = new CueMatch("c", "t-c", "s-c", 0.8,
-                LocalDateTime.of(2025, 5, 29, 10, 0));
+                Instant.parse("2025-05-29T10:00:00Z"));
 
         queue.push(List.of(a, b, c));
 
@@ -153,6 +153,6 @@ class MemoryCueQueueTest {
 
     private static CueMatch cue(String cueId, double score) {
         return new CueMatch(cueId, "topic-" + cueId, "summary-" + cueId, score,
-                LocalDateTime.of(2025, 5, 28, 10, 0));
+                Instant.parse("2025-05-28T10:00:00Z"));
     }
 }

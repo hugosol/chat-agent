@@ -13,7 +13,6 @@ import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
 
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,18 +40,15 @@ public class ReviewService {
     private final UserPreferencesService preferencesService;
     private final ReviewLogRepository reviewLogRepository;
     private final FsrsConfigService fsrsConfigService;
-    private final CacheManager cacheManager;
     private final ExecutorService optimizerExecutor;
 
     public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService,
                          ReviewLogRepository reviewLogRepository, FsrsConfigService fsrsConfigService,
-                         CacheManager cacheManager,
                          @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor) {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
         this.reviewLogRepository = reviewLogRepository;
         this.fsrsConfigService = fsrsConfigService;
-        this.cacheManager = cacheManager;
         this.optimizerExecutor = optimizerExecutor;
     }
 
@@ -234,8 +231,6 @@ public class ReviewService {
             if (!updatedCards.isEmpty()) {
                 cardRepository.saveAll(updatedCards);
             }
-
-            cacheManager.getCache("fsrsConfig").evict(userId);
         }, optimizerExecutor);
     }
 
@@ -290,17 +285,15 @@ public class ReviewService {
     }
 
     private Instant computeTodayStart(UserPreferences prefs) {
-        String timezone = prefs.getTimezone() != null ? prefs.getTimezone() : ZoneId.systemDefault().getId();
-        ZoneId zoneId;
-        try {
-            zoneId = ZoneId.of(timezone);
-        } catch (Exception e) {
-            zoneId = ZoneId.systemDefault();
-        }
-        ZonedDateTime nowInZone = ZonedDateTime.now(zoneId);
+        int offsetHours = prefs.getUtcOffset() != null ? prefs.getUtcOffset() : 8;
+        ZoneOffset offset = ZoneOffset.ofHours(offsetHours);
+        ZonedDateTime nowInZone = Instant.now().atZone(offset);
         LocalDate today = nowInZone.toLocalDate();
+        if (nowInZone.getHour() < prefs.getDayStartHour()) {
+            today = today.minusDays(1);
+        }
         LocalDateTime todayStart = today.atStartOfDay().plusHours(prefs.getDayStartHour());
-        return todayStart.atZone(zoneId).toInstant();
+        return todayStart.atZone(offset).toInstant();
     }
 
     private ReviewStats computeStats(String deckId, String mode, String userId) {

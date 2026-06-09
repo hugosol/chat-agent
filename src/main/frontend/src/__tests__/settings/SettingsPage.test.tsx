@@ -5,7 +5,7 @@ import { SettingsPage } from "../../components/settings/SettingsPage";
 const mockPrefs = {
   newCardDailyLimit: 20,
   dayStartHour: 6,
-  timezone: "Asia/Shanghai",
+  utcOffset: 8,
   lastDeckId: "deck-1",
   lastMode: "STANDARD",
   learningSteps: "1m,10m",
@@ -48,7 +48,7 @@ describe("SettingsPage", () => {
     });
 
     expect(screen.getByTestId("settings-dayStartHour")).toBeTruthy();
-    expect(screen.getByTestId("settings-timezone")).toBeTruthy();
+    expect(screen.getByTestId("settings-utcOffset")).toBeTruthy();
     expect(screen.getByTestId("settings-learningPreset")).toBeTruthy();
     expect(screen.getByTestId("settings-learningSteps")).toBeTruthy();
     expect(screen.getByTestId("settings-relearningPreset")).toBeTruthy();
@@ -237,6 +237,7 @@ describe("SettingsPage", () => {
       expect(body.enableFuzz).toBe(true);
       expect(body.shuffleDueCards).toBe(false);
       expect(body.maximumInterval).toBe(36500);
+      expect(body.utcOffset).toBe(8);
     });
   });
 
@@ -270,5 +271,61 @@ describe("SettingsPage", () => {
       expect(screen.getByTestId("toast")).toBeTruthy();
       expect(screen.getByTestId("toast").textContent).toBe("设置已保存");
     });
+  });
+
+  it("utcOffset_plus_button_increments", async () => {
+    setupFetch();
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-utcOffset")).toBeTruthy();
+    });
+
+    const plusBtn = screen.getByTestId("settings-utcOffset-plus");
+    fireEvent.click(plusBtn);
+
+    const input = screen.getByTestId("settings-utcOffset") as HTMLInputElement;
+    expect(input.value).toBe("9");
+  });
+
+  it("utcOffset_minus_button_decrements", async () => {
+    setupFetch();
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-utcOffset")).toBeTruthy();
+    });
+
+    const minusBtn = screen.getByTestId("settings-utcOffset-minus");
+    fireEvent.click(minusBtn);
+
+    const input = screen.getByTestId("settings-utcOffset") as HTMLInputElement;
+    expect(input.value).toBe("7");
+  });
+
+  it("utcOffset_plus_capped_at_14", async () => {
+    setupFetch({ ...mockPrefs, utcOffset: 14 });
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-utcOffset")).toBeTruthy();
+    });
+
+    const plusBtn = screen.getByTestId("settings-utcOffset-plus");
+    fireEvent.click(plusBtn);
+
+    const input = screen.getByTestId("settings-utcOffset") as HTMLInputElement;
+    expect(input.value).toBe("14");
+  });
+
+  it("utcOffset_minus_capped_at_neg12", async () => {
+    setupFetch({ ...mockPrefs, utcOffset: -12 });
+    render(<SettingsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-utcOffset")).toBeTruthy();
+    });
+
+    const minusBtn = screen.getByTestId("settings-utcOffset-minus");
+    fireEvent.click(minusBtn);
+
+    const input = screen.getByTestId("settings-utcOffset") as HTMLInputElement;
+    expect(input.value).toBe("-12");
   });
 });

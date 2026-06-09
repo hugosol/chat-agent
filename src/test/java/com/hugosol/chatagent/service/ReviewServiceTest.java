@@ -15,13 +15,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Captor;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -55,12 +58,6 @@ class ReviewServiceTest {
     private FsrsConfigService fsrsConfigService;
 
     @Mock
-    private CacheManager cacheManager;
-
-    @Mock
-    private Cache cache;
-
-    @Mock
     private ExecutorService optimizerExecutor;
 
     private ReviewService reviewService;
@@ -69,13 +66,12 @@ class ReviewServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(fsrsConfigService.getConfig(anyString())).thenReturn(FsrsSchedulerConfig.defaults());
-        lenient().when(cacheManager.getCache("fsrsConfig")).thenReturn(cache);
         lenient().doAnswer(inv -> {
             ((Runnable) inv.getArgument(0)).run();
             return null;
         }).when(optimizerExecutor).execute(any(Runnable.class));
         reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository,
-                fsrsConfigService, cacheManager, optimizerExecutor);
+                fsrsConfigService, optimizerExecutor);
         lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0), anyString())).thenReturn(1000L);
     }
 
@@ -413,17 +409,19 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_standard_returnsDueCountPlusNewQuota() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(2L);
         when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(3L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(5L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "STANDARD", "user-1");
 
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
         assertThat(stats.reviewedToday()).isEqualTo(2);
         assertThat(stats.remaining()).isEqualTo(18L);
         assertThat(stats.learnedToday()).isEqualTo(5);
@@ -433,17 +431,19 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_reviewOnly_returnsDueCountOnly() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(1L);
         when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(4L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(0L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "REVIEW_ONLY", "user-1");
 
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
         assertThat(stats.remaining()).isEqualTo(4L);
         assertThat(stats.learnedToday()).isEqualTo(0);
     }
@@ -451,15 +451,17 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_newOnly_returnsNewQuotaOnly() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(3L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(8L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
 
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
         assertThat(stats.remaining()).isEqualTo(12L);
         assertThat(stats.learnedToday()).isEqualTo(8);
     }
@@ -467,14 +469,16 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_cram_returnsNegativeSentinel() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(10L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(5L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 
         var stats = reviewService.computeReviewStats("deck-1", "CRAM", "user-1");
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
 
         assertThat(stats.remaining()).isEqualTo(-1);
         assertThat(stats.learnedToday()).isEqualTo(-1);
@@ -483,11 +487,12 @@ class ReviewServiceTest {
     @Test
     void computeReviewStats_standard_capsNewCardRemainingByActualCount() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(2L);
         when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(5L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(0L);
         when(cardRepository.countByTagsIdAndCardState(eq("deck-1"), eq(0), anyString())).thenReturn(3L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
@@ -495,15 +500,17 @@ class ReviewServiceTest {
 
         var stats = reviewService.computeReviewStats("deck-1", "STANDARD", "user-1");
 
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
         assertThat(stats.remaining()).isEqualTo(8L);
     }
 
     @Test
     void computeReviewStats_newOnly_capsNewCardRemainingByActualCount() {
         when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(3L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), any(Instant.class), anyString()))
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(0L);
         when(cardRepository.countByTagsIdAndCardState(eq("deck-1"), eq(0), anyString())).thenReturn(2L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
@@ -511,7 +518,70 @@ class ReviewServiceTest {
 
         var stats = reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
 
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
         assertThat(stats.remaining()).isEqualTo(2L);
+    }
+
+    @Test
+    void computeTodayStart_normalHours_returnsToday() {
+        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
+                .thenReturn(0L);
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
+                .thenReturn(0L);
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
+                .thenReturn(null);
+
+        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
+
+        Instant captured = todayStartCaptor.getValue();
+        ZoneId zone = ZoneId.of("+08:00");
+        ZonedDateTime nowInZone = ZonedDateTime.now(zone);
+        Instant expectedTodayStart = nowInZone.toLocalDate().atStartOfDay(zone).plusHours(6).toInstant();
+        assertThat(captured).isEqualTo(expectedTodayStart);
+    }
+
+    @Test
+    void computeTodayStart_midnightWindow_returnsYesterday() {
+        UserPreferences prefs = new UserPreferences("user-1");
+        prefs.setNewCardDailyLimit(20);
+        prefs.setDayStartHour(23);
+        prefs.setUtcOffset(8);
+        when(preferencesService.get("user-1")).thenReturn(prefs);
+
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
+                .thenReturn(0L);
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
+                .thenReturn(0L);
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
+                .thenReturn(null);
+
+        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
+
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now().minus(1, ChronoUnit.HOURS));
+    }
+
+    @Test
+    void computeTodayStart_dayStartHourZero_neverBackdates() {
+        UserPreferences prefs = new UserPreferences("user-1");
+        prefs.setNewCardDailyLimit(20);
+        prefs.setDayStartHour(0);
+        prefs.setUtcOffset(8);
+        when(preferencesService.get("user-1")).thenReturn(prefs);
+
+        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
+        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
+                .thenReturn(0L);
+        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
+                .thenReturn(0L);
+        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
+                .thenReturn(null);
+
+        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
+
+        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
     }
 
     @Test
@@ -690,6 +760,7 @@ class ReviewServiceTest {
         UserPreferences prefs = new UserPreferences("user-1");
         prefs.setNewCardDailyLimit(20);
         prefs.setDayStartHour(6);
+        prefs.setUtcOffset(8);
         return prefs;
     }
 
@@ -737,7 +808,6 @@ class ReviewServiceTest {
         verify(cardRepository).saveAll(captor.capture());
         List<Card> savedCards = captor.getValue();
         assertThat(savedCards).hasSize(3);
-        verify(cache).evict("user-1");
     }
 
     @Test

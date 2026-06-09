@@ -1,7 +1,7 @@
 package com.hugosol.chatagent.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "sessions")
@@ -16,9 +16,9 @@ public class Session extends BaseEntity {
     private AgentMode mode;
 
     @Column(nullable = false)
-    private LocalDateTime startTime;
+    private Instant startTime;
 
-    private LocalDateTime endTime;
+    private Instant endTime;
 
     @Column(nullable = false)
     private String userId;
@@ -31,13 +31,13 @@ public class Session extends BaseEntity {
 
     public Session(AgentMode mode) {
         this.mode = mode;
-        this.startTime = LocalDateTime.now();
+        this.startTime = Instant.now();
         this.status = SessionStatus.ACTIVE;
     }
 
     public void complete() {
         this.status = SessionStatus.COMPLETED;
-        this.endTime = LocalDateTime.now();
+        this.endTime = Instant.now();
     }
 
     public String getId() { return id; }
@@ -46,11 +46,11 @@ public class Session extends BaseEntity {
     public AgentMode getMode() { return mode; }
     public void setMode(AgentMode mode) { this.mode = mode; }
 
-    public LocalDateTime getStartTime() { return startTime; }
-    public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }
+    public Instant getStartTime() { return startTime; }
+    public void setStartTime(Instant startTime) { this.startTime = startTime; }
 
-    public LocalDateTime getEndTime() { return endTime; }
-    public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
+    public Instant getEndTime() { return endTime; }
+    public void setEndTime(Instant endTime) { this.endTime = endTime; }
 
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }

@@ -78,7 +78,7 @@ public class UserLearningProfile extends BaseEntity {
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 
     @Transient
-    public String getTimeLabel(java.time.LocalDateTime referenceTime) {
-        return TimeLabel.computeLabel(getCreateTime(), referenceTime);
+    public String getTimeLabel(java.time.Instant referenceTime, java.time.ZoneId zoneId) {
+        return TimeLabel.computeLabel(getCreateTime(), referenceTime, zoneId);
     }
 }

@@ -26,10 +26,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -92,28 +88,8 @@ public class ReviewController {
             @RequestParam String deckId,
             @RequestParam(defaultValue = "") String mode) {
         String userId = getUserId();
-
-        if (!mode.isEmpty()) {
-            var stats = reviewService.computeReviewStats(deckId, mode, userId);
-            return ResponseEntity.ok(statsToMap(stats));
-        }
-
-        UserPreferences prefs = preferencesService.get(userId);
-        Instant now = Instant.now();
-        Instant todayStart = computeTodayStart(prefs);
-
-        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart, userId);
-        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
-        long remaining = cardRepository.countDueCardsByTagsId(deckId, now, userId);
-        Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now, userId);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("reviewedToday", reviewedToday);
-        result.put("remaining", remaining);
-        result.put("learnedToday", learnedToday);
-        result.put("dailyLimit", prefs.getNewCardDailyLimit());
-        result.put("nextDueAt", nextDueAt != null ? nextDueAt.toString() : null);
-        return ResponseEntity.ok(result);
+        var stats = reviewService.computeReviewStats(deckId, mode.isEmpty() ? "STANDARD" : mode, userId);
+        return ResponseEntity.ok(statsToMap(stats));
     }
 
     @GetMapping("/review/start")
@@ -167,7 +143,7 @@ public class ReviewController {
         result.put("lastMode", prefs.getLastMode());
         result.put("newCardDailyLimit", prefs.getNewCardDailyLimit());
         result.put("dayStartHour", prefs.getDayStartHour());
-        result.put("timezone", prefs.getTimezone());
+        result.put("utcOffset", prefs.getUtcOffset());
         result.put("learningSteps", prefs.getLearningSteps());
         result.put("relearningSteps", prefs.getRelearningSteps());
         result.put("desiredRetention", prefs.getDesiredRetention());
@@ -201,8 +177,9 @@ public class ReviewController {
         if (body.containsKey("dayStartHour")) {
             prefs.setDayStartHour(((Number) body.get("dayStartHour")).intValue());
         }
-        if (body.containsKey("timezone")) {
-            prefs.setTimezone((String) body.get("timezone"));
+        if (body.containsKey("utcOffset")) {
+            Object val = body.get("utcOffset");
+            prefs.setUtcOffset(val != null ? ((Number) val).intValue() : null);
         }
         if (body.containsKey("learningSteps")) {
             prefs.setLearningSteps((String) body.get("learningSteps"));
@@ -231,7 +208,7 @@ public class ReviewController {
         result.put("lastMode", prefs.getLastMode());
         result.put("newCardDailyLimit", prefs.getNewCardDailyLimit());
         result.put("dayStartHour", prefs.getDayStartHour());
-        result.put("timezone", prefs.getTimezone());
+        result.put("utcOffset", prefs.getUtcOffset());
         result.put("learningSteps", prefs.getLearningSteps());
         result.put("relearningSteps", prefs.getRelearningSteps());
         result.put("desiredRetention", prefs.getDesiredRetention());
@@ -241,19 +218,6 @@ public class ReviewController {
         return ResponseEntity.ok(result);
     }
 
-    private Instant computeTodayStart(UserPreferences prefs) {
-        String timezone = prefs.getTimezone() != null ? prefs.getTimezone() : ZoneId.systemDefault().getId();
-        ZoneId zoneId;
-        try {
-            zoneId = ZoneId.of(timezone);
-        } catch (Exception e) {
-            zoneId = ZoneId.systemDefault();
-        }
-        ZonedDateTime nowInZone = ZonedDateTime.now(zoneId);
-        LocalDate today = nowInZone.toLocalDate();
-        LocalDateTime todayStart = today.atStartOfDay().plusHours(prefs.getDayStartHour());
-        return todayStart.atZone(zoneId).toInstant();
-    }
 
     private String getUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

@@ -6,6 +6,8 @@ import com.hugosol.chatagent.dto.MemoryContent;
 import com.hugosol.chatagent.dto.MessageData;
 import com.hugosol.chatagent.model.AgentMode;
 import com.hugosol.chatagent.model.MessageRole;
+import com.hugosol.chatagent.model.UserPreferences;
+import com.hugosol.chatagent.service.UserPreferencesService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -16,15 +18,25 @@ import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.output.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.core.io.DefaultResourceLoader;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ConversationAgentTest {
 
     private ConversationAgent agent;
@@ -33,11 +45,18 @@ class ConversationAgentTest {
     private List<ChatMessage> lastMessages;
     private CountDownLatch latch;
 
+    @Mock
+    private UserPreferencesService userPreferencesService;
+
     @BeforeEach
     void setUp() {
         promptLoader = new PromptLoader(new DefaultResourceLoader());
         receivedTokens = new ArrayList<>();
         latch = new CountDownLatch(1);
+
+        UserPreferences prefs = new UserPreferences("test-user");
+        prefs.setUtcOffset(8);
+        when(userPreferencesService.get("test-user")).thenReturn(prefs);
 
         StubStreamingModel model = new StubStreamingModel() {
             @Override
@@ -62,7 +81,7 @@ class ConversationAgentTest {
                         .build());
             }
         };
-        agent = new ConversationAgent(model, promptLoader);
+        agent = new ConversationAgent(model, promptLoader, userPreferencesService);
     }
 
     @Test
@@ -70,7 +89,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new RecordingHandler());
 
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
@@ -82,7 +101,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("workplace_standup/description.txt");
@@ -95,7 +114,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         String description = promptLoader.load("workplace_standup/description.txt");
@@ -108,7 +127,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.DAILY_TALK,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("daily_talk/description.txt");
@@ -121,7 +140,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.DAILY_TALK,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("daily_talk/rules.txt");
@@ -134,7 +153,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         String expected = promptLoader.load("workplace_standup/rules.txt");
@@ -147,7 +166,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "I finished the login module", 1)),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         assertThat(lastMessages).isNotNull();
@@ -163,7 +182,7 @@ class ConversationAgentTest {
         agent.generateStream(
                 List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         assertThat(lastMessages).isNotNull();
@@ -179,7 +198,7 @@ class ConversationAgentTest {
 
         agent.generateStream(history,
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         assertThat(lastMessages).hasSize(3);
@@ -196,12 +215,12 @@ class ConversationAgentTest {
             }
         };
         ConversationAgent errorAgent = new ConversationAgent(errorModel,
-                new PromptLoader(new DefaultResourceLoader()));
+                new PromptLoader(new DefaultResourceLoader()), userPreferencesService);
 
         latch = new CountDownLatch(1);
         errorAgent.generateStream(List.of(),
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new StreamingChatResponseHandler() {
                     @Override
                     public void onPartialResponse(String token) {}
@@ -224,6 +243,7 @@ class ConversationAgentTest {
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
                 new MemoryContent("earlier today", "Past tense needs work", null),
+                "test-user",
                 0,
                 new NoopHandler());
 
@@ -238,12 +258,13 @@ class ConversationAgentTest {
     @Test
     void ragMemoryInjection_containsMemoryCues() {
         var cue = new CueMatch("cue-1", "Work Standup", "Discussed login module", 0.85,
-                java.time.LocalDateTime.of(2026, 5, 27, 10, 0));
+                Instant.parse("2026-05-27T10:00:00Z"));
 
         agent.generateStream(
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
                 new MemoryContent(null, null, List.of(cue)),
+                "test-user",
                 0,
                 new NoopHandler());
 
@@ -262,6 +283,7 @@ class ConversationAgentTest {
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
                 new MemoryContent(null, null, null),
+                "test-user",
                 0,
                 new NoopHandler());
 
@@ -280,7 +302,7 @@ class ConversationAgentTest {
 
         agent.generateStream(history,
                 AgentMode.WORKPLACE_STANDUP,
-                new MemoryContent(null, null, null), 0,
+                new MemoryContent(null, null, null), "test-user", 0,
                 new NoopHandler());
 
         assertThat(lastMessages).hasSize(2);
@@ -288,9 +310,9 @@ class ConversationAgentTest {
 
     @Test
     void formatMemoryCuesForPrompt_producesNumberedListWithTimeLabels() {
-        var now = java.time.LocalDateTime.now();
-        var yesterday9am = now.minusDays(1).withHour(9).withMinute(0).withSecond(0);
-        var lastWeek = now.minusDays(5);
+        var now = Instant.now();
+        var yesterday9am = now.minus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.DAYS).plus(9, ChronoUnit.HOURS);
+        var lastWeek = now.minus(5, ChronoUnit.DAYS);
 
         var cue1 = new CueMatch("c1", "Work Standup", "Discussed login", 0.85, yesterday9am);
         var cue2 = new CueMatch("c2", "Travel", "Japan trip plan", 0.75, lastWeek);
@@ -299,6 +321,7 @@ class ConversationAgentTest {
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
                 new MemoryContent(null, null, List.of(cue2, cue1)),
+                "test-user",
                 0,
                 new NoopHandler());
 
@@ -316,6 +339,7 @@ class ConversationAgentTest {
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
                 new MemoryContent(null, null, List.of()),
+                "test-user",
                 0,
                 new NoopHandler());
 
@@ -330,6 +354,7 @@ class ConversationAgentTest {
                 List.of(new MessageData(MessageRole.USER, "Hi", 0)),
                 AgentMode.WORKPLACE_STANDUP,
                 new MemoryContent(null, null, (List<CueMatch>) null),
+                "test-user",
                 0,
                 new NoopHandler());
 

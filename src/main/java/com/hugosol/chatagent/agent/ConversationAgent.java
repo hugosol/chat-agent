@@ -7,6 +7,7 @@ import com.hugosol.chatagent.dto.MessageData;
 import com.hugosol.chatagent.model.AgentMode;
 import com.hugosol.chatagent.model.MessageRole;
 import com.hugosol.chatagent.model.TimeLabel;
+import com.hugosol.chatagent.service.UserPreferencesService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -17,7 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -34,12 +36,15 @@ public class ConversationAgent {
             "in the conversation. Ask the user questions about their interests to keep the conversation engaging.";
 
     private final StreamingChatLanguageModel chatModel;
+    private final UserPreferencesService userPreferencesService;
     private final String systemTemplate;
     private final Map<AgentMode, String> modeDescriptions = new EnumMap<>(AgentMode.class);
     private final Map<AgentMode, String> modeRules = new EnumMap<>(AgentMode.class);
 
-    public ConversationAgent(StreamingChatLanguageModel chatModel, PromptLoader promptLoader) {
+    public ConversationAgent(StreamingChatLanguageModel chatModel, PromptLoader promptLoader,
+                             UserPreferencesService userPreferencesService) {
         this.chatModel = chatModel;
+        this.userPreferencesService = userPreferencesService;
         this.systemTemplate = promptLoader.load("conversation-system.txt");
         for (AgentMode mode : AgentMode.values()) {
             String path = mode.getTemplatePath();
@@ -49,32 +54,32 @@ public class ConversationAgent {
     }
 
     public void generateStream(List<MessageData> history, AgentMode mode,
-                                MemoryContent memoryContent,
+                                MemoryContent memoryContent, String userId,
                                 int messageId, StreamingChatResponseHandler handler) {
-        generate(history, mode, memoryContent, handler);
+        generate(history, mode, memoryContent, userId, handler);
     }
 
     public String buildPromptJson(List<MessageData> history, AgentMode mode,
-                                   MemoryContent memoryContent,
+                                   MemoryContent memoryContent, String userId,
                                    int messageId) {
-        List<ChatMessage> messages = buildMessages(history, mode, memoryContent);
+        List<ChatMessage> messages = buildMessages(history, mode, memoryContent, userId);
         return "[" + messages.stream()
                 .map(m -> "{\"role\":\"" + roleName(m) + "\",\"content\":" + jsonEscape(contentOf(m)) + "}")
                 .collect(Collectors.joining(",")) + "]";
     }
 
     private void generate(List<MessageData> history, AgentMode mode,
-                           MemoryContent memoryContent,
+                           MemoryContent memoryContent, String userId,
                            StreamingChatResponseHandler handler) {
-        List<ChatMessage> messages = buildMessages(history, mode, memoryContent);
+        List<ChatMessage> messages = buildMessages(history, mode, memoryContent, userId);
 
         log.debug("ConversationAgent sending {} messages", messages.size());
         chatModel.chat(messages, handler);
     }
 
     private List<ChatMessage> buildMessages(List<MessageData> history, AgentMode mode,
-                                              MemoryContent memoryContent) {
-        String systemContent = buildSystemContent(mode, memoryContent);
+                                              MemoryContent memoryContent, String userId) {
+        String systemContent = buildSystemContent(mode, memoryContent, userId);
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(systemContent));
@@ -122,7 +127,7 @@ public class ConversationAgent {
         return sb.toString();
     }
 
-    private String buildSystemContent(AgentMode mode, MemoryContent memoryContent) {
+    private String buildSystemContent(AgentMode mode, MemoryContent memoryContent, String userId) {
         String description = modeDescriptions.getOrDefault(mode, "");
         String rules = modeRules.getOrDefault(mode, "");
 
@@ -152,7 +157,7 @@ public class ConversationAgent {
 
         if (hasMemoryCues) {
             content = content.replace("{memoryCues}",
-                    formatMemoryCuesForPrompt(memoryContent.cueMatches()));
+                    formatMemoryCuesForPrompt(memoryContent.cueMatches(), userId));
         } else {
             content = content.replace("{memoryCues}", "");
         }
@@ -166,15 +171,28 @@ public class ConversationAgent {
         return content;
     }
 
-    private static String formatMemoryCuesForPrompt(List<CueMatch> cues) {
+    private String formatMemoryCuesForPrompt(List<CueMatch> cues, String userId) {
         StringBuilder sb = new StringBuilder("[Memory Cues]\n");
-        LocalDateTime now = LocalDateTime.now();
+        java.time.Instant now = java.time.Instant.now();
+        ZoneId zoneId = getZoneId(userId);
         for (int i = 0; i < cues.size(); i++) {
             CueMatch cue = cues.get(i);
-            String timeLabel = TimeLabel.computeLabel(cue.createdAt(), now);
+            String timeLabel = TimeLabel.computeLabel(cue.createdAt(), now, zoneId);
             sb.append(i + 1).append(". [from ").append(timeLabel).append("] ")
                     .append(cue.topic()).append(": ").append(cue.summary()).append("\n");
         }
         return sb.toString();
+    }
+
+    private ZoneId getZoneId(String userId) {
+        try {
+            var prefs = userPreferencesService.get(userId);
+            Integer utcOffset = prefs.getUtcOffset();
+            if (utcOffset != null) {
+                return ZoneOffset.ofHours(utcOffset);
+            }
+        } catch (Exception ignored) {
+        }
+        return ZoneOffset.ofHours(8);
     }
 }

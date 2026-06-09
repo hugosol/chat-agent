@@ -6,7 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -87,12 +87,12 @@ class LlmCallLogServiceTest {
         service.cleanupOnStartup();
         Thread.sleep(200);
 
-        ArgumentCaptor<LocalDateTime> cutoffCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<Instant> cutoffCaptor = ArgumentCaptor.forClass(Instant.class);
         verify(repository).deleteByCreateTimeBefore(cutoffCaptor.capture());
-        LocalDateTime cutoff = cutoffCaptor.getValue();
+        Instant cutoff = cutoffCaptor.getValue();
         // Should be approximately 3 days ago
-        LocalDateTime threeDaysAgo = LocalDateTime.now().minusDays(3);
-        assertThat(cutoff).isAfter(threeDaysAgo.minusMinutes(1));
-        assertThat(cutoff).isBefore(threeDaysAgo.plusMinutes(1));
+        Instant threeDaysAgo = Instant.now().minus(3, java.time.temporal.ChronoUnit.DAYS);
+        assertThat(cutoff).isAfter(threeDaysAgo.minusSeconds(60));
+        assertThat(cutoff).isBefore(threeDaysAgo.plusSeconds(60));
     }
 }

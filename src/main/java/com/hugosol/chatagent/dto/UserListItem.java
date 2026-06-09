@@ -1,5 +1,5 @@
 package com.hugosol.chatagent.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
-public record UserListItem(String id, String username, LocalDateTime createTime, boolean enabled) {}
+public record UserListItem(String id, String username, Instant createTime, boolean enabled) {}

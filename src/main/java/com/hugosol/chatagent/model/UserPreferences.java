@@ -24,8 +24,8 @@ public class UserPreferences extends BaseEntity {
     @Column(nullable = false)
     private int dayStartHour = 6;
 
-    @Column
-    private String timezone;
+    @Column(name = "utc_offset")
+    private Integer utcOffset;
 
     @Column
     private String lastDeckId;
@@ -66,8 +66,8 @@ public class UserPreferences extends BaseEntity {
     public void setNewCardDailyLimit(int newCardDailyLimit) { this.newCardDailyLimit = newCardDailyLimit; }
     public int getDayStartHour() { return dayStartHour; }
     public void setDayStartHour(int dayStartHour) { this.dayStartHour = dayStartHour; }
-    public String getTimezone() { return timezone; }
-    public void setTimezone(String timezone) { this.timezone = timezone; }
+    public Integer getUtcOffset() { return utcOffset; }
+    public void setUtcOffset(Integer utcOffset) { this.utcOffset = utcOffset; }
     public String getLastDeckId() { return lastDeckId; }
     public void setLastDeckId(String lastDeckId) { this.lastDeckId = lastDeckId; }
     public String getLastMode() { return lastMode; }

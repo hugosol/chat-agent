@@ -26,7 +26,6 @@ import com.hugosol.chatagent.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -52,7 +51,7 @@ public class FsrsOptimizeService {
     private final CardRepository cardRepository;
     private final UserPreferencesService preferencesService;
     private final FsrsConfigService fsrsConfigService;
-    private final CacheManager cacheManager;
+    private final FsrsParametersService fsrsParametersService;
     private final ExecutorService optimizerExecutor;
     private final FsrsOptimizeLogRepository optimizeLogRepository;
     private final FsrsRescheduleLogRepository rescheduleLogRepository;
@@ -66,7 +65,7 @@ public class FsrsOptimizeService {
                                CardRepository cardRepository,
                                UserPreferencesService preferencesService,
                                FsrsConfigService fsrsConfigService,
-                               CacheManager cacheManager,
+                               FsrsParametersService fsrsParametersService,
                                @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor,
                                FsrsOptimizeLogRepository optimizeLogRepository,
                                FsrsRescheduleLogRepository rescheduleLogRepository,
@@ -76,7 +75,7 @@ public class FsrsOptimizeService {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
         this.fsrsConfigService = fsrsConfigService;
-        this.cacheManager = cacheManager;
+        this.fsrsParametersService = fsrsParametersService;
         this.optimizerExecutor = optimizerExecutor;
         this.optimizeLogRepository = optimizeLogRepository;
         this.rescheduleLogRepository = rescheduleLogRepository;
@@ -207,8 +206,6 @@ public class FsrsOptimizeService {
 
             saveParameters(userId, params, result.weights());
 
-            cacheManager.getCache("fsrsConfig").evict(userId);
-
             String optimizeLogId = UUID.randomUUID().toString();
             rescheduleCards(userId, result.weights(), config, optimizeLogId, triggerType);
 
@@ -291,7 +288,7 @@ public class FsrsOptimizeService {
                 : FsrsParameters.defaults(userId);
         params.setUserId(userId);
         params.setWeights(weights);
-        paramsRepository.save(params);
+        fsrsParametersService.save(params);
     }
 
     @Transactional

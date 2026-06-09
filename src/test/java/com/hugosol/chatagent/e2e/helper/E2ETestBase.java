@@ -13,6 +13,7 @@ import org.junit.jupiter.api.TestInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.file.Files;
@@ -72,6 +73,9 @@ public abstract class E2ETestBase {
     @Autowired
     protected UserPreferencesRepository userPreferencesRepository;
 
+    @Autowired
+    protected CacheManager cacheManager;
+
     private int turnNumber = 0;
     private String currentTestMethodName;
 
@@ -107,6 +111,13 @@ public abstract class E2ETestBase {
 
     @BeforeEach
     void setUp(TestInfo testInfo) {
+        for (String name : cacheManager.getCacheNames()) {
+            var cache = cacheManager.getCache(name);
+            if (cache != null) {
+                cache.clear();
+            }
+        }
+
         currentTestMethodName = testInfo.getTestMethod()
                 .map(method -> method.getName())
                 .orElse("unknown");

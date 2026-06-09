@@ -24,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,6 +52,7 @@ public class TurnProcessor {
     private final MemoryCueRepository memoryCueRepository;
     private final AppProperties appProperties;
     private final ExecutorService executor;
+    private final UserPreferencesService userPreferencesService;
 
     public interface TurnCallback {
         void onConversationToken(String delta, int messageId);
@@ -66,6 +69,7 @@ public class TurnProcessor {
                           LearningProfileService learningProfileService,
                           MemoryCueRepository memoryCueRepository,
                           AppProperties appProperties,
+                          UserPreferencesService userPreferencesService,
                           @org.springframework.beans.factory.annotation.Qualifier("llmRequestExecutor") ExecutorService executor) {
         this.graph = graphBuilder.getCompiledGraph();
         this.conversationAgent = conversationAgent;
@@ -75,6 +79,7 @@ public class TurnProcessor {
         this.learningProfileService = learningProfileService;
         this.memoryCueRepository = memoryCueRepository;
         this.appProperties = appProperties;
+        this.userPreferencesService = userPreferencesService;
         this.executor = executor;
     }
 
@@ -120,8 +125,9 @@ public class TurnProcessor {
                     userId, mode, MemoryCueStatus.COMPLETED);
             if (fallback.isPresent()) {
                 var cue = fallback.get();
-                var now = java.time.LocalDateTime.now();
-                String label = TimeLabel.computeLabel(cue.getCreateTime(), now);
+                ZoneId zoneId = getZoneId(userId);
+                var now = java.time.Instant.now();
+                String label = TimeLabel.computeLabel(cue.getCreateTime(), now, zoneId);
                 lastConversationTimeLabel = label;
                 queue.push(List.of(new CueMatch(
                         cue.getId(),
@@ -145,7 +151,7 @@ public class TurnProcessor {
 
     private void startConversation(String sessionId, List<MessageData> history, AgentMode mode,
                                     MemoryContent memoryContent, int messageId, String userId, TurnCallback callback) {
-        String promptJson = conversationAgent.buildPromptJson(history, mode, memoryContent, messageId);
+        String promptJson = conversationAgent.buildPromptJson(history, mode, memoryContent, userId, messageId);
         long startTime = System.currentTimeMillis();
         StringBuilder fullText = new StringBuilder();
         String modeName = mode.name();
@@ -198,7 +204,7 @@ public class TurnProcessor {
             }
         };
 
-        conversationAgent.generateStream(history, mode, memoryContent, messageId, handler);
+        conversationAgent.generateStream(history, mode, memoryContent, userId, messageId, handler);
     }
 
     private CompletableFuture<Void> startCorrection(String sessionId, String userInput, int messageId,
@@ -259,5 +265,17 @@ public class TurnProcessor {
             log.warn("TurnProcessor: failed to parse prompt JSON for logging: {}", e.getMessage());
             return new String[]{ null, null };
         }
+    }
+
+    private ZoneId getZoneId(String userId) {
+        try {
+            var prefs = userPreferencesService.get(userId);
+            Integer utcOffset = prefs.getUtcOffset();
+            if (utcOffset != null) {
+                return ZoneOffset.ofHours(utcOffset);
+            }
+        } catch (Exception ignored) {
+        }
+        return ZoneOffset.ofHours(8);
     }
 }

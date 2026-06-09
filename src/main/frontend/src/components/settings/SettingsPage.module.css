@@ -86,6 +86,50 @@
   white-space: nowrap;
 }
 
+.offsetRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.offsetBtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #2a2a2a;
+  color: #ccc;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.offsetBtn:hover {
+  background: #3a3a3a;
+  border-color: #555;
+}
+
+.offsetBtn:active {
+  background: #1a1a1a;
+}
+
+.offsetSign {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+}
+
+.offsetInput {
+  max-width: 80px;
+  text-align: center;
+}
+
 .select {
   width: 100%;
   padding: 10px 36px 10px 14px;

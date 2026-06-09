@@ -1,6 +1,7 @@
 package com.hugosol.chatagent.model;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 
 @Entity
 @Table(name = "memory_cues")
@@ -71,7 +72,7 @@ public class MemoryCue extends BaseEntity {
     public void setStatus(MemoryCueStatus status) { this.status = status; }
 
     @Transient
-    public String getTimeLabel(java.time.LocalDateTime referenceTime) {
-        return TimeLabel.computeLabel(getCreateTime(), referenceTime);
+    public String getTimeLabel(java.time.Instant referenceTime, java.time.ZoneId zoneId) {
+        return TimeLabel.computeLabel(getCreateTime(), referenceTime, zoneId);
     }
 }

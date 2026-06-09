@@ -16,7 +16,7 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager("fsrsConfig");
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager("userPreferences", "fsrsParameters");
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterAccess(24, TimeUnit.HOURS));
         return cacheManager;

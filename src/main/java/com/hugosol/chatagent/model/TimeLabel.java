@@ -1,9 +1,11 @@
 package com.hugosol.chatagent.model;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 
 public enum TimeLabel {
@@ -33,10 +35,13 @@ public enum TimeLabel {
         return label;
     }
 
-    public static String computeLabel(LocalDateTime eventTime, LocalDateTime referenceTime) {
+    public static String computeLabel(Instant eventTime, Instant referenceTime, ZoneId zoneId) {
         if (eventTime == null) return "";
 
-        Duration elapsed = Duration.between(eventTime, referenceTime);
+        LocalDateTime eventLocal = eventTime.atZone(zoneId).toLocalDateTime();
+        LocalDateTime referenceLocal = referenceTime.atZone(zoneId).toLocalDateTime();
+
+        Duration elapsed = Duration.between(eventLocal, referenceLocal);
         if (elapsed.isNegative()) return "";
 
         if (elapsed.compareTo(Duration.ofMinutes(5)) <= 0) {
@@ -46,15 +51,15 @@ public enum TimeLabel {
             return A_FEW_MINUTES_AGO.label;
         }
 
-        LocalDate eventDate = eventTime.toLocalDate();
-        LocalDate refDate = referenceTime.toLocalDate();
+        LocalDate eventDate = eventLocal.toLocalDate();
+        LocalDate refDate = referenceLocal.toLocalDate();
         long daysBetween = ChronoUnit.DAYS.between(eventDate, refDate);
 
         if (daysBetween == 0) {
-            return timeSlotLabel(eventTime.toLocalTime(), "this", true);
+            return timeSlotLabel(eventLocal.toLocalTime(), "this", true);
         }
         if (daysBetween == 1) {
-            return timeSlotLabel(eventTime.toLocalTime(), "yesterday", false);
+            return timeSlotLabel(eventLocal.toLocalTime(), "yesterday", false);
         }
 
         long totalDays = elapsed.toDays();

@@ -30,6 +30,23 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
       .catch(() => setUsername("Logout"));
   }, []);
 
+  useEffect(() => {
+    if (sessionStorage.getItem("tz_checked")) return;
+    fetch("/api/user/preferences")
+      .then((r) => r.json())
+      .then((prefs) => {
+        if (prefs.utcOffset != null) return;
+        const offset = -(new Date().getTimezoneOffset() / 60);
+        fetch("/api/user/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utcOffset: offset }),
+        });
+      })
+      .catch(() => {})
+      .finally(() => sessionStorage.setItem("tz_checked", "1"));
+  }, []);
+
   const sidebarOpen = activePanel !== undefined ? activePanel === "menu" : localSidebarOpen;
 
   const openSidebar = useCallback(() => {
