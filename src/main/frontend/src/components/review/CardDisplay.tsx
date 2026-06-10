@@ -8,18 +8,18 @@ interface Props {
   front: string;
   back: string;
   cardId?: string;
+  flipped: boolean;
+  onFlip?: () => void;
   onCardUpdated?: (card: ReviewCard) => void;
   onEditingChange?: (editing: boolean) => void;
 }
-
-export function CardDisplay({ front, back, cardId, onCardUpdated, onEditingChange }: Props): React.ReactElement {
-  const [flipped, setFlipped] = useState(false);
+export function CardDisplay({ front, back, cardId, flipped, onFlip, onCardUpdated, onEditingChange }: Props): React.ReactElement {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleFlip = () => {
-    setFlipped(true);
+    onFlip?.();
   };
 
   const handleEdit = (e: React.MouseEvent) => {
@@ -78,7 +78,7 @@ export function CardDisplay({ front, back, cardId, onCardUpdated, onEditingChang
         <div className={styles.cardInner}>
           <div className={styles.cardFront} data-testid="card-front">
             <span className={styles.cardText}>{renderText(front)}</span>
-            {showTtsFront && (
+            {flipped && showTtsFront && (
               <button
                 data-testid="tts-btn-front"
                 className={styles.ttsBtn}
@@ -141,6 +141,15 @@ export function CardDisplay({ front, back, cardId, onCardUpdated, onEditingChang
           <p className={styles.tapHint}>Tap to reveal</p>
         )}
       </div>
+      {!flipped && showTtsFront && (
+        <button
+          data-testid="tts-btn-below"
+          className={styles.ttsBtnBelow}
+          onClick={() => speakText(englishOnly(front))}
+        >
+          {"\uD83D\uDD0A"}
+        </button>
+      )}
     </div>
   );
 }

@@ -412,8 +412,8 @@ class ReviewServiceTest {
         ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
         when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(2L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(3L);
+        when(cardRepository.countDueAndNewByDeckId(eq("deck-1"), any(Instant.class), anyString()))
+                .thenReturn(java.util.Collections.singletonList(new Object[]{3L, 1000L}));
         when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(5L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
@@ -490,11 +490,10 @@ class ReviewServiceTest {
         ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
         when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(2L);
-        when(cardRepository.countDueCardsByTagsId(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(5L);
+        when(cardRepository.countDueAndNewByDeckId(eq("deck-1"), any(Instant.class), anyString()))
+                .thenReturn(java.util.Collections.singletonList(new Object[]{5L, 3L}));
         when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
                 .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndCardState(eq("deck-1"), eq(0), anyString())).thenReturn(3L);
         when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
                 .thenReturn(null);
 

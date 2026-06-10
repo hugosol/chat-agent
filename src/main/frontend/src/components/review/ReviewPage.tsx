@@ -113,12 +113,14 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
         </span>
       </div>
 
-      <div className={styles.content} onClick={!flipped && !editing ? handleFlip : undefined}>
+      <div className={styles.content}>
         <CardDisplay
           key={card.id}
           front={card.front}
           back={card.back}
           cardId={card.id}
+          flipped={flipped}
+          onFlip={handleFlip}
           onCardUpdated={handleCardUpdated}
           onEditingChange={setEditing}
         />

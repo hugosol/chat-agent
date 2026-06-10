@@ -53,8 +53,9 @@ public class ReviewController {
         String userId = getUserId();
         Rating rating = Rating.valueOf(request.rating().toUpperCase());
         reviewService.rateCard(request.cardId(), rating, request.mode(), Instant.now(), userId, request.deckId());
-        var card = reviewService.getNextCard(request.deckId(), request.mode(), userId);
-        var stats = reviewService.computeReviewStats(request.deckId(), request.mode(), userId);
+        var result = reviewService.getNextCardAndStats(request.deckId(), request.mode(), userId);
+        var card = result.card();
+        var stats = result.stats();
 
         Map<String, Object> response = new HashMap<>();
         if (card.isPresent()) {
@@ -91,24 +92,24 @@ public class ReviewController {
         var stats = reviewService.computeReviewStats(deckId, mode.isEmpty() ? "STANDARD" : mode, userId);
         return ResponseEntity.ok(statsToMap(stats));
     }
-
     @GetMapping("/review/start")
     public ResponseEntity<Map<String, Object>> startReview(
             @RequestParam String deckId,
             @RequestParam(defaultValue = "STANDARD") String mode) {
         String userId = getUserId();
-        var card = reviewService.getNextCard(deckId, mode, userId);
-        var stats = reviewService.computeReviewStats(deckId, mode, userId);
-        Map<String, Object> result = new HashMap<>();
+        var result = reviewService.getNextCardAndStats(deckId, mode, userId);
+        var card = result.card();
+        var stats = result.stats();
+        Map<String, Object> response = new HashMap<>();
         if (card.isPresent()) {
-            result.put("card", cardToMap(card.get()));
+            response.put("card", cardToMap(card.get()));
             Map<Rating, CardState> preview = reviewService.previewCard(card.get(), Instant.now());
-            result.put("preview", previewToMap(preview));
+            response.put("preview", previewToMap(preview));
         } else {
-            result.put("card", null);
+            response.put("card", null);
         }
-        result.put("stats", statsToMap(stats));
-        return ResponseEntity.ok(result);
+        response.put("stats", statsToMap(stats));
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/cards/{cardId}/forget")
