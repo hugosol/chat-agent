@@ -144,7 +144,7 @@ export function CardDisplay({ front, back, cardId, flipped, onFlip, onCardUpdate
       {!flipped && showTtsFront && (
         <button
           data-testid="tts-btn-below"
-          className={styles.ttsBtn}
+          className={styles.ttsBtnBelow}
           onClick={() => speakText(englishOnly(front))}
         >
           {"\uD83D\uDD0A"}
