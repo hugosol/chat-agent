@@ -1,6 +1,7 @@
 package com.hugosol.chatagent.service;
 
 import com.hugosol.chatagent.dto.ForgetDeckResult;
+import com.hugosol.chatagent.dto.NextCardAndStats;
 import com.hugosol.chatagent.flashcard.AleaPrng;
 import com.hugosol.chatagent.flashcard.CardState;
 import com.hugosol.chatagent.flashcard.FsrsScheduler;
@@ -241,6 +242,25 @@ public class ReviewService {
     public Optional<Card> getNextCard(String deckId, String mode, String userId) {
         Instant now = Instant.now();
         UserPreferences prefs = preferencesService.get(userId);
+        Instant todayStart = computeTodayStart(prefs);
+        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
+        return getNextCardInternal(deckId, mode, userId, prefs, now, todayStart, learnedToday);
+    }
+
+    public NextCardAndStats getNextCardAndStats(String deckId, String mode, String userId) {
+        Instant now = Instant.now();
+        UserPreferences prefs = preferencesService.get(userId);
+        Instant todayStart = computeTodayStart(prefs);
+        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
+
+        Optional<Card> card = getNextCardInternal(deckId, mode, userId, prefs, now, todayStart, learnedToday);
+        ReviewStats stats = computeStatsInternal(deckId, mode, userId, prefs, todayStart, learnedToday, now);
+
+        return new NextCardAndStats(card, stats);
+    }
+
+    Optional<Card> getNextCardInternal(String deckId, String mode, String userId,
+                                       UserPreferences prefs, Instant now, Instant todayStart, long learnedToday) {
         boolean shuffle = prefs.getShuffleDueCards() != null && prefs.getShuffleDueCards();
 
         switch (mode) {
@@ -251,7 +271,7 @@ public class ReviewService {
                 if (dueCard.isPresent()) {
                     return dueCard;
                 }
-                if (isNewCardLimitExceeded(deckId, userId, prefs)) {
+                if (isNewCardLimitExceeded(prefs, learnedToday)) {
                     return Optional.empty();
                 }
                 return shuffle
@@ -264,7 +284,7 @@ public class ReviewService {
                         : cardRepository.findFirstDueCardByDeckId(deckId, now, userId);
             }
             case "NEW_ONLY" -> {
-                if (isNewCardLimitExceeded(deckId, userId, prefs)) {
+                if (isNewCardLimitExceeded(prefs, learnedToday)) {
                     return Optional.empty();
                 }
                 return shuffle
@@ -278,9 +298,7 @@ public class ReviewService {
         }
     }
 
-    private boolean isNewCardLimitExceeded(String deckId, String userId, UserPreferences prefs) {
-        Instant todayStart = computeTodayStart(prefs);
-        long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
+    private boolean isNewCardLimitExceeded(UserPreferences prefs, long learnedToday) {
         return learnedToday >= prefs.getNewCardDailyLimit();
     }
 
@@ -303,8 +321,16 @@ public class ReviewService {
         UserPreferences prefs = preferencesService.get(userId);
         Instant todayStart = computeTodayStart(prefs);
         Instant now = Instant.now();
-        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart, userId);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
+        return computeStatsInternal(deckId, mode, userId, prefs, todayStart, learnedToday, now);
+    }
+
+    ReviewStats computeStatsInternal(String deckId, String mode, String userId,
+                                     UserPreferences prefs, Instant todayStart, long learnedToday, Instant now) {
+        if (deckId == null) {
+            return new ReviewStats(0, 0, 0, 20, null);
+        }
+        long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart, userId);
         long remaining = computeRemaining(deckId, mode, userId, prefs, learnedToday, now);
         Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now, userId);
         long displayedLearnedToday = "CRAM".equals(mode) ? -1 : learnedToday;
@@ -314,8 +340,10 @@ public class ReviewService {
     private long computeRemaining(String deckId, String mode, String userId, UserPreferences prefs, long learnedToday, Instant now) {
         return switch (mode) {
             case "STANDARD" -> {
-                long dueCount = cardRepository.countDueCardsByTagsId(deckId, now, userId);
-                long actualNewCards = cardRepository.countByTagsIdAndCardState(deckId, 0, userId);
+                List<Object[]> results = cardRepository.countDueAndNewByDeckId(deckId, now, userId);
+                Object[] counts = results.get(0);
+                long dueCount = ((Number) counts[0]).longValue();
+                long actualNewCards = ((Number) counts[1]).longValue();
                 long newQuota = Math.max(0, prefs.getNewCardDailyLimit() - learnedToday);
                 yield dueCount + Math.min(newQuota, actualNewCards);
             }

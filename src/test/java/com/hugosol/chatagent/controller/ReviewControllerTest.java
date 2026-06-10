@@ -98,12 +98,12 @@ class ReviewControllerTest {
         previewMap.put(Rating.GOOD, new CardState(2.3065, 2.1181, 1, 1, now.plusSeconds(600), 1, 0, now, 0.0, true));
         previewMap.put(Rating.EASY, new CardState(8.2956, 1.0, 2, -1, now.plusSeconds(86400 * 4), 1, 0, now, 0.0, true));
 
-        when(reviewService.getNextCard(eq("deck-1"), eq("STANDARD"), eq("admin")))
-                .thenReturn(Optional.of(card));
+        var nextCardAndStats = new com.hugosol.chatagent.dto.NextCardAndStats(Optional.of(card),
+                new ReviewStats(0, 10, 0, 20, null));
+        when(reviewService.getNextCardAndStats(eq("deck-1"), eq("STANDARD"), eq("admin")))
+                .thenReturn(nextCardAndStats);
         when(reviewService.previewCard(any(Card.class), any(Instant.class)))
                 .thenReturn(previewMap);
-        when(reviewService.computeReviewStats(eq("deck-1"), eq("STANDARD"), eq("admin")))
-                .thenReturn(new ReviewStats(0, 10, 0, 20, null));
 
         mockMvc.perform(get("/api/review/start")
                         .param("deckId", "deck-1")
@@ -142,12 +142,12 @@ class ReviewControllerTest {
         previewMap.put(Rating.GOOD, new CardState(2.3065, 2.1181, 1, 1, now.plusSeconds(600), 1, 0, now, 0.0, true));
         previewMap.put(Rating.EASY, new CardState(8.2956, 1.0, 2, -1, now.plusSeconds(86400 * 4), 1, 0, now, 0.0, true));
 
-        when(reviewService.getNextCard(eq("deck-1"), eq("STANDARD"), eq("admin")))
-                .thenReturn(Optional.of(nextCard));
+        var nextCardAndStats = new com.hugosol.chatagent.dto.NextCardAndStats(Optional.of(nextCard),
+                new ReviewStats(1, 9, 1, 20, null));
+        when(reviewService.getNextCardAndStats(eq("deck-1"), eq("STANDARD"), eq("admin")))
+                .thenReturn(nextCardAndStats);
         when(reviewService.previewCard(any(Card.class), any(Instant.class)))
                 .thenReturn(previewMap);
-        when(reviewService.computeReviewStats(eq("deck-1"), eq("STANDARD"), eq("admin")))
-                .thenReturn(new ReviewStats(1, 9, 1, 20, null));
 
         mockMvc.perform(post("/api/review/next")
                         .with(csrf())

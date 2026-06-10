@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
 import java.util.Set;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -145,5 +146,58 @@ class CardRepositoryIsolationTest {
         long countB = cardRepository.countByTagsIdAndCardStateNotAndDueLessThanEqual(
                 deckA.getId(), 0, now, userIdB);
         assertThat(countB).isEqualTo(0);
+    }
+
+    @Test
+    void countDueAndNewByDeckId_shouldNotCountOtherUserCards() {
+        List<Object[]> results = cardRepository.countDueAndNewByDeckId(deckA.getId(), now, userIdB);
+        Object[] counts = results.get(0);
+        assertThat(((Number) counts[0]).longValue()).isEqualTo(0);
+        assertThat(((Number) counts[1]).longValue()).isEqualTo(0);
+    }
+
+    @Test
+    void countDueAndNewByDeckId_separatesDueAndNew() {
+        Card newCard = new Card(userIdA, "new", "card");
+        newCard.setCardState(0);
+        newCard.setTags(Set.of(deckA));
+        em.persistAndFlush(newCard);
+
+        List<Object[]> results = cardRepository.countDueAndNewByDeckId(deckA.getId(), now, userIdA);
+        Object[] counts = results.get(0);
+
+        assertThat(((Number) counts[0]).longValue()).isEqualTo(1);
+        assertThat(((Number) counts[1]).longValue()).isEqualTo(1);
+    }
+
+    @Test
+    void countDueAndNewByDeckId_excludesFutureDueCards() {
+        Card futureCard = new Card(userIdA, "future", "card");
+        futureCard.setCardState(2);
+        futureCard.setDue(now.plusSeconds(3600));
+        futureCard.setTags(Set.of(deckA));
+        em.persistAndFlush(futureCard);
+
+        List<Object[]> results = cardRepository.countDueAndNewByDeckId(deckA.getId(), now, userIdA);
+        Object[] counts = results.get(0);
+
+        assertThat(((Number) counts[0]).longValue()).isEqualTo(1);
+        assertThat(((Number) counts[1]).longValue()).isEqualTo(0);
+    }
+
+    @Test
+    void countDueAndNewByDeckId_emptyDeckReturnsZero() {
+        List<Object[]> results = cardRepository.countDueAndNewByDeckId("non-existent-deck", now, userIdA);
+        Object[] counts = results.get(0);
+        assertThat(((Number) counts[0]).longValue()).isEqualTo(0);
+        assertThat(((Number) counts[1]).longValue()).isEqualTo(0);
+    }
+
+    @Test
+    void countDueAndNewByDeckId_returnsNumberTypes() {
+        List<Object[]> results = cardRepository.countDueAndNewByDeckId(deckA.getId(), now, userIdA);
+        Object[] counts = results.get(0);
+        assertThat(counts[0]).isInstanceOf(Number.class);
+        assertThat(counts[1]).isInstanceOf(Number.class);
     }
 }

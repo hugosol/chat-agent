@@ -39,6 +39,11 @@ public interface CardRepository extends JpaRepository<Card, String>, JpaSpecific
     @Query("SELECT COUNT(c) FROM Card c JOIN c.tags t WHERE t.id = :tagId AND c.cardState <> 0 AND c.due <= :now AND c.userId = :userId")
     long countDueCardsByTagsId(@Param("tagId") String tagId, @Param("now") Instant now, @Param("userId") String userId);
 
+    @Query("SELECT COUNT(CASE WHEN c.cardState <> 0 AND c.due <= :now THEN 1 END), " +
+           "COUNT(CASE WHEN c.cardState = 0 THEN 1 END) " +
+           "FROM Card c JOIN c.tags t WHERE t.id = :deckId AND c.userId = :userId")
+    List<Object[]> countDueAndNewByDeckId(@Param("deckId") String deckId, @Param("now") Instant now, @Param("userId") String userId);
+
     @Query("SELECT COUNT(c) FROM Card c JOIN c.tags t WHERE t.id = :tagId AND c.userId = :userId")
     long countByTagsId(@Param("tagId") String tagId, @Param("userId") String userId);
 
