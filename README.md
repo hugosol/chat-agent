@@ -1,6 +1,6 @@
 # Chat Agent
 
-AI 英语口语练习工具，兼具聊天练习和闪卡复习两大功能。通过 AI Agent 角色扮演进行实时英文对话，自动纠正语法/措辞错误，生成学习报告，并内置 FSRS-6 间隔重复算法管理词汇复习。
+AI 口语练习工具，兼具聊天练习和闪卡复习两大功能。通过 AI Agent 角色扮演进行实时对话（支持英语、日语），自动纠正语法/措辞错误，生成学习报告，并内置 FSRS-6 间隔重复算法管理词汇复习。
 
 ## Quick Start
 
@@ -118,7 +118,7 @@ cd src/main/frontend && npm test
 - [x] 闪卡系统（FSRS-6 调度 + 复习面板 + CSV 导入导出）
 - [x] MemoryCue 跨会话语义记忆（RAG 检索 + 向量化）
 - [x] 多用户与数据隔离
-- [x] DAILY_TALK 闲聊模式 + WORKPLACE_STANDUP 站会模式
+- [x] DAILY_TALK 闲聊模式 + WORKPLACE_STANDUP 站会模式 + JAPANESE_BUSINESS ビジネス日本語
 - [x] FSRS 参数优化器（Adam 梯度下降自动调参）
 - [x] 前端全量 React + TypeScript 迁移
 - [ ] STT/TTS 语音交互

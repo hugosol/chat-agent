@@ -28,9 +28,8 @@ cd src/main/frontend && npm test
 
 | 文件 | 说明 |
 |------|------|
-| `agent/ConversationAgentTest.java` | 对话提示构建、MemoryContent 注入、流式回调 |
-| `agent/CorrectionAgentTest.java` | 纠错分析逻辑、ErrorType 映射 |
-| `agent/ReportAgentTest.java` | 报告生成、ReportResult 解析 |
+| `agent/ConversationAgentTest.java` | 对话提示构建、MemoryContent 注入、流式回调 · 含日语模式骨架加载测试 |
+| `agent/ReportAgentTest.java` | 报告生成、ReportResult 解析 · 含日语报告模板测试 |
 | `agent/LearningAgentTest.java` | Learning Profile 合并逻辑 |
 | `agent/MemoryCueAgentTest.java` | 话题切换检测、分段摘要生成 |
 | `agent/common/TaskRunnerTest.java` | 同步引擎、LLM 调用日志、ErrorStrategy |
@@ -40,8 +39,8 @@ cd src/main/frontend && npm test
 | 文件 | 说明 |
 |------|------|
 | `service/SessionServiceTest.java` | 会话生命周期、状态管理、userId 隔离 |
-| `service/TurnProcessorTest.java` | 并行回合处理、流式推送、null guard |
-| `service/SessionCompleteTest.java` | 会话结束流水线（Report + MemoryCue + Profile） |
+| `service/TurnProcessorTest.java` | 并行回合处理、流式推送、null guard · 含日语模式跳过纠错测试 |
+| `service/SessionCompleteTest.java` | 会话结束流水线（Report + MemoryCue + Profile）· 含日语模式跳过记忆生成测试 |
 | `service/SessionDbStoreTest.java` | H2 持久化、EntityMapper 转换 |
 | `service/TokenTrackerTest.java` | LLM token 计数、80% 警告阈值 |
 | `service/EmbeddingServiceTest.java` | ONNX 向量化、语义搜索、EmbeddingStore 持久化 |
@@ -114,6 +113,8 @@ cd src/main/frontend && npm test
 | `e2e/SettingsPageIT.java` | 设置页：偏好保存验证 |
 | `e2e/AuthIT.java` | 登录/登出/会话验证 |
 
+> **计划**：`e2e/JapaneseBusinessIT.java`（JAPANESE_BUSINESS 模式完整会话）推迟到后续迭代，届时需验证：无纠错气泡、无 MemoryCue 生成、日语报告内容。
+
 > E2E 测试基类: `e2e/helper/E2ETestBase.java`、`e2e/helper/WireMockStubs.java`
 
 ---
@@ -124,8 +125,7 @@ cd src/main/frontend && npm test
 
 | 文件 | 说明 |
 |------|------|
-| `chat/ChatInput.test.tsx` | 输入框发送、Enter 键、多行支持 |
-| `chat/chatReducer.test.ts` | 状态机：消息追加、delta 合并、纠错挂载 |
+| `chat/chatReducer.test.ts` | 状态机：消息追加、delta 合并、纠错挂载 · 含 mode 字段持久化测试 |
 | `chat/CorrectionSidebar.test.tsx` | 侧栏展开/折叠、纠错项显示 |
 | `chat/DebugPanel.test.tsx` | 调试面板日志显示 |
 | `chat/FlashcardPanel.test.tsx` | 闪卡面板两阶段交互 |
@@ -165,8 +165,7 @@ cd src/main/frontend && npm test
 | `shared/InlineChipInput.test.tsx` | Chip 标签输入组件 |
 | `shared/Modal.test.tsx` | 模态框通用组件 |
 | `shared/Pagination.test.tsx` | 分页组件 |
-| `shared/Toast.test.tsx` | Toast 通知系统 |
-| `shared/tts.test.ts` | TTS 播放逻辑 |
+| `shared/tts.test.ts` | TTS 播放逻辑 · 含日语模式语音选择测试 |
 | `shared/useTagAutocomplete.test.ts` | Tag 自动补全 Hook |
 | `shared/utils.test.ts` | 工具函数（escapeHtml、formatDate 等） |
 

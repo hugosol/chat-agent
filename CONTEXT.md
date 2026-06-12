@@ -2,13 +2,13 @@
 
 > 架构细节见 [docs/architecture.md](docs/architecture.md)，前端规范见 [docs/frontend-notes.md](docs/frontend-notes.md)，FSRS 算法见 [docs/fsrs.md](docs/fsrs.md)，测试清单见 [docs/tests.md](docs/tests.md)。
 
-Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（UserLearningProfile）。
+Chat Agent 是一个基于 AI 的语言口语练习 Web 应用。使用者（Learner）选择一个对话模式（AgentMode），通过 WebSocket 与 AI Agent 进行实时对话练习。系统提供流式回复、语法/措辞纠正（Correction）、会话报告（Report）以及跨会话的持久化记忆（UserLearningProfile）。支持英语和日语。
 
 ## People and Identity
 
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
-| **Learner** | A person who uses Chat Agent to practice spoken English | User, student, customer |
+| **Learner** | A person who uses Chat Agent to practice spoken language | User, student, customer |
 | **Principal** | Spring Security representation of the authenticated Learner within a request context | Current user, auth context |
 | **Login session** | The Spring Security HTTP session (JSESSIONID cookie) that proves the Learner is authenticated | Auth session, HTTP session |
 | **Remember-Me** | A persistent cookie that survives browser restart and automatically re-establishes a Login session within 14 days | Auto-login, persistent login |
@@ -19,11 +19,11 @@ Chat Agent 是一个基于 AI 的英语口语练习 Web 应用。使用者（Lea
 
 | Term | Definition | Aliases to avoid |
 |------|------------|-----------------|
-| **Practice session** | A single English practice conversation from START to END, identified by a UUID | Session, conversation, chat session |
+| **Practice session** | A single language practice conversation from START to END, identified by a UUID | Session, conversation, chat session |
 | **Turn** | One round-trip: a Learner message followed by the Agent reply and any corrections | Round, exchange, message-pair |
-| **AgentMode** | A pre-defined conversation mode that bundles both the social context (what Scenario used to be) and the AI role (what Persona used to be) into a single selection. The Learner picks one from a dropdown to start a Practice session. Examples: `WORKPLACE_STANDUP` (a daily standup with a friendly teammate), `DAILY_TALK` (casual chat with Chris, a friend / English tutor hybrid). Each AgentMode carries a `templatePath` pointing to per-Mode prompt files. | Scenario, scene, Persona, role, character, conversation type |
+| **AgentMode** | A pre-defined conversation mode that bundles both the social context (what Scenario used to be) and the AI role (what Persona used to be) into a single selection. The Learner picks one from a dropdown to start a Practice session. Examples: `WORKPLACE_STANDUP` (a daily standup with a friendly teammate), `DAILY_TALK` (casual chat with Chris, a friend / English tutor hybrid), `JAPANESE_BUSINESS` (business Japanese with a 取引先 persona). Each AgentMode carries a `templatePath` pointing to per-Mode prompt files. | Scenario, scene, Persona, role, character, conversation type |
 | **Mode template** | Per-AgentMode prompt files under `prompts/{templatePath}/` — a `description.txt` (identity + scenario) and a `rules.txt` (behavioral constraints). These are pre-loaded by ConversationAgent at startup into an EnumMap for zero-I/O prompt assembly at request time. | Mode prompt, per-mode template |
-| **System Prompt skeleton** | The `conversation-system.txt` file that serves as a structural wrapper, containing only `{Description}` and `{Rules}` placeholders (plus dynamic sections like `{topicSummary}`). Its sole purpose is to let placeholder ordering control LLM attention without modifying per-Mode files. | Skeleton template, prompt wrapper |
+| **System Prompt skeleton** | The `conversation-system.txt` file that serves as a structural wrapper, containing `{Description}` and `{Rules}` placeholders (plus dynamic sections like `{memoryCues}`). Each AgentMode may provide its own skeleton (e.g., with language-appropriate labels like `ルール:` instead of `Rules:`); if missing, the root skeleton is used as a fallback. | Skeleton template, prompt wrapper |
 | **Streaming** | Agent reply delivered token-by-token to the frontend in real-time, before the full response is complete | Token streaming, incremental output |
 | **Stale delta** | A streaming token that arrives at a browser tab that no longer owns the Practice session due to multi-tab competition | Belated token, orphaned delta |
 

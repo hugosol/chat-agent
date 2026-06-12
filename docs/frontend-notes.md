@@ -112,14 +112,16 @@ iOS Safari **禁止**无用户手势触发的音频播放（`SpeechSynthesis`、
 
 **实现：** `src/main/frontend/src/shared/tts.ts`
 ```typescript
-export function speakText(text: string): void {
+export function speakText(text: string, mode?: string): void {
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
+  utterance.lang = mode === "JAPANESE_BUSINESS" ? "ja-JP" : "en-US";
   utterance.rate = 0.95;
   speechSynthesis.speak(utterance);
 }
 ```
+
+> **模式感知**：日语模式自动选 `ja-JP` 语音，其他模式默认 `en-US`。浏览器根据 `lang` 属性从已安装语音列表中选择匹配的日语语音。
 
 **E2E 测试：** Playwright 使用 `page.evaluate()` 注入 `SpeechSynthesisUtterance` mock，绕过实际音频播放。
 

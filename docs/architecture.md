@@ -2,18 +2,18 @@
 
 ## 一、项目定位
 
-一个**个人英语口语练习工具**，通过 AI Agent 角色扮演进行**全语音双向英文对话**，在对话中自然纠正表达错误，对话后生成分析报告并追踪学习进度。
+一个**个人 AI 口语练习工具**，通过 AI Agent 角色扮演进行实时对话（支持英语、日语），在对话中自然纠正表达错误，对话后生成分析报告并追踪学习进度。
 
 **学习目标**：深度掌握 LangChain4j + langgraph4j 的 Agent 开发，重点实践 StateGraph、Multi-Agent 协作、Human-in-the-Loop、Checkpoint、持久化。
 
 ---
 
-## 二、全量决策日志（35 项）
+## 二、全量决策日志（54 项）
 
 | # | 决策点 | 选择 |
 |---|--------|------|
-| 1 | 核心场景 | AI 英语对话伙伴 |
-| 2 | 对话场景 | 职场英语 + 技术演讲练习 |
+| 1 | 核心场景 | AI 对话伙伴 |
+| 2 | 对话场景 | 职场英语 + 日常闲聊 + 商务日语 |
 | 3 | 交互模态 | 文本输入 + TTS 朗读（语音输入通过 OpenAI Whisper API 预留到 V2） |
 | 4 | 交付形态 | Web 应用 (Spring Boot + 浏览器) |
 | 5 | LLM 提供商 | DeepSeek V4 FAST，LangChain4j 抽象层保证可替换 |
@@ -29,8 +29,8 @@
 | 15 | 会话控制 | 纯 UI 按钮（开始/切换/结束） |
 | 16 | 纠错类型 | 5 类全追踪：语法/用词/中式英语/发音/流利度 |
 | 17 | LangGraph 库 | `org.bsc.langgraph4j:langgraph4j-core:1.8.16` |
-| 18 | V1 范围 | 两个 AgentMode (Workplace Standup + Daily Talk) + 三 Agent + 完整报告 |
-| 19 | Prompt 管理 | `resources/prompts/` 目录，per-AgentMode 子目录存放 description.txt + rules.txt |
+| 18 | V1 范围 | 三个 AgentMode (Workplace Standup + Daily Talk + Japanese Business) + 三 Agent + 完整报告 |
+| 19 | Prompt 管理 | `resources/prompts/` 目录，per-AgentMode 子目录存放 description.txt + rules.txt + conversation-system.txt（per-Mode 骨架，fallback 根骨架）+ report.txt（per-Mode 报告，fallback 根 report） |
 | 20 | WS 消息协议 | JSON：START_SESSION / USER_INPUT / END_SESSION / AGENT_STREAM_DELTA / CORRECTION_RESULT / SESSION_REPORT |
 | 21 | Token 窗口 | 手动分段：UI 显示用量，80% 提醒用户结束会话 |
 | 22 | 持久化粒度 | 逐条存储 Message + ErrorRecord |
@@ -65,6 +65,7 @@
 | 51 | Review 模块：双端点架构 | `GET /api/review/start` + `POST /api/review/next`，统一返回 `{card, stats, preview}`。→ 详见 `docs/fsrs.md` |
 | 52 | ReviewStats：日累计 | 后端 COUNT/MIN 实时查询，`todayStart` 按用户时区。→ 详见 `docs/fsrs.md` |
 | 53 | 每日新卡上限后端化 | 存储于 `UserPreferences`，后端 `ReviewService` 统一读取。→ 详见 `docs/fsrs.md` |
+| 54 | JAPANESE_BUSINESS 模式 | 新增 `AgentMode.JAPANESE_BUSINESS`（ビジネス日本語），取引先角色扮演。日语骨架独立（`japanese_business/conversation-system.txt`，日语标签如 `ルール:`）。Report 模式感知化（per-Mode report.txt）。Correction/MemoryCue/LearningProfile 跳过（`TurnProcessor` 和 `SessionComplete` 按 mode guard） |
 
 ---
 
@@ -181,7 +182,7 @@ START → correction → END
     → messageId ≥ 2: MemoryCueQueue.isEmpty() ? search(topK+1) : search(topK) → push results → MemoryContent(cueMatches)
     → 两路 CompletableFuture 并行:
       A) ConversationAgent.generateStream(history, mode, MemoryContent, messageId, handler) → 流式推送到前端
-      B) graph.stream(input, config) → CorrectionNode → 纠错结果异步推送
+      B) graph.stream(input, config) → CorrectionNode → 纠错结果异步推送（**日语模式跳过**）
   → 回调通过 TurnProcessor.TurnCallback 通知 ChatMessageHandler
 
 [用户 End Session]
@@ -189,9 +190,8 @@ START → correction → END
   → SessionService 收集状态数据（messages, corrections, userId, mode）
   → SessionComplete.complete(sessionId, messages, corrections, userId, mode)
     → 报告 LLM 成功 → 生成 ReportResult；失败 → 降级报告（fluencyScore=-1）
-    → SessionDbStore.completeSession(sessionId, messages, corrections, report) → H2 持久化（null report → SessionStatus.FAILED）
-    → LearningProfileService.generateMemoryAsync(userId, report, mode, sessionId) → 异步保存 Topic 摘要 + 合并 Profile 记忆
-    → MemoryCueService.generateCuesAsync(sessionId, userId, mode, messages) → 异步生成结构化 MemoryCue
+    → LearningProfileService.generateMemoryAsync(userId, report, mode, sessionId) → 异步保存 Topic 摘要 + 合并 Profile 记忆（**日语模式跳过**）
+    → MemoryCueService.generateCuesAsync(sessionId, userId, mode, messages) → 异步生成结构化 MemoryCue（**日语模式跳过**）
   → SessionService.remove(sessionId) → 释放 state + TokenTracker + sessionToWs 映射
   → 发送 SESSION_REPORT 到前端（降级报告时 fluencyscore=-1，前端隐藏评分行）
 
@@ -224,8 +224,7 @@ compiled.stream(input, RunnableConfig.builder()
 ## 五、三 Agent Prompt 设计
 
 ### 1. ConversationAgent (骨架模板 `prompts/conversation-system.txt` + per-Mode 文件)
-
-**骨架模板** — 所有 AgentMode 共用：
+**骨架模板** — 根文件 `prompts/conversation-system.txt` 作为默认骨架；各 AgentMode 可在 `{templatePath}/conversation-system.txt` 提供自己的骨架（如日语模式使用日语标签 `ルール:`），未提供则 fallback 到根骨架：
 ```
 {Description}
 
@@ -249,9 +248,14 @@ prompts/workplace_standup/
 prompts/daily_talk/
 ├── description.txt    ← Chris 人设：朋友+外教混搭
 └── rules.txt          ← 10 条：轻松闲聊、教地道表达、补充词汇、文化背景解释等
-```
 
-**ConversationAgent 构造时**遍历所有 `AgentMode.values()`，通过 `PromptLoader` 加载每个 Mode 的 `description.txt` 和 `rules.txt` 到 `EnumMap`，请求时 O(1) 查取并替换 `{Description}` / `{Rules}` 占位符。
+prompts/japanese_business/
+├── description.txt    ← 取引先・田中さん役、商談練習
+├── rules.txt          ← 敬語指導、自然な言い換え、ビジネスマナー等
+├── conversation-system.txt  ← 日语标签骨架（`ルール:` 等）
+└── report.txt         ← 日语报告模板
+
+**ConversationAgent 构造时**遍历所有 `AgentMode.values()`，通过 `PromptLoader` 加载每个 Mode 的 `description.txt`、`rules.txt` 和 `conversation-system.txt`（骨架，fallback 到根文件）到 `EnumMap`，请求时 O(1) 查取并替换 `{Description}` / `{Rules}` / `{memoryCues}` 等占位符。ReportAgent 同样模式感知：加载 per-Mode `report.txt`。
 
 > `{Description}` → `description.txt` 内容（含 "You are..." 身份声明 + 场景）  
 > `{Rules}` → `rules.txt` 内容  
@@ -361,7 +365,7 @@ Errors: {allCorrections}
 Enum: MessageRole { USER, AGENT, CORRECTION }
 Enum: ErrorType  { GRAMMAR, WORD_CHOICE, CHINGLISH, PRONUNCIATION, FLUENCY }
 Enum: SessionStatus { ACTIVE, COMPLETED, FAILED }
-Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAILY_TALK("Daily Talk", "daily_talk") }
+Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAILY_TALK("Daily Talk", "daily_talk"), JAPANESE_BUSINESS("ビジネス日本語", "japanese_business") }
 Enum: LearningType { LEARNING_PROFILE }
 Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
 Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AFTERNOON, THIS_EVENING, TONIGHT, YESTERDAY_MORNING, YESTERDAY_AFTERNOON, YESTERDAY_EVENING, A_FEW_DAYS_AGO, ABOUT_A_WEEK_AGO, A_FEW_WEEKS_AGO, ABOUT_A_MONTH_AGO, A_WHILE_AGO }（计算方式为日期+时段判断，非 Duration 桶遍历）
@@ -637,7 +641,7 @@ chat-agent/
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED / FAILED
-│   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP (含 displayName + templatePath)
+│   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP / DAILY_TALK / JAPANESE_BUSINESS (含 displayName + templatePath)
 │   │
 │   ├── repository/                         // Spring Data JPA（15 个）
 │   │   ├── UserRepository.java             // findByUsername
@@ -700,7 +704,11 @@ chat-agent/
 │       ├── daily_talk/                     // per-AgentMode 子目录 (Chris)
 │       │   ├── description.txt
 │       │   └── rules.txt
-│       ├── correction.txt
+│       ├── japanese_business/              // per-AgentMode 子目录（ビジネス日本語）
+│       │   ├── description.txt
+│       │   ├── rules.txt
+│       │   ├── conversation-system.txt
+│       │   └── report.txt
 │       ├── report.txt
 │       ├── memory-profile.txt
 │       ├── memory-cue-split.txt
