@@ -175,4 +175,18 @@ class ReportAgentTest {
         assertThat(result.errorSummary()).contains("CHINGLISH");
         assertThat(result.fluencyScore()).isEqualTo(7);
     }
+
+    @Test
+    void japaneseModeUsesJapaneseReportTemplate() {
+        chatModel.setResponse("{\"overallAssessment\":\"良好\",\"fluencyScore\":6}");
+
+        agent.generate(
+                List.of(new MessageData(MessageRole.USER, "こんにちは", 1)),
+                List.of(),
+                new TaskContext("s1", "u1", "JAPANESE_BUSINESS")
+        );
+
+        assertThat(chatModel.lastPrompt).contains("日本語コーチ");
+        assertThat(chatModel.lastPrompt).doesNotContain("English coach");
+    }
 }

@@ -94,8 +94,10 @@ public class TurnProcessor {
 
         startConversation(sessionId, history, mode, memoryContent, messageId, userId, callback);
 
-        CompletableFuture<Void> correctionFuture = startCorrection(sessionId, userInput, messageId, correctionsBefore, callback);
-        sessionService.addPendingCorrection(sessionId, correctionFuture);
+        if (mode != AgentMode.JAPANESE_BUSINESS) {
+            CompletableFuture<Void> correctionFuture = startCorrection(sessionId, userInput, messageId, correctionsBefore, callback);
+            sessionService.addPendingCorrection(sessionId, correctionFuture);
+        }
     }
 
     private AgentMode resolveMode(String sessionId) {

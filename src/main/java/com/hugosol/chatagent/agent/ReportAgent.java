@@ -9,11 +9,13 @@ import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.CorrectionData;
 import com.hugosol.chatagent.dto.MessageData;
 import com.hugosol.chatagent.model.MessageRole;
+import com.hugosol.chatagent.model.AgentMode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,13 +26,20 @@ public class ReportAgent {
     private final TaskRunner runner;
     private final ObjectMapper objectMapper;
 
+    private final String rootReportTemplate;
+    private final Map<AgentMode, String> reportTemplates = new EnumMap<>(AgentMode.class);
+
     public ReportAgent(TaskRunner runner, PromptLoader promptLoader, ObjectMapper objectMapper) {
         this.runner = runner;
         this.objectMapper = objectMapper;
-        String template = promptLoader.load("report.txt");
+        this.rootReportTemplate = promptLoader.load("report.txt");
+        for (AgentMode mode : AgentMode.values()) {
+            String path = mode.getTemplatePath();
+            reportTemplates.put(mode, promptLoader.loadIfExists(path + "/report.txt", rootReportTemplate));
+        }
         runner.register(TaskName.REPORT, TaskDefinition
                 .<ReportParams, ReportResult>builder()
-                .template(template)
+                .template(rootReportTemplate)  // placeholder; overridden at request time
                 .paramBuilder(p -> Map.of(
                         "fullConversation", buildConversationText(p.messages()),
                         "allCorrections", buildErrorsText(p.corrections())
@@ -42,8 +51,15 @@ public class ReportAgent {
 
     public ReportResult generate(List<MessageData> messages, List<CorrectionData> allCorrections, TaskContext ctx) {
         log.debug("ReportAgent generating...");
+        AgentMode mode;
+        try {
+            mode = AgentMode.valueOf(ctx.mode());
+        } catch (IllegalArgumentException e) {
+            mode = AgentMode.WORKPLACE_STANDUP;
+        }
+        String template = reportTemplates.getOrDefault(mode, rootReportTemplate);
         ReportResult result = runner.requestModel(TaskName.REPORT,
-                new ReportParams(messages, allCorrections), ctx);
+                new ReportParams(messages, allCorrections), ctx, template);
         return result != null ? result : new ReportResult("", "", 0, "");
     }
 

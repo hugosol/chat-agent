@@ -30,4 +30,18 @@ public class PromptLoader {
             throw new RuntimeException("Failed to load prompt: " + promptFile, e);
         }
     }
+
+    public String loadIfExists(String promptFile, String fallback) {
+        try {
+            Resource resource = resourceLoader.getResource("classpath:prompts/" + promptFile);
+            if (resource.exists()) {
+                String content = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                log.debug("Loaded prompt file: {}", promptFile);
+                return content;
+            }
+        } catch (IOException e) {
+            log.warn("Failed to load prompt file {}, falling back", promptFile, e);
+        }
+        return fallback;
+    }
 }

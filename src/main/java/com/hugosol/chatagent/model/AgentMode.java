@@ -2,7 +2,8 @@ package com.hugosol.chatagent.model;
 
 public enum AgentMode {
     WORKPLACE_STANDUP("Standup", "workplace_standup"),
-    DAILY_TALK("Daily", "daily_talk");
+    DAILY_TALK("Daily", "daily_talk"),
+    JAPANESE_BUSINESS("ビジネス日本語", "japanese_business");
 
     private final String displayName;
     private final String templatePath;

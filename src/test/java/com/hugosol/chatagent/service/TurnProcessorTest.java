@@ -381,6 +381,25 @@ class TurnProcessorTest {
         verify(embeddingService).search(eq("follow up"), eq(AgentMode.WORKPLACE_STANDUP), eq("user1"), eq(2), eq(0.6));
     }
 
+
+    @Test
+    void japaneseModeDoesNotInvokeCorrection() throws Exception {
+        setupConversationAgent("こんにちは", 8);
+        when(sessionService.getMode("s1")).thenReturn("JAPANESE_BUSINESS");
+        TurnProcessor processor = newProcessor();
+
+        CountDownLatch latch = new CountDownLatch(1);
+        processor.processTurn("s1", "こんにちは", 1, new StubCallback() {
+            @Override
+            public void onConversationComplete(String text, int msgId, int tokens) {
+                latch.countDown();
+            }
+        });
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        verify(correctionNode, never()).apply(any(ChatState.class));
+        verify(sessionService, never()).addPendingCorrection(eq("s1"), any());
+    }
     private TurnProcessor newProcessor() {
         ChatGraphBuilder builder = new ChatGraphBuilder(correctionNode);
         return new TurnProcessor(builder, conversationAgent, sessionService, llmCallLogService, embeddingService, learningProfileService, memoryCueRepository, appProperties, userPreferencesService, executor);

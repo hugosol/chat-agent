@@ -15,6 +15,9 @@ describe("initialState", () => {
   it("has report null by default", () => {
     expect(initialState.report).toBeNull();
   });
+  it("has mode empty string by default", () => {
+    expect(initialState.mode).toBe("");
+  });
 });
 
 function seededState(): ChatState {
@@ -37,6 +40,7 @@ function seededState(): ChatState {
     tokenUsage: 5000,
     streamInProgress: false,
     report: null,
+    mode: "WORKPLACE_STANDUP",
   };
 }
 
@@ -51,6 +55,7 @@ describe("chatReducer", () => {
     expect(state).toEqual({
       ...initialState,
       appStatus: "UserTurn",
+      mode: "DAILY_TALK",
     });
   });
 
@@ -149,6 +154,7 @@ describe("chatReducer", () => {
   it("SESSION_RESUMED batch rebuilds messages, corrections, tokenUsage, and sets active", () => {
     const state = chatReducer(initialState, {
       type: "SESSION_RESUMED",
+      mode: "WORKPLACE_STANDUP",
       messages: [
         { role: "USER", content: "Hello", messageId: 1 },
         { role: "AGENT", content: "Hi there!", messageId: 1 },
@@ -182,6 +188,7 @@ describe("chatReducer", () => {
     expect(state.corrections[0].type).toBe("WORD_CHOICE");
     expect(state.tokenUsage).toBe(250);
     expect(state.appStatus).toBe("UserTurn");
+    expect(state.mode).toBe("WORKPLACE_STANDUP");
   });
 
   it("WS_CLOSED resets all state with disconnected and idle status", () => {
@@ -214,6 +221,7 @@ describe("chatReducer", () => {
   it("USER_MESSAGE_SENT appends after existing messages with correct next id", () => {
     const withMessages = chatReducer(initialState, {
       type: "SESSION_RESUMED",
+      mode: "",
       messages: [
         { role: "USER", content: "First", messageId: 1 },
         { role: "AGENT", content: "Reply", messageId: 1 },

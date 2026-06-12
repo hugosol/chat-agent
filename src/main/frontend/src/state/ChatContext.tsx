@@ -63,6 +63,7 @@ function toAction(msg: ServerMessage): Action | null {
       const corrections = (msg.corrections || []) as CorrectionData[];
       return {
         type: "SESSION_RESUMED",
+        mode: (msg.mode as string) ?? "",
         messages,
         corrections,
         tokenUsage: msg.tokenUsage as number,
@@ -94,6 +95,7 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const resumePendingRef = useRef(false);
+  const modeRef = useRef<string>("");
 
   const send = useCallback((msg: unknown): void => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -132,12 +134,14 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
         if (msg.type === "SESSION_STARTED" && msg.sessionId) {
           sessionIdRef.current = msg.sessionId as string;
           resumePendingRef.current = false;
+          modeRef.current = (msg.mode as string) ?? "";
           if (typeof localStorage !== "undefined") {
             localStorage.setItem("sessionId", msg.sessionId as string);
           }
         }
         if (msg.type === "SESSION_RESUMED") {
           resumePendingRef.current = false;
+          modeRef.current = (msg.mode as string) ?? "";
         }
         if (msg.type === "SESSION_REPORT") {
           sessionIdRef.current = null;
@@ -178,7 +182,7 @@ function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
           }
         }
         if (msg.type === "AGENT_STREAM_END" && msg.text && document.visibilityState === "visible") {
-          speakText(msg.text as string);
+          speakText(msg.text as string, modeRef.current);
         }
       } catch {
         // ignore parse errors
