@@ -110,6 +110,10 @@ public class TurnProcessor {
 
     private MemoryContent resolveMemoryContext(String sessionId, String userInput, int messageId,
                                                 AgentMode mode, String userId) {
+        // Japanese mode has no memory cues or learning profile — skip all RAG/DB queries
+        if (mode == AgentMode.JAPANESE_BUSINESS) {
+            return new MemoryContent(null, null, List.of());
+        }
         int topK = appProperties.getMemory().getRetrieval().getTopK();
         double threshold = appProperties.getMemory().getRetrieval().getSimilarityThreshold();
 
