@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.controller;
 
+import com.hugosol.chatagent.dto.CheckCardResponse;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.service.FlashcardService;
@@ -138,7 +139,7 @@ class FlashcardControllerTest {
     @WithMockUser(username = "admin")
     void addCard_duplicate_returnsConflict() throws Exception {
         when(flashcardService.createCard(anyString(), anyString(), anyList(), anyString()))
-                .thenThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片'yesterday'已存在"));
+                .thenThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片'yesterday'在牌组'daily'中已存在"));
 
         String requestJson = """
                 {"front":"yesterday","back":"昨天","tagIds":["tag-1"]}""";
@@ -148,6 +149,26 @@ class FlashcardControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @WithMockUser(username = "admin")
+    void checkCard_returnsConflicts() throws Exception {
+        var response = new CheckCardResponse(List.of(
+                new CheckCardResponse.ConflictInfo("other-deck-id", "Other Deck")
+        ));
+        when(flashcardService.checkCard(anyString(), anyList(), anyString())).thenReturn(response);
+
+        String requestJson = """
+                {"front":"hello","back":"world","tagIds":["deck-id"]}""";
+
+        mockMvc.perform(post("/api/cards/check")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conflicts[0].tagId").value("other-deck-id"))
+                .andExpect(jsonPath("$.conflicts[0].tagName").value("Other Deck"));
     }
 
     @Test

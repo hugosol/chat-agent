@@ -22,6 +22,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [learnedToday, setLearnedToday] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [totalNewCards, setTotalNewCards] = useState(0);
 
   useEffect(() => {
     loadDecks();
@@ -98,6 +99,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
         const data = await res.json();
         setLearnedToday(data.learnedToday ?? 0);
         setRemaining(data.remaining ?? null);
+        setTotalNewCards(data.totalNewCards ?? 0);
       }
     } catch {
       // ignore
@@ -182,7 +184,15 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
             }}
           />
           {learnedToday > 0 && (
-            <span className={styles.learnedInfo}>今日已学新卡: {learnedToday}</span>
+            <span className={styles.learnedInfo}>
+              今日已学新卡: {learnedToday}
+              {totalNewCards > 0 && (
+                <>，预计还需 {Math.ceil(totalNewCards / learnedToday)} 天学完</>
+              )}
+            </span>
+          )}
+          {learnedToday === 0 && totalNewCards > 0 && (
+            <span className={styles.learnedInfo}>暂无数据</span>
           )}
         </div>
       )}

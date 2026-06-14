@@ -99,7 +99,7 @@ class ReviewControllerTest {
         previewMap.put(Rating.EASY, new CardState(8.2956, 1.0, 2, -1, now.plusSeconds(86400 * 4), 1, 0, now, 0.0, true));
 
         var nextCardAndStats = new com.hugosol.chatagent.dto.NextCardAndStats(Optional.of(card),
-                new ReviewStats(0, 10, 0, 20, null));
+                new ReviewStats(0, 10, 0, 20, null, 5));
         when(reviewService.getNextCardAndStats(eq("deck-1"), eq("STANDARD"), eq("admin")))
                 .thenReturn(nextCardAndStats);
         when(reviewService.previewCard(any(Card.class), any(Instant.class)))
@@ -143,7 +143,7 @@ class ReviewControllerTest {
         previewMap.put(Rating.EASY, new CardState(8.2956, 1.0, 2, -1, now.plusSeconds(86400 * 4), 1, 0, now, 0.0, true));
 
         var nextCardAndStats = new com.hugosol.chatagent.dto.NextCardAndStats(Optional.of(nextCard),
-                new ReviewStats(1, 9, 1, 20, null));
+                new ReviewStats(1, 9, 1, 20, null, 5));
         when(reviewService.getNextCardAndStats(eq("deck-1"), eq("STANDARD"), eq("admin")))
                 .thenReturn(nextCardAndStats);
         when(reviewService.previewCard(any(Card.class), any(Instant.class)))

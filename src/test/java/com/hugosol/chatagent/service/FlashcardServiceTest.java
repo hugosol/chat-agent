@@ -43,8 +43,8 @@ class FlashcardServiceTest {
 
         when(tagRepository.findById("deck-tag-id"))
                 .thenReturn(Optional.of(deckTag));
-        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
-                .thenReturn(Optional.empty());
+        when(cardRepository.findConflictingTagInfoByFront("hello", "user-1"))
+                .thenReturn(List.of());
         when(cardRepository.save(any(Card.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -82,8 +82,8 @@ class FlashcardServiceTest {
                 .thenReturn(Optional.of(deckTag));
         when(tagRepository.findById("tag-id"))
                 .thenReturn(Optional.of(normalTag));
-        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
-                .thenReturn(Optional.empty());
+        when(cardRepository.findConflictingTagInfoByFront("hello", "user-1"))
+                .thenReturn(List.of());
         when(cardRepository.save(any(Card.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -102,8 +102,6 @@ class FlashcardServiceTest {
 
         when(tagRepository.findById("tag-id"))
                 .thenReturn(Optional.of(normalTag));
-        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
-                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.createCard("hello", "world", List.of("tag-id"), "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
@@ -175,11 +173,17 @@ class FlashcardServiceTest {
     }
 
     @Test
-    void createCard_duplicate_throwsConflict() {
+    void createCard_sameDeckConflict_throws422() {
         var service = new FlashcardService(cardRepository, tagRepository);
-        Card existing = new Card("user-1", "hello", "old meaning");
-        when(cardRepository.findByFrontIgnoreCaseAndUserId("hello", "user-1"))
-                .thenReturn(Optional.of(existing));
+
+        Tag deckTag = new Tag("daily", "user-1");
+        deckTag.setId("deck-id");
+        deckTag.setType("deck");
+
+        when(tagRepository.findById("deck-id"))
+                .thenReturn(Optional.of(deckTag));
+        when(cardRepository.findConflictingTagInfoByFront("hello", "user-1"))
+                .thenReturn(java.util.Collections.singletonList(new Object[]{"deck-id", "daily"}));
 
         assertThatThrownBy(() -> service.createCard("hello", "world", List.of("deck-id"), "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
@@ -187,6 +191,28 @@ class FlashcardServiceTest {
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
 
         verify(cardRepository, never()).save(any());
+    }
+
+    @Test
+    void createCard_crossDeckConflict_allowsCreation() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        Tag deckTag = new Tag("daily", "user-1");
+        deckTag.setId("deck-id");
+        deckTag.setType("deck");
+
+        when(tagRepository.findById("deck-id"))
+                .thenReturn(Optional.of(deckTag));
+        // Card exists in other-deck but NOT in deck-id
+        when(cardRepository.findConflictingTagInfoByFront("hello", "user-1"))
+                .thenReturn(java.util.Collections.singletonList(new Object[]{"other-deck-id", "Other Deck"}));
+        when(cardRepository.save(any(Card.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        Card result = service.createCard("hello", "world", List.of("deck-id"), "user-1");
+
+        assertThat(result.getFront()).isEqualTo("hello");
+        verify(cardRepository).save(any(Card.class));
     }
 
     @Test
@@ -238,5 +264,53 @@ class FlashcardServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void updateCard_frontConflict_throws422() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        Card card = new Card("user-1", "hello", "world");
+        card.setId("card-1");
+
+        Tag deckTag = new Tag("daily", "user-1");
+        deckTag.setId("deck-id");
+        deckTag.setType("deck");
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(tagRepository.findById("deck-id")).thenReturn(Optional.of(deckTag));
+        when(cardRepository.findConflictingTagInfoByFrontExcludingId("newword", "user-1", "card-1"))
+                .thenReturn(java.util.Collections.singletonList(new Object[]{"deck-id", "daily"}));
+
+        assertThatThrownBy(() -> service.updateCard("user-1", "card-1", "newword", "world", List.of("deck-id")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        verify(cardRepository, never()).save(any());
+    }
+
+    @Test
+    void updateCard_crossDeckConflict_allowsUpdate() {
+        var service = new FlashcardService(cardRepository, tagRepository);
+
+        Card card = new Card("user-1", "hello", "world");
+        card.setId("card-1");
+
+        Tag deckTag = new Tag("daily", "user-1");
+        deckTag.setId("deck-id");
+        deckTag.setType("deck");
+
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(tagRepository.findById("deck-id")).thenReturn(Optional.of(deckTag));
+        // Conflict exists only in other-deck, not in deck-id
+        when(cardRepository.findConflictingTagInfoByFrontExcludingId("newword", "user-1", "card-1"))
+                .thenReturn(java.util.Collections.singletonList(new Object[]{"other-deck-id", "Other Deck"}));
+        when(cardRepository.save(any(Card.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Card result = service.updateCard("user-1", "card-1", "newword", "world", List.of("deck-id"));
+
+        assertThat(result.getFront()).isEqualTo("newword");
+        verify(cardRepository).save(any(Card.class));
     }
 }

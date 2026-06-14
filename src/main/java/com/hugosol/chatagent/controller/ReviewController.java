@@ -299,6 +299,7 @@ public class ReviewController {
         map.put("learnedToday", stats.learnedToday());
         map.put("dailyLimit", stats.dailyLimit());
         map.put("nextDueAt", stats.nextDueAt() != null ? stats.nextDueAt().toString() : null);
+        map.put("totalNewCards", stats.totalNewCards());
         return map;
     }
 
