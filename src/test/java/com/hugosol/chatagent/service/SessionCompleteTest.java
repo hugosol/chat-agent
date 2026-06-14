@@ -117,4 +117,35 @@ class SessionCompleteTest {
         verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
         verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
     }
+
+    @Test
+    void japaneseModeSkipsLearningProfileAndMemoryCues() {
+        List<MessageData> messages = List.of(new MessageData(MessageRole.USER, "こんにちは", 1));
+        List<CorrectionData> corrections = List.of();
+        ReportResult expectedReport = new ReportResult("良好", "none", 6, "敬語を練習");
+        when(reportAgent.generate(any(), any(), any())).thenReturn(expectedReport);
+
+        ReportResult result = sessionComplete.complete("s1", messages, corrections, "user1", AgentMode.JAPANESE_BUSINESS);
+
+        assertThat(result).isEqualTo(expectedReport);
+        verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
+        verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
+        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+    }
+
+    @Test
+    void japaneseModeStillGeneratesReportAndPersists() {
+        List<MessageData> messages = List.of(new MessageData(MessageRole.USER, "おはよう", 1));
+        List<CorrectionData> corrections = List.of();
+        ReportResult expectedReport = new ReportResult("良い", "none", 7, "続けて");
+        when(reportAgent.generate(any(), any(), any())).thenReturn(expectedReport);
+
+        ReportResult result = sessionComplete.complete("s1", messages, corrections, "user1", AgentMode.JAPANESE_BUSINESS);
+
+        assertThat(result).isEqualTo(expectedReport);
+        verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
+        verify(reportAgent).generate(eq(messages), eq(corrections), any());
+        verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
+        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+    }
 }

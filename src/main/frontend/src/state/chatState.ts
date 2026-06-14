@@ -24,8 +24,8 @@ export interface ChatState {
   tokenUsage: number;
   streamInProgress: boolean;
   report: Record<string, unknown> | null;
+  mode: string;
 }
-
 export const initialState: ChatState = {
   appStatus: "Connecting",
   statusPayload: null,
@@ -34,6 +34,7 @@ export const initialState: ChatState = {
   tokenUsage: 0,
   streamInProgress: false,
   report: null,
+  mode: "",
 };
 
 export type Action =
@@ -41,9 +42,9 @@ export type Action =
   | { type: "AGENT_STREAM_DELTA"; messageId: number; delta: string }
   | { type: "AGENT_STREAM_END"; messageId: number; text: string; tokenUsage: number }
   | { type: "CORRECTION_RESULT"; messageId: number; corrections: CorrectionData[] }
-  | { type: "STATE_UPDATE"; state: string; tokenUsage: number }
   | {
       type: "SESSION_RESUMED";
+      mode: string;
       messages: Array<{ role: string; content: string; messageId?: number }>;
       corrections: CorrectionData[];
       tokenUsage: number;

@@ -67,6 +67,9 @@ class FsrsOptimizeServiceTest {
                 optimizerExecutor,
                 optimizeLogRepository, rescheduleLogRepository,
                 userRepository);
+        // Return the saved entity so optLog.getId() is available for rescheduleCards
+        lenient().when(optimizeLogRepository.save(any(FsrsOptimizeLog.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -146,6 +149,7 @@ class FsrsOptimizeServiceTest {
         assertThat(optLog.getStatus()).isEqualTo(OptimizeStatus.SUCCESS);
         assertThat(optLog.isParamsUpdated()).isTrue();
         assertThat(optLog.getUserId()).isEqualTo("user1");
+        assertThat(optLog.getId()).isNull(); // Not manually set; Hibernate generates on persist
 
         ArgumentCaptor<FsrsRescheduleLog> resCaptor = ArgumentCaptor.forClass(FsrsRescheduleLog.class);
         verify(rescheduleLogRepository).save(resCaptor.capture());

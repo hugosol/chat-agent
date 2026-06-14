@@ -316,7 +316,7 @@ public class ReviewService {
 
     private ReviewStats computeStats(String deckId, String mode, String userId) {
         if (deckId == null) {
-            return new ReviewStats(0, 0, 0, 20, null);
+            return new ReviewStats(0, 0, 0, 20, null, 0);
         }
         UserPreferences prefs = preferencesService.get(userId);
         Instant todayStart = computeTodayStart(prefs);
@@ -328,13 +328,14 @@ public class ReviewService {
     ReviewStats computeStatsInternal(String deckId, String mode, String userId,
                                      UserPreferences prefs, Instant todayStart, long learnedToday, Instant now) {
         if (deckId == null) {
-            return new ReviewStats(0, 0, 0, 20, null);
+            return new ReviewStats(0, 0, 0, 20, null, 0);
         }
         long reviewedToday = cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(deckId, todayStart, userId);
         long remaining = computeRemaining(deckId, mode, userId, prefs, learnedToday, now);
         Instant nextDueAt = cardRepository.findFirstDueByTagsIdAndDueAfter(deckId, now, userId);
         long displayedLearnedToday = "CRAM".equals(mode) ? -1 : learnedToday;
-        return new ReviewStats(reviewedToday, remaining, displayedLearnedToday, prefs.getNewCardDailyLimit(), nextDueAt);
+        long totalNewCards = "CRAM".equals(mode) ? -1 : cardRepository.countByTagsIdAndCardState(deckId, 0, userId);
+        return new ReviewStats(reviewedToday, remaining, displayedLearnedToday, prefs.getNewCardDailyLimit(), nextDueAt, totalNewCards);
     }
 
     private long computeRemaining(String deckId, String mode, String userId, UserPreferences prefs, long learnedToday, Instant now) {

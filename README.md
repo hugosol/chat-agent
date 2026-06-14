@@ -1,6 +1,6 @@
 # Chat Agent
 
-AI 英语口语练习工具，兼具聊天练习和闪卡复习两大功能。通过 AI Agent 角色扮演进行实时英文对话，自动纠正语法/措辞错误，生成学习报告，并内置 FSRS-6 间隔重复算法管理词汇复习。
+AI 口语练习工具，兼具聊天练习和闪卡复习两大功能。通过 AI Agent 角色扮演进行实时对话（支持英语、日语），自动纠正语法/措辞错误，生成学习报告，并内置 FSRS-6 间隔重复算法管理词汇复习。
 
 ## Quick Start
 
@@ -75,6 +75,11 @@ docker push ghcr.io/你的用户名/chat-agent:latest
 | FSRS 优化器 | 基于复习历史自动调参，Adam 梯度下降优化 W[21] | [fsrs.md](docs/fsrs.md) |
 | 多 Tab 会话管理 | 页面切换自动恢复，防旧数据干扰，一 Session 一 Tab 绑定 | [frontend-notes.md](docs/frontend-notes.md) |
 
+### 闪卡使用规则
+
+- **卡片防重**: 同一牌组内不允许两张 front 相同的卡片（大小写不敏感）。不同牌组允许各自独立的同名卡片，各自拥有独立的 FSRS 调度状态。创建卡片时若跨牌组已有同名，前端弹出确认对话框；同牌组已有同名则直接拒绝。
+- **牌组估算**: 选择牌组时显示"预计还需 X 天学完"，基于当前每日新卡学习速度除以牌组中剩余新卡总数估算。
+
 ## 测试与参与开发
 
 ### 覆盖范围
@@ -118,7 +123,7 @@ cd src/main/frontend && npm test
 - [x] 闪卡系统（FSRS-6 调度 + 复习面板 + CSV 导入导出）
 - [x] MemoryCue 跨会话语义记忆（RAG 检索 + 向量化）
 - [x] 多用户与数据隔离
-- [x] DAILY_TALK 闲聊模式 + WORKPLACE_STANDUP 站会模式
+- [x] DAILY_TALK 闲聊模式 + WORKPLACE_STANDUP 站会模式 + JAPANESE_BUSINESS ビジネス日本語
 - [x] FSRS 参数优化器（Adam 梯度下降自动调参）
 - [x] 前端全量 React + TypeScript 迁移
 - [ ] STT/TTS 语音交互

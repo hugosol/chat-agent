@@ -9,7 +9,7 @@ const MAX_VISIBLE = 10;
 
 function buildCorrectionSummary(corrections: CorrectionData[]): string {
   return corrections
-    .map((c, i) => `${i + 1}. ${c.original} â†?${c.corrected}`)
+    .map((c, i) => `${i + 1}. ${c.original} ï¿½?${c.corrected}`)
     .join("\n");
 }
 
@@ -41,7 +41,7 @@ function renderCorrectionBubble(
   );
 }
 
-function renderMessage(msg: Message): React.ReactElement {
+function renderMessage(msg: Message, mode: string): React.ReactElement {
   const roleLabel = msg.role === "user" ? "You:" : "Agent:";
   const children: React.ReactNode[] = [
     React.createElement("span", { key: "role", className: styles.role }, roleLabel),
@@ -69,7 +69,7 @@ function renderMessage(msg: Message): React.ReactElement {
           "data-testid": "play-button",
           className: styles.btnPlay,
           title: "Read aloud",
-          onClick: () => speakText(msg.text),
+          onClick: () => speakText(msg.text, mode),
         },
         "\uD83D\uDD0A"
       )
@@ -129,7 +129,7 @@ export function MessageList(): React.ReactElement {
 
   for (let i = startIdx; i < state.messages.length; i++) {
     const msg = state.messages[i];
-    items.push(renderMessage(msg));
+    items.push(renderMessage(msg, state.mode));
     if (msg.role === "user") {
       const msgCorrections = correctionGroups.get(msg.id) || [];
       const bubble = renderCorrectionBubble(msg.id, msgCorrections);

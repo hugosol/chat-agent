@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.service;
 
+import com.hugosol.chatagent.dto.CheckCardResponse;
 import com.hugosol.chatagent.flashcard.FsrsScheduler;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class FlashcardService {
@@ -39,10 +41,6 @@ public class FlashcardService {
     public Card createCard(String front, String back, List<String> tagIds, String userId) {
         if (tagIds == null || tagIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不能为空");
-        }
-
-        if (cardRepository.findByFrontIgnoreCaseAndUserId(front, userId).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片'" + front + "'已存在");
         }
 
         Card card = new Card(userId, front, back);
@@ -74,9 +72,26 @@ public class FlashcardService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "至少需要一个牌组标签");
         }
 
+        List<Object[]> conflicts = cardRepository.findConflictingTagInfoByFront(front, userId);
+        for (Object[] row : conflicts) {
+            String conflictTagId = (String) row[0];
+            if (tagIds.contains(conflictTagId)) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "卡片'" + front + "'在牌组'" + row[1] + "'中已存在");
+            }
+        }
+
         card.setTags(tags);
 
         return cardRepository.save(card);
+    }
+
+    public CheckCardResponse checkCard(String front, List<String> tagIds, String userId) {
+        List<Object[]> rows = cardRepository.findConflictingTagInfoByFront(front, userId);
+        List<CheckCardResponse.ConflictInfo> conflicts = rows.stream()
+                .map(row -> new CheckCardResponse.ConflictInfo((String) row[0], (String) row[1]))
+                .collect(Collectors.toList());
+        return new CheckCardResponse(conflicts);
     }
 
     public List<Tag> getTags(String userId) {
@@ -196,10 +211,6 @@ public class FlashcardService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "标签不能为空");
         }
 
-        if (cardRepository.findByFrontIgnoreCaseAndUserIdAndIdNot(front, userId, cardId).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "卡片'" + front + "'已存在");
-        }
-
         card.setFront(front);
         card.setBack(back);
 
@@ -219,6 +230,15 @@ public class FlashcardService {
 
         if (!hasDeck) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "至少需要一个牌组标签");
+        }
+
+        List<Object[]> conflicts = cardRepository.findConflictingTagInfoByFrontExcludingId(front, userId, cardId);
+        for (Object[] row : conflicts) {
+            String conflictTagId = (String) row[0];
+            if (tagIds.contains(conflictTagId)) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "卡片'" + front + "'在牌组'" + row[1] + "'中已存在");
+            }
         }
 
         card.setTags(tags);

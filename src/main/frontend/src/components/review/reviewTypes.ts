@@ -15,6 +15,7 @@ export interface ReviewStats {
   learnedToday: number;
   dailyLimit: number;
   nextDueAt: string | null;
+  totalNewCards: number;
 }
 
 export interface ReviewCard {

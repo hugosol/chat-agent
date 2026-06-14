@@ -206,15 +206,11 @@ public class FsrsOptimizeService {
 
             saveParameters(userId, params, result.weights());
 
-            String optimizeLogId = UUID.randomUUID().toString();
-            rescheduleCards(userId, result.weights(), config, optimizeLogId, triggerType);
-
-            progressMap.put(taskId, OptimizeProgress.completed(result));
+        progressMap.put(taskId, OptimizeProgress.completed(result));
 
             String weightsAfterJson = Arrays.toString(result.weights());
 
             FsrsOptimizeLog optLog = new FsrsOptimizeLog();
-            optLog.setId(optimizeLogId);
             optLog.setUserId(userId);
             optLog.setTriggerType(triggerType);
             optLog.setStatus(OptimizeStatus.SUCCESS);
@@ -231,7 +227,9 @@ public class FsrsOptimizeService {
             optLog.setStartTime(Instant.ofEpochMilli(startTime));
             optLog.setEndTime(Instant.now());
             optLog.setDurationMs(System.currentTimeMillis() - startTime);
-            optimizeLogRepository.save(optLog);
+            optLog = optimizeLogRepository.save(optLog);
+
+            rescheduleCards(userId, result.weights(), config, optLog.getId(), triggerType);
 
             userTaskMap.remove(userId);
 

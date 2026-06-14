@@ -363,6 +363,48 @@ class ConversationAgentTest {
         assertThat(systemContent).doesNotContain("Active Engagement");
     }
 
+
+    @Test
+    void japaneseModeSkeletonUsesJapaneseLabels() {
+        agent.generateStream(
+                List.of(),
+                AgentMode.JAPANESE_BUSINESS,
+                new MemoryContent(null, null, null), "test-user", 0,
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("ルール:");
+        assertThat(systemContent).doesNotContain("Rules:");
+    }
+
+    @Test
+    void japaneseModeSystemContentContainsJapaneseDescriptionAndRules() {
+        agent.generateStream(
+                List.of(),
+                AgentMode.JAPANESE_BUSINESS,
+                new MemoryContent(null, null, null), "test-user", 0,
+                new NoopHandler());
+
+        String description = promptLoader.load("japanese_business/description.txt");
+        String rules = promptLoader.load("japanese_business/rules.txt");
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains(description);
+        assertThat(systemContent).contains(rules);
+    }
+
+    @Test
+    void modesWithoutPerModeSkeletonFallbackToRootSkeleton() {
+        // Daily Talk has no per-mode conversation-system.txt, should use root skeleton with "Rules:"
+        agent.generateStream(
+                List.of(),
+                AgentMode.DAILY_TALK,
+                new MemoryContent(null, null, null), "test-user", 0,
+                new NoopHandler());
+
+        String systemContent = getSystemContent();
+        assertThat(systemContent).contains("Rules:");
+        assertThat(systemContent).doesNotContain("ルール:");
+    }
     private String getSystemContent() {
         if (lastMessages != null && !lastMessages.isEmpty()) {
             ChatMessage first = lastMessages.get(0);

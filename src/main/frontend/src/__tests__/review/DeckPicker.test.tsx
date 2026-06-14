@@ -26,10 +26,11 @@ describe("DeckPicker", () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
-            learnedToday: 0,
+            learnedToday: 5,
             reviewedToday: 8,
             remaining: 12,
             dailyLimit: 20,
+            totalNewCards: 50,
           }),
         } as Response);
       }
@@ -162,5 +163,22 @@ describe("DeckPicker", () => {
     });
 
     expect(screen.queryByTestId("mode-remaining")).toBeNull();
+  });
+
+  it("shows estimated days to finish new cards", async () => {
+    render(<DeckPicker onStart={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("请选择牌组")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByTestId("deck-select"), {
+      target: { value: "deck-1" },
+    });
+
+    await waitFor(() => {
+      const el = screen.getByText(/预计还需/);
+      expect(el.textContent).toContain("预计还需 3 天学完");
+    });
   });
 });

@@ -34,3 +34,12 @@ export interface PageResponse<T> {
   number: number;
   size: number;
 }
+
+export interface ConflictInfo {
+  tagId: string;
+  tagName: string;
+}
+
+export interface CheckCardResponse {
+  conflicts: ConflictInfo[];
+}

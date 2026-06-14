@@ -48,6 +48,9 @@ public class DataInitializer implements CommandLineRunner {
 
         initFsrsParameters();
 
+        migrateDropSessionsModeCheckConstraint();
+        migrateDropOtherModeCheckConstraints();
+
         try {
             jdbcTemplate.execute("ALTER TABLE memory_cues DROP COLUMN IF EXISTS tags");
             log.info("Migrated: dropped tags column from memory_cues");
@@ -71,6 +74,30 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Migrated: backfilled enabled column for existing users");
         } catch (Exception e) {
             log.debug("Enabled column migration skipped or already applied: {}", e.getMessage());
+        }
+    }
+
+    private void migrateDropSessionsModeCheckConstraint() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE sessions ALTER COLUMN mode VARCHAR NOT NULL");
+            log.info("Migrated: redefined sessions.mode column (removed old CHECK constraint)");
+        } catch (Exception e) {
+            log.debug("Mode CHECK constraint migration skipped: {}", e.getMessage());
+        }
+    }
+
+    private void migrateDropOtherModeCheckConstraints() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE memory_cues ALTER COLUMN mode VARCHAR NOT NULL");
+            log.info("Migrated: redefined memory_cues.mode column (removed old CHECK constraint)");
+        } catch (Exception e) {
+            log.debug("memory_cues mode CHECK constraint migration skipped: {}", e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE user_learning_profiles ALTER COLUMN mode VARCHAR");
+            log.info("Migrated: redefined user_learning_profiles.mode column (removed old CHECK constraint)");
+        } catch (Exception e) {
+            log.debug("user_learning_profiles mode CHECK constraint migration skipped: {}", e.getMessage());
         }
     }
 

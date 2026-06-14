@@ -40,6 +40,7 @@ public class ConversationAgent {
     private final String systemTemplate;
     private final Map<AgentMode, String> modeDescriptions = new EnumMap<>(AgentMode.class);
     private final Map<AgentMode, String> modeRules = new EnumMap<>(AgentMode.class);
+    private final Map<AgentMode, String> modeTemplates = new EnumMap<>(AgentMode.class);
 
     public ConversationAgent(StreamingChatLanguageModel chatModel, PromptLoader promptLoader,
                              UserPreferencesService userPreferencesService) {
@@ -50,6 +51,7 @@ public class ConversationAgent {
             String path = mode.getTemplatePath();
             modeDescriptions.put(mode, promptLoader.load(path + "/description.txt"));
             modeRules.put(mode, promptLoader.load(path + "/rules.txt"));
+            modeTemplates.put(mode, promptLoader.loadIfExists(path + "/conversation-system.txt", this.systemTemplate));
         }
     }
 
@@ -130,8 +132,9 @@ public class ConversationAgent {
     private String buildSystemContent(AgentMode mode, MemoryContent memoryContent, String userId) {
         String description = modeDescriptions.getOrDefault(mode, "");
         String rules = modeRules.getOrDefault(mode, "");
+        String skeleton = modeTemplates.getOrDefault(mode, systemTemplate);
 
-        String content = systemTemplate
+        String content = skeleton
                 .replace("{Description}", description)
                 .replace("{Rules}", rules);
 

@@ -94,8 +94,10 @@ public class TurnProcessor {
 
         startConversation(sessionId, history, mode, memoryContent, messageId, userId, callback);
 
-        CompletableFuture<Void> correctionFuture = startCorrection(sessionId, userInput, messageId, correctionsBefore, callback);
-        sessionService.addPendingCorrection(sessionId, correctionFuture);
+        if (mode != AgentMode.JAPANESE_BUSINESS) {
+            CompletableFuture<Void> correctionFuture = startCorrection(sessionId, userInput, messageId, correctionsBefore, callback);
+            sessionService.addPendingCorrection(sessionId, correctionFuture);
+        }
     }
 
     private AgentMode resolveMode(String sessionId) {
@@ -108,6 +110,10 @@ public class TurnProcessor {
 
     private MemoryContent resolveMemoryContext(String sessionId, String userInput, int messageId,
                                                 AgentMode mode, String userId) {
+        // Japanese mode has no memory cues or learning profile — skip all RAG/DB queries
+        if (mode == AgentMode.JAPANESE_BUSINESS) {
+            return new MemoryContent(null, null, List.of());
+        }
         int topK = appProperties.getMemory().getRetrieval().getTopK();
         double threshold = appProperties.getMemory().getRetrieval().getSimilarityThreshold();
 

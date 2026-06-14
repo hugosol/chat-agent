@@ -114,12 +114,40 @@ function CardsTab(): JSX.Element {
       return;
     }
     const tagIds = formTags.map((t) => t.id);
-    fetch("/api/cards/add", {
+    const front = formFront.trim();
+    const back = formBack.trim();
+    const payload = JSON.stringify({ front, back, tagIds });
+
+    // Check for conflicts before creating
+    fetch("/api/cards/check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ front: formFront.trim(), back: formBack.trim(), tagIds }),
+      body: payload,
       credentials: "same-origin",
     })
+      .then((resp) => resp.json())
+      .then((checkResult: { conflicts: { tagId: string; tagName: string }[] }) => {
+        const conflicts = checkResult.conflicts || [];
+        if (conflicts.length === 0) {
+          return;
+        }
+        const sameDeckConflicts = conflicts.filter((c) => tagIds.includes(c.tagId));
+        if (sameDeckConflicts.length > 0) {
+          const names = sameDeckConflicts.map((c) => c.tagName).join(", ");
+          showToast(`卡片 '${front}' 在牌组 '${names}' 中已存在`);
+          throw new Error("same-deck-conflict");
+        }
+        const names = conflicts.map((c) => c.tagName).join(", ");
+        if (!window.confirm(`卡片 '${front}' 已在牌组 '${names}' 中存在，确认添加？`)) {
+          throw new Error("user-cancelled");
+        }
+      })
+      .then(() => fetch("/api/cards/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        credentials: "same-origin",
+      }))
       .then((resp) => {
         if (resp.ok) {
           setModal(null);
@@ -127,13 +155,15 @@ function CardsTab(): JSX.Element {
           fetchDecks();
           return;
         }
-        return resp.json().then((body) => {
+        return resp.text().then((text) => {
+          try { return JSON.parse(text); } catch { return { message: text }; }
+        }).then((body) => {
           throw { message: body.message, status: resp.status };
         });
       })
-      .catch((err: any) => {
-        if (err.status === 422) showToast(err.message);
-        else showToast("创建失败");
+      .catch((err: { message?: string; status?: number }) => {
+        if (err.status === 422) showToast(err.message ?? "创建失败");
+        else if (err.message !== "same-deck-conflict" && err.message !== "user-cancelled") showToast("创建失败");
       });
   }, [formFront, formBack, formTags, fetchCards, fetchDecks]);
 

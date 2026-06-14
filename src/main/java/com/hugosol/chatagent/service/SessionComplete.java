@@ -45,7 +45,7 @@ public class SessionComplete {
             log.error("Failed to persist session {}: {}", sessionId, e.getMessage());
         }
 
-        if (userId != null) {
+        if (userId != null && mode != AgentMode.JAPANESE_BUSINESS) {
             learningProfileService.generateLearningProfileAsync(userId, report, mode, sessionId);
             memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
         }

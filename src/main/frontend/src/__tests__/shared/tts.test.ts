@@ -36,4 +36,13 @@ describe("speakText", () => {
     expect(utterance.lang).toBe("en-US");
     expect(utterance.rate).toBe(0.95);
   });
+
+  it("sets lang to ja-JP when mode is JAPANESE_BUSINESS", () => {
+    speakText("こんにちは", "JAPANESE_BUSINESS");
+
+    const utterance = (window.speechSynthesis.speak as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as MockSpeechSynthesisUtterance;
+    expect(utterance.text).toBe("こんにちは");
+    expect(utterance.lang).toBe("ja-JP");
+  });
 });

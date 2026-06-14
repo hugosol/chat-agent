@@ -2,6 +2,7 @@ package com.hugosol.chatagent.controller;
 
 import com.hugosol.chatagent.dto.AddCardRequest;
 import com.hugosol.chatagent.dto.AddCardResponse;
+import com.hugosol.chatagent.dto.CheckCardResponse;
 import com.hugosol.chatagent.dto.CreateTagRequest;
 import com.hugosol.chatagent.dto.ImportResult;
 import com.hugosol.chatagent.dto.PatchCardBackRequest;
@@ -55,6 +56,13 @@ public class FlashcardController {
         String userId = getUserId();
         Card card = flashcardService.createCard(request.front(), request.back(), request.tagIds(), userId);
         return ResponseEntity.ok(toAddCardResponse(card));
+    }
+
+    @PostMapping("/cards/check")
+    public ResponseEntity<CheckCardResponse> checkCard(@RequestBody AddCardRequest request) {
+        String userId = getUserId();
+        CheckCardResponse response = flashcardService.checkCard(request.front(), request.tagIds(), userId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/tags")

@@ -7,6 +7,7 @@ export function chatReducer(state: ChatState, action: Action): ChatState {
       return {
         ...initialState,
         appStatus: "UserTurn",
+        mode: action.mode,
       };
     case "AGENT_STREAM_DELTA": {
       const existingIdx = state.messages.findIndex(
@@ -81,6 +82,7 @@ export function chatReducer(state: ChatState, action: Action): ChatState {
         corrections: action.corrections,
         tokenUsage: action.tokenUsage,
         appStatus: "UserTurn",
+        mode: action.mode ?? "",
       };
     }
     case "WS_CLOSED":

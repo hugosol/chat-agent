@@ -75,14 +75,14 @@
 
 .startBtn {
   composes: btn btnPrimary;
-  padding: 12px 24px;
-  font-size: 1em;
-  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 0.9em;
+  min-height: 36px;
 }
 
 .endBtn {
   composes: btn btnDanger;
-  padding: 12px 24px;
-  font-size: 1em;
-  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 0.9em;
+  min-height: 36px;
 }
