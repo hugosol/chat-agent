@@ -178,7 +178,7 @@ describe("DeckPicker", () => {
 
     await waitFor(() => {
       const el = screen.getByText(/预计还需/);
-      expect(el.textContent).toContain("预计还需 10 天学完");
+      expect(el.textContent).toContain("预计还需 3 天学完");
     });
   });
 });

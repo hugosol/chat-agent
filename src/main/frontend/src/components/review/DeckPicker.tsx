@@ -23,6 +23,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
   const [learnedToday, setLearnedToday] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [totalNewCards, setTotalNewCards] = useState(0);
+  const [dailyLimit, setDailyLimit] = useState(20);
 
   useEffect(() => {
     loadDecks();
@@ -100,6 +101,7 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
         setLearnedToday(data.learnedToday ?? 0);
         setRemaining(data.remaining ?? null);
         setTotalNewCards(data.totalNewCards ?? 0);
+        setDailyLimit(data.dailyLimit ?? 20);
       }
     } catch {
       // ignore
@@ -183,16 +185,16 @@ export function DeckPicker({ onStart }: Props): React.ReactElement {
               if (limitInput === "") setLimitInput(String(limit));
             }}
           />
-          {learnedToday > 0 && (
+          {(learnedToday > 0 || (totalNewCards > 0 && dailyLimit > 0)) && (
             <span className={styles.learnedInfo}>
-              今日已学新卡: {learnedToday}
-              {totalNewCards > 0 && (
-                <>，预计还需 {Math.ceil(totalNewCards / learnedToday)} 天学完</>
+              {learnedToday > 0 && <>今日已学新卡: {learnedToday}</>}
+              {learnedToday > 0 && totalNewCards > 0 && dailyLimit > 0 && <br />}
+              {totalNewCards > 0 && dailyLimit > 0 && (
+                <>{Math.ceil(totalNewCards / dailyLimit) > 0
+                  ? `预计还需 ${Math.ceil(totalNewCards / dailyLimit)} 天学完`
+                  : '暂无数据'}</>
               )}
             </span>
-          )}
-          {learnedToday === 0 && totalNewCards > 0 && (
-            <span className={styles.learnedInfo}>暂无数据</span>
           )}
         </div>
       )}
