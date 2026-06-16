@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { speakText } from "../../shared/tts";
 import { englishOnly } from "../../shared/utils";
-import type { ReviewCard } from "./reviewTypes";
+import type { EnhancementData, ReviewCard } from "./reviewTypes";
 import styles from "./CardDisplay.module.css";
 
 interface Props {
@@ -9,14 +9,21 @@ interface Props {
   back: string;
   cardId?: string;
   flipped: boolean;
+  enhancement?: EnhancementData | null;
   onFlip?: () => void;
   onCardUpdated?: (card: ReviewCard) => void;
   onEditingChange?: (editing: boolean) => void;
 }
-export function CardDisplay({ front, back, cardId, flipped, onFlip, onCardUpdated, onEditingChange }: Props): React.ReactElement {
+export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip, onCardUpdated, onEditingChange }: Props): React.ReactElement {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
+  const [enhanceError, setEnhanceError] = useState("");
+  const [localEnhancement, setLocalEnhancement] = useState<EnhancementData | null>(null);
+
+  const activeEnhancement = enhancement || localEnhancement;
+  const hasEnhancement = !!(activeEnhancement?.movieQuote || activeEnhancement?.etymology);
 
   const handleFlip = () => {
     onFlip?.();
@@ -38,20 +45,43 @@ export function CardDisplay({ front, back, cardId, flipped, onFlip, onCardUpdate
     if (!editText.trim() || !cardId) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/cards/${cardId}/back`, {
+      const resp = await fetch(`/api/cards/${cardId}/back`, {
         method: "PATCH",
-        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ back: editText.trim() }),
       });
-      if (res.ok) {
-        const updated: ReviewCard = await res.json();
+      if (resp.ok) {
+        const updated = await resp.json() as ReviewCard;
         onCardUpdated?.(updated);
         setEditing(false);
         onEditingChange?.(false);
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEnhance = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!cardId) return;
+    setEnhancing(true);
+    setEnhanceError("");
+    try {
+      const resp = await fetch(`/api/cards/${cardId}/enhance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (resp.ok) {
+        const data = await resp.json() as EnhancementData;
+        setLocalEnhancement(data);
+      } else {
+        setEnhanceError("Enhancement failed");
+      }
+    } catch {
+      setEnhanceError("Network error");
+    } finally {
+      setEnhancing(false);
     }
   };
 
@@ -89,7 +119,7 @@ export function CardDisplay({ front, back, cardId, flipped, onFlip, onCardUpdate
             )}
           </div>
           {flipped && !editing && (
-            <div className={styles.cardBack} data-testid="card-back">
+            <div className={`${styles.cardBack} ${hasEnhancement || enhancing ? styles.scrollableBack : ""}`} data-testid="card-back">
               <button
                 data-testid="edit-btn"
                 className={styles.ttsBtn}
@@ -97,7 +127,9 @@ export function CardDisplay({ front, back, cardId, flipped, onFlip, onCardUpdate
               >
                 {"\u270E"}
               </button>
-              <span className={styles.cardText}>{renderText(back)}</span>
+              <div className={styles.enhanceSection} data-testid="definition-zone">
+                <span className={styles.cardText}>{renderText(back)}</span>
+              </div>
               {showTtsBack && (
                 <button
                   data-testid="tts-btn-back"
@@ -106,6 +138,56 @@ export function CardDisplay({ front, back, cardId, flipped, onFlip, onCardUpdate
                 >
                   {"\uD83D\uDD0A"}
                 </button>
+              )}
+
+              {activeEnhancement?.movieQuote && (
+                <>
+                  <hr className={styles.divider} />
+                  <div className={styles.enhanceSection} data-testid="movie-quote-zone">
+                    <div className={styles.movieQuoteTitle}>
+                      {activeEnhancement.movieQuote.movieTitle} [{activeEnhancement.movieQuote.timestamp}]
+                    </div>
+                    <div className={styles.movieQuoteText}>
+                      "{activeEnhancement.movieQuote.quote}"
+                    </div>
+                    {activeEnhancement.sceneSummary && (
+                      <div className={styles.sceneSummary} data-testid="scene-summary">
+                        {activeEnhancement.sceneSummary}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {activeEnhancement?.etymology && (
+                <>
+                  <hr className={styles.divider} />
+                  <div className={styles.enhanceSection} data-testid="etymology-zone">
+                    {activeEnhancement.etymology}
+                  </div>
+                </>
+              )}
+
+              {!hasEnhancement && !enhancing && (
+                <button
+                  data-testid="card-enhance-btn"
+                  className={styles.enhanceBtn}
+                  onClick={handleEnhance}
+                >
+                  Card Enhance
+                </button>
+              )}
+
+              {enhancing && (
+                <div className={styles.loadingOverlay} data-testid="enhance-loading">
+                  <div className={styles.spinner} />
+                  {enhanceError && (
+                    <div className={styles.enhanceError} data-testid="enhance-error">
+                      {enhanceError}
+                      <button className={styles.enhanceBtn} onClick={handleEnhance}>Retry</button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

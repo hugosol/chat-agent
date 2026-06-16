@@ -289,6 +289,11 @@ public class ReviewController {
         map.put("lastReview", card.getLastReview() != null ? card.getLastReview().toString() : null);
         map.put("firstReviewDate", card.getFirstReviewDate() != null ? card.getFirstReviewDate().toString() : null);
         map.put("createTime", card.getCreateTime() != null ? card.getCreateTime().toString() : null);
+
+        Map<String, Object> enhancement = reviewService.buildEnhancementMap(card.getId());
+        if (enhancement != null && !enhancement.isEmpty()) {
+            map.put("enhancement", enhancement);
+        }
         return map;
     }
 

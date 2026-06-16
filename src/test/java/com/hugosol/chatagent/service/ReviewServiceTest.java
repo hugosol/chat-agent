@@ -7,6 +7,7 @@ import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.ReviewLog;
 import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.model.UserPreferences;
+import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
 
@@ -60,6 +61,9 @@ class ReviewServiceTest {
     @Mock
     private ExecutorService optimizerExecutor;
 
+    @Mock
+    private CardEnhancementRepository cardEnhancementRepository;
+
     private ReviewService reviewService;
     private static final Instant NOW = Instant.parse("2026-06-04T10:00:00Z");
 
@@ -71,7 +75,7 @@ class ReviewServiceTest {
             return null;
         }).when(optimizerExecutor).execute(any(Runnable.class));
         reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository,
-                fsrsConfigService, optimizerExecutor);
+                fsrsConfigService, optimizerExecutor, cardEnhancementRepository);
         lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0), anyString())).thenReturn(1000L);
     }
 

@@ -8,10 +8,15 @@ import com.hugosol.chatagent.flashcard.FsrsScheduler;
 import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
+import com.hugosol.chatagent.model.CardEnhancement;
+import com.hugosol.chatagent.model.EnhancementStatus;
+import com.hugosol.chatagent.model.EnhancementType;
 import com.hugosol.chatagent.model.ReviewLog;
 import com.hugosol.chatagent.model.UserPreferences;
+import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
@@ -42,15 +47,18 @@ public class ReviewService {
     private final ReviewLogRepository reviewLogRepository;
     private final FsrsConfigService fsrsConfigService;
     private final ExecutorService optimizerExecutor;
+    private final CardEnhancementRepository cardEnhancementRepository;
 
     public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService,
                          ReviewLogRepository reviewLogRepository, FsrsConfigService fsrsConfigService,
-                         @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor) {
+                         @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor,
+                         CardEnhancementRepository cardEnhancementRepository) {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
         this.reviewLogRepository = reviewLogRepository;
         this.fsrsConfigService = fsrsConfigService;
         this.optimizerExecutor = optimizerExecutor;
+        this.cardEnhancementRepository = cardEnhancementRepository;
     }
 
     @Transactional
@@ -357,5 +365,49 @@ public class ReviewService {
             case "CRAM" -> -1;
             default -> 0;
         };
+    }
+
+    /**
+     * Builds an enhancement data map for a card if it has completed enhancements.
+     * Returns null if the card has no enhancement data.
+     */
+    public Map<String, Object> buildEnhancementMap(String cardId) {
+        List<CardEnhancement> enhancements = cardEnhancementRepository.findByCardId(cardId);
+        boolean hasSubtitle = enhancements.stream().anyMatch(e ->
+                e.getType() == EnhancementType.SUBTITLE && e.getStatus() == EnhancementStatus.SUCCESS);
+        boolean hasEtymology = enhancements.stream().anyMatch(e ->
+                e.getType() == EnhancementType.ETYMOLOGY && e.getStatus() == EnhancementStatus.SUCCESS);
+
+        if (!hasSubtitle && !hasEtymology) {
+            return null;
+        }
+
+        Map<String, Object> result = new java.util.HashMap<>();
+        ObjectMapper mapper = new ObjectMapper();
+
+        for (CardEnhancement e : enhancements) {
+            if (e.getType() == EnhancementType.SUBTITLE && e.getStatus() == EnhancementStatus.SUCCESS) {
+                try {
+                    var node = mapper.readTree(e.getData());
+                    if (node.has("quote")) {
+                        Map<String, Object> quote = new java.util.HashMap<>();
+                        quote.put("movieTitle", node.get("movieTitle").asText());
+                        quote.put("imdbId", node.get("imdbId").asText());
+                        quote.put("quote", node.get("quote").asText());
+                        quote.put("timestamp", node.get("timestamp").asText());
+                        result.put("movieQuote", quote);
+                    }
+                    if (node.has("sceneSummary")) {
+                        result.put("sceneSummary", node.get("sceneSummary").asText());
+                    }
+                } catch (Exception ex) {
+                    // skip malformed data
+                }
+            } else if (e.getType() == EnhancementType.ETYMOLOGY && e.getStatus() == EnhancementStatus.SUCCESS) {
+                result.put("etymology", e.getData());
+            }
+        }
+
+        return result;
     }
 }

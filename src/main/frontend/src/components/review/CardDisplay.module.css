@@ -143,3 +143,89 @@
   font-size: 13px;
   cursor: pointer;
 }
+
+.scrollableBack {
+  overflow-y: auto;
+  max-height: 55vh;
+}
+
+.enhanceSection {
+  padding: 4px 0;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid #2a5a7a;
+  margin: 8px 0;
+}
+
+.enhanceBtn {
+  display: block;
+  margin: 8px auto 0;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  background: #1a3a5c;
+  color: #8ab4d6;
+  border: 1px solid #2a5a7a;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .enhanceBtn:hover {
+    background: #2a4a6c;
+  }
+}
+
+.movieQuoteTitle {
+  font-size: 0.8rem;
+  color: #8ab4d6;
+  margin-bottom: 4px;
+}
+
+.movieQuoteText {
+  font-style: italic;
+  font-size: 0.85rem;
+  color: #ccc;
+  margin-bottom: 4px;
+}
+
+.sceneSummary {
+  font-size: 0.8rem;
+  color: #a0c0a0;
+}
+
+.loadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 20, 40, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #2a5a7a;
+  border-top-color: #8ab4d6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.enhanceError {
+  margin-top: 12px;
+  color: #e94560;
+  font-size: 0.8rem;
+  text-align: center;
+}
