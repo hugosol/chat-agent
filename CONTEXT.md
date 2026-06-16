@@ -127,6 +127,19 @@ Chat Agent 是一个基于 AI 的语言口语练习 Web 应用。使用者（Lea
 | **Daily New Card Limit** | A per-Learner preference stored in `UserPreferences.newCardDailyLimit` that caps how many new cards (cardState = 0) the Learner can encounter per day in STANDARD or NEW_ONLY modes. Read by the backend on every request; saved by DeckPicker on "开始". | 每日新卡上限 |
 | **todayStart** | A timestamp representing "start of today" for the Learner, computed from their `timezone` and `dayStartHour` preferences. Used as the threshold for `reviewedToday` and `learnedToday` COUNT queries so that stats reflect the Learner's own day boundary. | 今日起始时间 |
 
+## Movie & Subtitle
+
+| Term | Definition | Aliases to avoid |
+|------|------------|-----------------|
+| **WatchedMovie** | A movie the Learner has imported, stored in `watched_movies` with imdbId, title, releaseYear, and SubtitleStatus. Used by CardEnhanceService to find subtitle matches for flashcard words during Review. | Movie, film, imported movie |
+| **SubtitleStatus** | The download state of a WatchedMovie's subtitles: `PENDING` (awaiting download), `DOWNLOADING` (in progress), `DONE` (complete with line count), `FAILED` (download failed with error message). | Subtitle state, download status |
+| **SubtitleLine** | One parsed SRT subtitle line from a WatchedMovie, stored in `subtitle_lines`. Contains imdbId, movieTitle, startTime, endTime, text, wordsLower, and lineIndex. Indexed for full-text word matching during Card Enhancement. | Subtitle row, SRT line |
+| **Card Enhancement** | The `CardEnhanceService` feature that searches a Learner's WatchedMovie subtitles for a flashcard word. When a match is found, displays the Movie Quote Zone (movie title, quote text, timestamp) and a scene summary on the flashcard back during Review. Falls back to dictionary-only etymology when no subtitle match exists. | Enhancement, card enrichment, movie context |
+| **Movie Quote Zone** | The UI section on a flashcard back showing a matched movie quote: movie title, timestamp, and the subtitle text. Rendered alongside scene summary and etymology when enhancement data is available. | Quote zone, movie quote display |
+| **TMDB Search** | Movie lookup via TMDB API v3 (`/search/movie`) that returns candidate movies (imdbId, title, year) for a given query. Used by the single-movie add flow on the Movies page. | Movie search, TMDB lookup |
+| **CSV Movie Import** | Batch import of movies from a CSV file with three fixed columns (imdbId, title, year). The first row is skipped if the imdbId value is non-numeric (header detection). Each row creates a WatchedMovie and triggers Subtitle Download. | Batch movie import, CSV upload |
+| **Subtitle Download** | Downloads SRT subtitles for a movie via Wyzie API, parses them with SrtParser, and persists as SubtitleLine rows. Clears old subtitle data before re-downloading. Triggered automatically on movie import and manually via the Movies page retry button. | SRT download, subtitle fetch |
+
 ## Relationships
 
 - A **Learner** has exactly one **Login session** at a time (per browser).
@@ -151,6 +164,10 @@ Chat Agent 是一个基于 AI 的语言口语练习 Web 应用。使用者（Lea
 - A **Card** has zero or more **ReviewLogs** — one per **Review** event.
 - A **ReviewLog** belongs to exactly one **Card** and exactly one **Learner**.
 - A **ReviewStats** is computed entirely from **Card** table COUNT/MIN queries at request time — it has no entity and is not persisted.
+- A **Learner** has zero or more **WatchedMovies**.
+- A **WatchedMovie** has zero or more **SubtitleLines**.
+- A **WatchedMovie** deletion cascades to its **SubtitleLines**.
+- A **Card Enhancement** searches **SubtitleLines** across all of a Learner's **WatchedMovies** for a given flashcard word.
 
 ## Flagged Ambiguities
 
