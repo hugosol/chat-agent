@@ -106,8 +106,10 @@ public class CardEnhanceService {
     }
 
     private SubtitleSearchResult searchSubtitle(String word, String userId, String cardId) {
+        log.info("searchSubtitle: word='{}' userId='{}' cardId={}", word, userId, cardId);
         List<WatchedMovie> movies = watchedMovieRepository.findByUserId(userId);
         if (movies.isEmpty()) {
+            log.info("searchSubtitle: no watched movies for userId={}", userId);
             saveEnhancement(cardId, EnhancementType.SUBTITLE, EnhancementStatus.SUCCESS,
                     "{\"found\":false}", null, null);
             return null;
@@ -118,8 +120,7 @@ public class CardEnhanceService {
         List<SubtitleLine> matches = subtitleLineRepository.findByImdbIdInAndWordsLowerLike(imdbIds, pattern);
 
         if (matches.isEmpty()) {
-            saveEnhancement(cardId, EnhancementType.SUBTITLE, EnhancementStatus.SUCCESS,
-                    "{\"found\":false}", null, null);
+            log.info("searchSubtitle: no subtitle match for word='{}' imdbIds={}", word, imdbIds);
             return null;
         }
 
@@ -137,15 +138,18 @@ public class CardEnhanceService {
         MovieQuote quote = new MovieQuote(movieTitle, imdbId, match.getText(), match.getStartTime());
 
         try {
-            String data = objectMapper.writeValueAsString(Map.of(
-                    "movieTitle", movieTitle,
-                    "imdbId", imdbId,
-                    "quote", match.getText(),
-                    "timestamp", match.getStartTime(),
-                    "sceneSummary", sceneSummary
-            ));
+            Map<String, Object> dataMap = new java.util.HashMap<>();
+            dataMap.put("movieTitle", movieTitle);
+            dataMap.put("imdbId", imdbId);
+            dataMap.put("quote", match.getText());
+            dataMap.put("timestamp", match.getStartTime());
+            if (sceneSummary != null) {
+                dataMap.put("sceneSummary", sceneSummary);
+            }
+            String data = objectMapper.writeValueAsString(dataMap);
             saveEnhancement(cardId, EnhancementType.SUBTITLE, EnhancementStatus.SUCCESS,
                     data, null, null);
+            log.info("Subtitle enhancement saved for card {}: {} [{}]", cardId, movieTitle, match.getStartTime());
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize subtitle enhancement data", e);
         }

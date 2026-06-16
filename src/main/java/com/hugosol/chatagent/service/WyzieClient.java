@@ -1,20 +1,22 @@
 package com.hugosol.chatagent.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Client for Wyzie Subs API (sub.wyzie.io).
- * Fetches subtitle download URLs and downloads SRT content by IMDB ID.
+ * Client for Wyzie Subs API. Fetches subtitle download URLs and downloads SRT content by IMDB ID.
  */
 @Component
 public class WyzieClient {
 
     private final java.net.http.HttpClient httpClient;
+    private final String baseUrl;
 
-    public WyzieClient() {
+    public WyzieClient(@Value("${app.wyzie.base-url:https://sub.wyzie.io}") String baseUrl) {
         this.httpClient = java.net.http.HttpClient.newBuilder()
                 .followRedirects(java.net.http.HttpClient.Redirect.ALWAYS)
                 .build();
+        this.baseUrl = baseUrl;
     }
 
     /**
@@ -26,7 +28,7 @@ public class WyzieClient {
      */
     public String downloadSrt(String imdbId) {
         try {
-            String url = "https://sub.wyzie.io/subtitles/" + imdbId;
+            String url = baseUrl + "/subtitles/" + imdbId;
             var request = java.net.http.HttpRequest.newBuilder()
                     .uri(java.net.URI.create(url))
                     .GET()

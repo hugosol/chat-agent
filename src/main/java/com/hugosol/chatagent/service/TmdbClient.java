@@ -21,11 +21,14 @@ import java.util.List;
 public class TmdbClient {
 
     private final String apiKey;
+    private final String baseUrl;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    public TmdbClient(@Value("${app.tmdb.api-key:}") String apiKey) {
+    public TmdbClient(@Value("${app.tmdb.api-key:}") String apiKey,
+                      @Value("${app.tmdb.base-url:https://api.themoviedb.org}") String baseUrl) {
         this.apiKey = apiKey;
+        this.baseUrl = baseUrl;
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper();
     }
@@ -45,7 +48,7 @@ public class TmdbClient {
 
         try {
             String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
-            String url = "https://api.themoviedb.org/3/search/movie?api_key=" + apiKey
+            String url = baseUrl + "/3/search/movie?api_key=" + apiKey
                     + "&query=" + encoded + "&language=zh-CN";
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -96,7 +99,7 @@ public class TmdbClient {
      */
     public String fetchImdbId(int tmdbId) {
         try {
-            String url = "https://api.themoviedb.org/3/movie/" + tmdbId
+            String url = baseUrl + "/3/movie/" + tmdbId
                     + "/external_ids?api_key=" + apiKey;
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(url))

@@ -250,7 +250,7 @@ public class ReviewService {
     public Optional<Card> getNextCard(String deckId, String mode, String userId) {
         Instant now = Instant.now();
         UserPreferences prefs = preferencesService.get(userId);
-        Instant todayStart = computeTodayStart(prefs);
+        Instant todayStart = computeTodayStart(prefs, now);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
         return getNextCardInternal(deckId, mode, userId, prefs, now, todayStart, learnedToday);
     }
@@ -258,7 +258,7 @@ public class ReviewService {
     public NextCardAndStats getNextCardAndStats(String deckId, String mode, String userId) {
         Instant now = Instant.now();
         UserPreferences prefs = preferencesService.get(userId);
-        Instant todayStart = computeTodayStart(prefs);
+        Instant todayStart = computeTodayStart(prefs, now);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
 
         Optional<Card> card = getNextCardInternal(deckId, mode, userId, prefs, now, todayStart, learnedToday);
@@ -310,10 +310,10 @@ public class ReviewService {
         return learnedToday >= prefs.getNewCardDailyLimit();
     }
 
-    private Instant computeTodayStart(UserPreferences prefs) {
+    Instant computeTodayStart(UserPreferences prefs, Instant now) {
         int offsetHours = prefs.getUtcOffset() != null ? prefs.getUtcOffset() : 8;
         ZoneOffset offset = ZoneOffset.ofHours(offsetHours);
-        ZonedDateTime nowInZone = Instant.now().atZone(offset);
+        ZonedDateTime nowInZone = now.atZone(offset);
         LocalDate today = nowInZone.toLocalDate();
         if (nowInZone.getHour() < prefs.getDayStartHour()) {
             today = today.minusDays(1);
@@ -327,8 +327,8 @@ public class ReviewService {
             return new ReviewStats(0, 0, 0, 20, null, 0);
         }
         UserPreferences prefs = preferencesService.get(userId);
-        Instant todayStart = computeTodayStart(prefs);
         Instant now = Instant.now();
+        Instant todayStart = computeTodayStart(prefs, now);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
         return computeStatsInternal(deckId, mode, userId, prefs, todayStart, learnedToday, now);
     }

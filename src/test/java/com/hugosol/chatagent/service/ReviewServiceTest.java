@@ -22,10 +22,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -527,22 +523,11 @@ class ReviewServiceTest {
 
     @Test
     void computeTodayStart_normalHours_returnsToday() {
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(null);
-
-        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
-
-        Instant captured = todayStartCaptor.getValue();
-        ZoneId zone = ZoneId.of("+08:00");
-        ZonedDateTime nowInZone = ZonedDateTime.now(zone);
-        Instant expectedTodayStart = nowInZone.toLocalDate().atStartOfDay(zone).plusHours(6).toInstant();
-        assertThat(captured).isEqualTo(expectedTodayStart);
+        // 2026-06-16T12:00:00Z = 20:00 UTC+8, dayStartHour=6, before midnight threshold → today at 06:00
+        Instant now = Instant.parse("2026-06-16T12:00:00Z");
+        Instant result = reviewService.computeTodayStart(defaultPreferences(), now);
+        // 2026-06-16T06:00:00+08:00 = 2026-06-15T22:00:00Z
+        assertThat(result).isEqualTo(Instant.parse("2026-06-15T22:00:00Z"));
     }
 
     @Test
@@ -551,19 +536,11 @@ class ReviewServiceTest {
         prefs.setNewCardDailyLimit(20);
         prefs.setDayStartHour(23);
         prefs.setUtcOffset(8);
-        when(preferencesService.get("user-1")).thenReturn(prefs);
-
-        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(null);
-
-        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
-
-        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now().minus(1, ChronoUnit.HOURS));
+        // 2026-06-16T14:06:30Z = 22:06 UTC+8, dayStartHour=23, BEFORE threshold → yesterday at 23:00
+        Instant now = Instant.parse("2026-06-16T14:06:30Z");
+        Instant result = reviewService.computeTodayStart(prefs, now);
+        // 2026-06-15T23:00:00+08:00 = 2026-06-15T15:00:00Z
+        assertThat(result).isEqualTo(Instant.parse("2026-06-15T15:00:00Z"));
     }
 
     @Test
@@ -572,19 +549,11 @@ class ReviewServiceTest {
         prefs.setNewCardDailyLimit(20);
         prefs.setDayStartHour(0);
         prefs.setUtcOffset(8);
-        when(preferencesService.get("user-1")).thenReturn(prefs);
-
-        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(null);
-
-        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
-
-        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
+        // 2026-06-16T14:06:30Z = 22:06 UTC+8, dayStartHour=0, AFTER threshold (22 >= 0) → today at 00:00
+        Instant now = Instant.parse("2026-06-16T14:06:30Z");
+        Instant result = reviewService.computeTodayStart(prefs, now);
+        // 2026-06-16T00:00:00+08:00 = 2026-06-15T16:00:00Z
+        assertThat(result).isEqualTo(Instant.parse("2026-06-15T16:00:00Z"));
     }
 
     @Test

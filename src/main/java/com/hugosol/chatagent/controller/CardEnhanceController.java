@@ -43,6 +43,9 @@ public class CardEnhanceController {
 
     private String getUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth != null ? auth.getName() : "anonymous";
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            return auth.getName();
+        }
+        return "anonymous";
     }
 }

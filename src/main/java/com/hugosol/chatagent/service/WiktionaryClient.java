@@ -2,6 +2,7 @@ package com.hugosol.chatagent.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -19,10 +20,12 @@ public class WiktionaryClient {
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final String baseUrl;
 
-    public WiktionaryClient() {
+    public WiktionaryClient(@Value("${app.wiktionary.base-url:https://en.wiktionary.org}") String baseUrl) {
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper();
+        this.baseUrl = baseUrl;
     }
 
     /**
@@ -33,7 +36,7 @@ public class WiktionaryClient {
      * @throws RuntimeException if the API call fails
      */
     public String fetchEtymology(String word) {
-        String url = "https://en.wiktionary.org/api/rest_v1/page/definition/" +
+        String url = baseUrl + "/api/rest_v1/page/definition/" +
                 URLEncoder.encode(word, StandardCharsets.UTF_8);
 
         try {

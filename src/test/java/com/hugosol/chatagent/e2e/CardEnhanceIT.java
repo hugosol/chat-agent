@@ -8,6 +8,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Set;
+
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,6 +25,8 @@ class CardEnhanceIT extends E2ETestBase {
 
     @Autowired
     private SubtitleLineRepository subtitleLineRepository;
+
+    private String deckId;
 
     @BeforeEach
     void setupData() {
@@ -40,7 +46,7 @@ class CardEnhanceIT extends E2ETestBase {
                                 1
                                 00:01:00,000 --> 00:01:02,500
                                 I dream of electric sheep.
-                                
+
                                 2
                                 00:02:00,000 --> 00:02:02,500
                                 Do androids dream?
@@ -60,7 +66,7 @@ class CardEnhanceIT extends E2ETestBase {
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"choices\":[{\"message\":{\"content\":\"科幻场景中关于梦境和意识的对话。\"}}]}")));
+                        .withBody("{\"id\":\"test-id\",\"object\":\"chat.completion\",\"created\":1,\"model\":\"test\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"科幻场景中关于梦境和意识的对话。\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}")));
 
         // Import a movie with subtitles
         WatchedMovie movie = new WatchedMovie(DEFAULT_USER_ID, "tt001", "Test Movie", 2020, SubtitleStatus.PENDING);
@@ -75,38 +81,63 @@ class CardEnhanceIT extends E2ETestBase {
         // Create a tag and card for review
         Tag deck = new Tag("test-deck", DEFAULT_USER_ID);
         deck.setType("deck");
-        tagRepository.save(deck);
+        deck = tagRepository.save(deck);
+        deckId = deck.getId();
 
         Card card = new Card(DEFAULT_USER_ID, "dream", "梦");
-        card.getTags().add(deck);
+        card.setStability(2.5);
+        card.setDifficulty(0.0);
+        card.setCardState(0);
+        card.setDue(Instant.now().minus(1, ChronoUnit.HOURS));
+        card.setReps(0);
+        card.setLapses(0);
+        card.setTags(Set.of(deck));
         cardRepository.save(card);
     }
 
     @Test
     void fullEnhanceFlow_showsMovieQuoteAndEtymology() {
         // Navigate to review page
-        page.navigate("http://localhost:" + serverPort + "/review");
-        page.waitForSelector("[data-testid=\"deck-item\"]");
+        page.navigate("http://localhost:" + serverPort + "/review/index.html");
+        page.waitForSelector("[data-testid=\"deck-select\"]");
 
-        // Select deck and start review
-        page.locator("[data-testid=\"deck-item\"]").first().click();
-        page.waitForSelector("[data-testid=\"flip-card-btn\"]");
+        // Select deck and mode
+        page.locator("[data-testid=\"deck-select\"]").selectOption(deckId);
+        page.waitForFunction(
+                "() => { var btn = document.querySelector(\"[data-testid='start-btn']\"); return btn && !btn.disabled; }");
+
+        // Start review
+        page.locator("[data-testid=\"start-btn\"]").click();
+        page.waitForSelector("[data-testid=\"card-front\"]");
 
         // Flip card
         page.locator("[data-testid=\"flip-card-btn\"]").click();
         page.waitForSelector("[data-testid=\"card-back\"]");
 
+        // Verify definition zone is shown
+        assertThat(page.locator("[data-testid=\"definition-zone\"]").isVisible()).isTrue();
+
+        // Verify Card Enhance button is visible (no pre-existing enhancement)
+        assertThat(page.locator("[data-testid=\"card-enhance-btn\"]").isVisible()).isTrue();
+
         // Click Card Enhance
         page.locator("[data-testid=\"card-enhance-btn\"]").click();
 
-        // Wait for loading to finish and movie quote zone to appear
+        // Wait for loading overlay to appear then disappear
+        page.waitForSelector("[data-testid=\"enhance-loading\"]");
         page.waitForSelector("[data-testid=\"movie-quote-zone\"]");
 
         // Verify movie quote zone content
-        assertThat(page.locator("[data-testid=\"movie-quote-zone\"]").innerText()).contains("dream");
+        assertThat(page.locator("[data-testid=\"movie-quote-zone\"]").innerText())
+                .contains("dream");
+
+        // Verify scene summary
+        assertThat(page.locator("[data-testid=\"scene-summary\"]").innerText())
+                .contains("科幻场景");
 
         // Verify etymology zone
-        assertThat(page.locator("[data-testid=\"etymology-zone\"]").innerText()).contains("Old English");
+        assertThat(page.locator("[data-testid=\"etymology-zone\"]").innerText())
+                .contains("Old English");
 
         // Verify CardEnhancement rows saved
         var enhancements = cardEnhancementRepository.findAll();
