@@ -66,11 +66,14 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
     if (!cardId) return;
     setEnhancing(true);
     setEnhanceError("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const resp = await fetch(`/api/cards/${cardId}/enhance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: controller.signal,
       });
       if (resp.ok) {
         const data = await resp.json() as EnhancementData;
@@ -78,9 +81,14 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
       } else {
         setEnhanceError("Enhancement failed");
       }
-    } catch {
-      setEnhanceError("Network error");
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setEnhanceError("Request timed out");
+      } else {
+        setEnhanceError("Network error");
+      }
     } finally {
+      clearTimeout(timeout);
       setEnhancing(false);
     }
   };

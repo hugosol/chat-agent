@@ -56,6 +56,10 @@ app:
       - /shared/react-dom.production.min.js
   wiktionary:
     base-url: https://en.wiktionary.org
+    connect-timeout: 5s
+    max-retries: 2
+    proxy-host:
+    proxy-port: 0
   wyzie:
     base-url: https://sub.wyzie.io
   tmdb:

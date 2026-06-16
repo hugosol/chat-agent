@@ -13,6 +13,9 @@ spring:
       path: /h2-console
 
 app:
+  wiktionary:
+    proxy-host: 127.0.0.1
+    proxy-port: 10808
   initial-users:
     - username: admin
       password: 123

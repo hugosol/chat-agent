@@ -184,11 +184,12 @@ public class CardEnhanceService {
         if (etymology != null && !etymology.isBlank()) {
             saveEnhancement(cardId, EnhancementType.ETYMOLOGY, EnhancementStatus.SUCCESS,
                     etymology, null, null);
+            return etymology;
         } else {
             saveEnhancement(cardId, EnhancementType.ETYMOLOGY, EnhancementStatus.FAILED,
                     null, "No etymology found", null);
+            return null;
         }
-        return etymology;
     }
 
     private void saveEnhancement(String cardId, EnhancementType type, EnhancementStatus status,

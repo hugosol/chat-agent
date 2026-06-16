@@ -52,12 +52,48 @@ class CardEnhanceIT extends E2ETestBase {
                                 Do androids dream?
                                 """)));
 
-        // Stub Wiktionary
-        stubFor(get(urlPathMatching("/api/rest_v1/page/definition/dream"))
+        // Stub Wiktionary: sections API → find Etymology + Derived terms indices
+        stubFor(get(urlPathEqualTo("/w/api.php"))
+                .withQueryParam("action", equalTo("parse"))
+                .withQueryParam("prop", equalTo("sections"))
+                .withQueryParam("page", equalTo("dream"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"en\":[{\"etymology\":\"From Old English dr\\u0113am.\"}]}")));
+                        .withBody("""
+                                {"parse":{"title":"dream","sections":[
+                                  {"toclevel":1,"level":"2","line":"English","index":"1"},
+                                  {"toclevel":2,"level":"3","line":"Etymology","index":"2"},
+                                  {"toclevel":3,"level":"4","line":"Noun","index":"3"},
+                                  {"toclevel":4,"level":"5","line":"Derived terms","index":"4"}
+                                ]}}
+                                """)));
+
+        // Stub Wiktionary: etymology wikitext → extract source
+        stubFor(get(urlPathEqualTo("/w/api.php"))
+                .withQueryParam("action", equalTo("parse"))
+                .withQueryParam("prop", equalTo("wikitext"))
+                .withQueryParam("section", equalTo("2"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"parse":{"title":"dream","wikitext":{"*":"===Etymology===\
+                From {{inh|en|enm|dreme}}, from {{inh|en|ang|dr\u0113am|t=music, joy}}."}}}
+                                """)));
+
+        // Stub Wiktionary: derived terms wikitext
+        stubFor(get(urlPathEqualTo("/w/api.php"))
+                .withQueryParam("action", equalTo("parse"))
+                .withQueryParam("prop", equalTo("wikitext"))
+                .withQueryParam("section", equalTo("4"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"parse":{"title":"dream","wikitext":{"*":"=====Derived terms=====\
+                {{col|en|dreamer|dreamful|dreamless|dreamlike|dreamland}}"}}}
+                                """)));
 
         // Stub DeepSeek scene summary (non-streaming JSON response)
         stubFor(post(urlPathEqualTo("/chat/completions"))
@@ -135,9 +171,10 @@ class CardEnhanceIT extends E2ETestBase {
         assertThat(page.locator("[data-testid=\"scene-summary\"]").innerText())
                 .contains("科幻场景");
 
-        // Verify etymology zone
-        assertThat(page.locator("[data-testid=\"etymology-zone\"]").innerText())
-                .contains("Old English");
+        // Verify etymology zone (source + derived terms)
+        String etymologyText = page.locator("[data-testid=\"etymology-zone\"]").innerText();
+        assertThat(etymologyText).contains("Old English");
+        assertThat(etymologyText).contains("dreamer");
 
         // Verify CardEnhancement rows saved
         var enhancements = cardEnhancementRepository.findAll();
