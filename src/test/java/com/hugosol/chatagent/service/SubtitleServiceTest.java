@@ -32,9 +32,6 @@ class SubtitleServiceTest {
     private WatchedMovieRepository watchedMovieRepository;
 
     @Mock
-    private OpenSubtitlesClient openSubtitlesClient;
-
-    @Mock
     private SubdlClient subdlClient;
 
     private SrtParser srtParser;
@@ -43,7 +40,7 @@ class SubtitleServiceTest {
     @BeforeEach
     void setUp() {
         srtParser = new SrtParser(); // real parser, already tested
-        service = new SubtitleService(subtitleLineRepository, watchedMovieRepository, srtParser, openSubtitlesClient, subdlClient);
+        service = new SubtitleService(subtitleLineRepository, watchedMovieRepository, srtParser, subdlClient);
     }
 
     @Test
@@ -51,7 +48,7 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.PENDING);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(openSubtitlesClient.downloadSrt("tt001")).thenReturn("""
+        when(subdlClient.downloadSrt("tt001")).thenReturn("""
                 1
                 00:01:00,000 --> 00:01:02,500
                 Hello world.
@@ -86,7 +83,7 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.FAILED);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(openSubtitlesClient.downloadSrt("tt001")).thenReturn("""
+        when(subdlClient.downloadSrt("tt001")).thenReturn("""
                 1
                 00:01:00,000 --> 00:01:02,500
                 New line.
@@ -107,15 +104,13 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.PENDING);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(openSubtitlesClient.downloadSrt("tt001"))
-                .thenThrow(new RuntimeException("Network error"));
         when(subdlClient.downloadSrt("tt001"))
-                .thenThrow(new RuntimeException("Subdl also failed"));
+                .thenThrow(new RuntimeException("Network error"));
 
         service.downloadSubtitles("tt001", "user-1");
 
         assertThat(movie.getSubtitleStatus()).isEqualTo(SubtitleStatus.FAILED);
-        assertThat(movie.getSubtitleError()).contains("Subdl also failed");
+        assertThat(movie.getSubtitleError()).contains("Network error");
     }
 
     @Test
@@ -123,7 +118,7 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.PENDING);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(openSubtitlesClient.downloadSrt("tt001")).thenReturn("""
+        when(subdlClient.downloadSrt("tt001")).thenReturn("""
                 1
                 00:01:00,000 --> 00:01:02,500
                 Test.

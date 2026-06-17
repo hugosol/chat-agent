@@ -28,30 +28,8 @@ class MovieImportIT extends E2ETestBase {
         watchedMovieRepository.deleteAll();
         subtitleLineRepository.deleteAll();
 
-        WireMock.configureFor("localhost", wireMockServer.port());
-
-        // Stub Wyzie Subs for test movies
-        stubFor(get(urlPathMatching("/subtitles/tt001"))
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withBody("""
-                                1
-                                00:01:00,000 --> 00:01:02,500
-                                Hello world.
-                                
-                                2
-                                00:02:00,000 --> 00:02:02,500
-                                Goodbye world.
-                                """)));
-
-        stubFor(get(urlPathMatching("/subtitles/tt002"))
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withBody("""
-                                1
-                                00:01:00,000 --> 00:01:02,500
-                                Another line.
-                                """)));
+        // Subtitle download is triggered manually via the retry endpoint;
+        // these tests verify the data model layer directly.
     }
 
     @Test

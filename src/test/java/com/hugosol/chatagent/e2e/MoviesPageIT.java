@@ -54,8 +54,8 @@ class MoviesPageIT extends E2ETestBase {
         // Verify delete button exists on each row
         assertThat(page.locator("[data-testid='movie-delete-btn']")).hasCount(3);
 
-        // Verify retry button only on FAILED movie
-        assertThat(page.locator("[data-testid='movie-download-btn']")).hasCount(1);
+        // Verify retry/download button on PENDING and FAILED movies (2 of 3)
+        assertThat(page.locator("[data-testid='movie-download-btn']")).hasCount(2);
     }
 
     @Test
@@ -142,7 +142,7 @@ class MoviesPageIT extends E2ETestBase {
         assertThat(page.locator("[data-testid='movie-retry-modal']")).isVisible();
         assertThat(page.locator("[data-testid='movie-retry-text']")).containsText("Inception");
 
-        // Close the modal (don't actually trigger retry since Wyzie may not be stubbed)
+        // Close the modal (don't actually trigger retry since Subdl may not be stubbed)
         page.locator("[data-testid='modal-cancel']").click();
     }
 

@@ -39,7 +39,7 @@ app:
       - /**
   wiktionary:
     base-url: http://localhost:19090
-  wyzie:
-    base-url: http://localhost:19090
   tmdb:
+    base-url: http://localhost:19090
+  subdl:
     base-url: http://localhost:19090

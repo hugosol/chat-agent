@@ -137,8 +137,8 @@ Chat Agent 是一个基于 AI 的语言口语练习 Web 应用。使用者（Lea
 | **Card Enhancement** | The `CardEnhanceService` feature that searches a Learner's WatchedMovie subtitles for a flashcard word. When a match is found, displays the Movie Quote Zone (movie title, quote text, timestamp) and a scene summary on the flashcard back during Review. Falls back to dictionary-only etymology when no subtitle match exists. | Enhancement, card enrichment, movie context |
 | **Movie Quote Zone** | The UI section on a flashcard back showing a matched movie quote: movie title, timestamp, and the subtitle text. Rendered alongside scene summary and etymology when enhancement data is available. | Quote zone, movie quote display |
 | **TMDB Search** | Movie lookup via TMDB API v3 (`/search/movie`) that returns candidate movies (imdbId, title, year) for a given query. Used by the single-movie add flow on the Movies page. | Movie search, TMDB lookup |
-| **CSV Movie Import** | Batch import of movies from a CSV file with three fixed columns (imdbId, title, year). The first row is skipped if the imdbId value is non-numeric (header detection). Each row creates a WatchedMovie and triggers Subtitle Download. | Batch movie import, CSV upload |
-| **Subtitle Download** | Downloads SRT subtitles for a movie via Wyzie API, parses them with SrtParser, and persists as SubtitleLine rows. Clears old subtitle data before re-downloading. Triggered automatically on movie import and manually via the Movies page retry button. | SRT download, subtitle fetch |
+| **CSV Movie Import** | Batch import of movies from a CSV file with three fixed columns (imdbId, title, year). The first row is skipped if the imdbId value is non-numeric (header detection). Each row creates a WatchedMovie with PENDING status. | Batch movie import, CSV upload |
+| **Subtitle Download** | Downloads SRT subtitles for a movie via Subdl API, parses them with SrtParser, and persists as SubtitleLine rows. Clears old subtitle data before re-downloading. Triggered manually via the Movies page retry button. | SRT download, subtitle fetch |
 
 ## Relationships
 

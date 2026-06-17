@@ -33,24 +33,21 @@ public class MovieService {
     private final SubtitleLineRepository subtitleLineRepository;
     private final SubtitleService subtitleService;
     private final TmdbClient tmdbClient;
-    private final CsvColumnDetector csvColumnDetector;
 
     public MovieService(WatchedMovieRepository watchedMovieRepository,
                         SubtitleLineRepository subtitleLineRepository,
                         SubtitleService subtitleService,
-                        TmdbClient tmdbClient,
-                        CsvColumnDetector csvColumnDetector) {
+                        TmdbClient tmdbClient) {
         this.watchedMovieRepository = watchedMovieRepository;
         this.subtitleLineRepository = subtitleLineRepository;
         this.subtitleService = subtitleService;
         this.tmdbClient = tmdbClient;
-        this.csvColumnDetector = csvColumnDetector;
     }
 
     /**
      * Imports a batch of movies from CSV-parsed rows.
-     * Each row is a map of column name → value. Column detection is handled by CsvColumnDetector.
-     * Subtitle download is triggered for each new movie. Failures on individual movies do not stop the batch.
+     * Each row is a map of column name → value, pre-parsed by the frontend.
+     * Movies are saved with PENDING status. Subtitle download is triggered manually via the retry endpoint.
      */
     @Transactional
     public void importBatch(List<Map<String, String>> rows, String userId) {

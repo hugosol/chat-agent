@@ -45,12 +45,13 @@ public class WiktionaryClient {
 
     public WiktionaryClient(@Value("${app.wiktionary.base-url:https://en.wiktionary.org}") String baseUrl,
                              @Value("${app.wiktionary.connect-timeout:5s}") Duration connectTimeout,
-                             @Value("${app.wiktionary.proxy-host:}") String proxyHost,
-                             @Value("${app.wiktionary.proxy-port:0}") int proxyPort,
-                             @Value("${app.wiktionary.max-retries:2}") int maxRetries) {
+                             @Value("${app.wiktionary.max-retries:2}") int maxRetries,
+                             @Value("${app.proxy.enabled:false}") boolean proxyEnabled,
+                             @Value("${app.proxy.host:}") String proxyHost,
+                             @Value("${app.proxy.port:0}") int proxyPort) {
         var builder = HttpClient.newBuilder()
                 .connectTimeout(connectTimeout);
-        if (proxyHost != null && !proxyHost.isBlank() && proxyPort > 0) {
+        if (proxyEnabled && proxyHost != null && !proxyHost.isBlank() && proxyPort > 0) {
             builder.proxy(ProxySelector.of(new InetSocketAddress(proxyHost, proxyPort)));
         }
         this.httpClient = builder.build();

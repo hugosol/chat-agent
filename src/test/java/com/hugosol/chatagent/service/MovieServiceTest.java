@@ -46,14 +46,12 @@ class MovieServiceTest {
     @Mock
     private TmdbClient tmdbClient;
 
-    private CsvColumnDetector csvColumnDetector;
     private MovieService service;
 
     @BeforeEach
     void setUp() {
-        csvColumnDetector = new CsvColumnDetector();
         service = new MovieService(watchedMovieRepository, subtitleLineRepository,
-                subtitleService, tmdbClient, csvColumnDetector);
+                subtitleService, tmdbClient);
     }
 
     @Test

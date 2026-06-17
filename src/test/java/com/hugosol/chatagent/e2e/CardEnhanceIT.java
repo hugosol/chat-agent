@@ -37,21 +37,6 @@ class CardEnhanceIT extends E2ETestBase {
         tagRepository.deleteAll();
         reviewLogRepository.deleteAll();
 
-        // Stub Wyzie Subs
-        WireMock.configureFor("localhost", wireMockServer.port());
-        stubFor(get(urlPathMatching("/subtitles/tt001"))
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withBody("""
-                                1
-                                00:01:00,000 --> 00:01:02,500
-                                I dream of electric sheep.
-
-                                2
-                                00:02:00,000 --> 00:02:02,500
-                                Do androids dream?
-                                """)));
-
         // Stub Wiktionary: sections API → find Etymology + Derived terms indices
         stubFor(get(urlPathEqualTo("/w/api.php"))
                 .withQueryParam("action", equalTo("parse"))

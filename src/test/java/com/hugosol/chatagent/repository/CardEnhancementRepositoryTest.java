@@ -30,7 +30,7 @@ class CardEnhancementRepositoryTest {
     void saveAndFindById_persistsCorrectly() {
         CardEnhancement enhancement = new CardEnhancement("card-1", EnhancementType.SUBTITLE,
                 EnhancementStatus.SUCCESS,
-                "{\"movieTitle\":\"Inception\"}", null, "https://sub.wyzie.io/tt1375666");
+                "{\"movieTitle\":\"Inception\"}", null, "https://api.subdl.com/tt1375666");
         entityManager.persistFlushFind(enhancement);
 
         var found = repository.findById(enhancement.getId());

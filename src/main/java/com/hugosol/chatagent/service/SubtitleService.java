@@ -23,18 +23,15 @@ public class SubtitleService {
     private final SubtitleLineRepository subtitleLineRepository;
     private final WatchedMovieRepository watchedMovieRepository;
     private final SrtParser srtParser;
-    private final OpenSubtitlesClient openSubtitlesClient;
     private final SubdlClient subdlClient;
 
     public SubtitleService(SubtitleLineRepository subtitleLineRepository,
                            WatchedMovieRepository watchedMovieRepository,
                            SrtParser srtParser,
-                           OpenSubtitlesClient openSubtitlesClient,
                            SubdlClient subdlClient) {
         this.subtitleLineRepository = subtitleLineRepository;
         this.watchedMovieRepository = watchedMovieRepository;
         this.srtParser = srtParser;
-        this.openSubtitlesClient = openSubtitlesClient;
         this.subdlClient = subdlClient;
     }
 
@@ -62,14 +59,7 @@ public class SubtitleService {
             // Clear old subtitle data (safe for retry)
             subtitleLineRepository.deleteByImdbId(imdbId);
 
-            // Try OpenSubtitles first, fall back to Subdl
-            String srtContent;
-            try {
-                srtContent = openSubtitlesClient.downloadSrt(imdbId);
-            } catch (RuntimeException e) {
-                log.warn("OpenSubtitles failed for {}, trying Subdl: {}", imdbId, e.getMessage());
-                srtContent = subdlClient.downloadSrt(imdbId);
-            }
+            String srtContent = subdlClient.downloadSrt(imdbId);
             log.info("SRT downloaded: imdbId={}, length={}", imdbId, srtContent.length());
             List<SubtitleLine> lines = srtParser.parse(srtContent, imdbId, movie.getTitle());
             log.info("SRT parsed: imdbId={}, lines={}", imdbId, lines.size());

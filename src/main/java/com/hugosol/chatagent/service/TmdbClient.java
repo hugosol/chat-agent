@@ -31,13 +31,14 @@ public class TmdbClient {
     public TmdbClient(@Value("${app.tmdb.api-key:}") String apiKey,
                       @Value("${app.tmdb.base-url:https://api.themoviedb.org}") String baseUrl,
                       @Value("${app.tmdb.connect-timeout:10s}") Duration connectTimeout,
-                      @Value("${app.tmdb.proxy-host:}") String proxyHost,
-                      @Value("${app.tmdb.proxy-port:0}") int proxyPort) {
+                      @Value("${app.proxy.enabled:false}") boolean proxyEnabled,
+                      @Value("${app.proxy.host:}") String proxyHost,
+                      @Value("${app.proxy.port:0}") int proxyPort) {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
         var builder = HttpClient.newBuilder()
                 .connectTimeout(connectTimeout);
-        if (proxyHost != null && !proxyHost.isBlank() && proxyPort > 0) {
+        if (proxyEnabled && proxyHost != null && !proxyHost.isBlank() && proxyPort > 0) {
             builder.proxy(ProxySelector.of(new InetSocketAddress(proxyHost, proxyPort)));
         }
         this.httpClient = builder.build();
