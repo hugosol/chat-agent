@@ -32,11 +32,17 @@ export function MovieRetryModal({ open, movie, onClose, onRetried }: MovieRetryM
   };
 
   return (
-    <Modal open={open} title="重新下载字幕" onClose={onClose} saveLabel="确认" onSave={handleRetry}>
+    <Modal open={open} title="重新下载字幕" onClose={onClose} saveLabel="确认" saveDisabled={retrying} onSave={handleRetry}>
       <div data-testid="movie-retry-modal">
         <p data-testid="movie-retry-text">
           重新下载 "{movie.title}" 的字幕？将清除现有字幕数据并重新获取。
         </p>
+        {retrying && (
+          <div data-testid="movie-retry-loading" style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="spinner" />
+            <span>下载中...</span>
+          </div>
+        )}
         {error && (
           <div data-testid="movie-retry-error" style={{ color: "rgb(231, 76, 60)", marginTop: 8 }}>
             {error}

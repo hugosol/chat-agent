@@ -368,17 +368,12 @@ public class ReviewService {
     }
 
     /**
-     * Builds an enhancement data map for a card if it has completed enhancements.
-     * Returns null if the card has no enhancement data.
+     * Builds an enhancement data map for a card if any enhancement records exist.
+     * Returns null only if there are zero records in card_enhancements.
      */
     public Map<String, Object> buildEnhancementMap(String cardId) {
         List<CardEnhancement> enhancements = cardEnhancementRepository.findByCardId(cardId);
-        boolean hasSubtitle = enhancements.stream().anyMatch(e ->
-                e.getType() == EnhancementType.SUBTITLE && e.getStatus() == EnhancementStatus.SUCCESS);
-        boolean hasEtymology = enhancements.stream().anyMatch(e ->
-                e.getType() == EnhancementType.ETYMOLOGY && e.getStatus() == EnhancementStatus.SUCCESS);
-
-        if (!hasSubtitle && !hasEtymology) {
+        if (enhancements.isEmpty()) {
             return null;
         }
 

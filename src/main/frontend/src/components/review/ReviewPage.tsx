@@ -120,6 +120,7 @@ export function ReviewPage({ deck, mode, limit, onComplete, onBack }: Props): Re
           back={card.back}
           cardId={card.id}
           flipped={flipped}
+          enhancement={card.enhancement}
           onFlip={handleFlip}
           onCardUpdated={handleCardUpdated}
           onEditingChange={setEditing}

@@ -131,6 +131,11 @@ describe("MoviesPage", () => {
     });
   });
 
+  it("renders Header component", () => {
+    render(<MoviesApp />);
+    expect(screen.getByTestId("nav-menu-btn")).toBeDefined();
+  });
+
   it("shows error message on fetch failure", async () => {
     vi.stubGlobal("fetch", vi.fn(() =>
       Promise.resolve({ ok: false, status: 500 })

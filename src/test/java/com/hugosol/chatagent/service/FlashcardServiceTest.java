@@ -2,6 +2,7 @@ package com.hugosol.chatagent.service;
 
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
+import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.TagRepository;
 
@@ -33,9 +34,12 @@ class FlashcardServiceTest {
     @Mock
     private TagRepository tagRepository;
 
+    @Mock
+    private CardEnhancementRepository cardEnhancementRepository;
+
     @Test
     void createCard_savesCardWithFsrsInitAndDeckTag() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Tag deckTag = new Tag("daily", "user-1");
         deckTag.setId("deck-tag-id");
@@ -69,7 +73,7 @@ class FlashcardServiceTest {
 
     @Test
     void createCard_acceptsBothDeckAndNormalTags() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Tag deckTag = new Tag("daily", "user-1");
         deckTag.setId("deck-id");
@@ -95,7 +99,7 @@ class FlashcardServiceTest {
 
     @Test
     void createCard_missingDeckTag_throws422() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Tag normalTag = new Tag("verb", "user-1");
         normalTag.setId("tag-id");
@@ -113,7 +117,7 @@ class FlashcardServiceTest {
 
     @Test
     void createCard_tagIdNotFound_throws422() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         when(tagRepository.findById("nonexistent"))
                 .thenReturn(Optional.empty());
@@ -128,7 +132,7 @@ class FlashcardServiceTest {
 
     @Test
     void createCard_tagNotOwnedByUser_throws422() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Tag otherUsersTag = new Tag("deck", "other-user");
         otherUsersTag.setId("deck-id");
@@ -147,7 +151,7 @@ class FlashcardServiceTest {
 
     @Test
     void getTags_returnsUserTags() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
         when(tagRepository.findByUserId("user-1"))
                 .thenReturn(List.of(new Tag("daily", "user-1"), new Tag("time", "user-1")));
 
@@ -161,7 +165,7 @@ class FlashcardServiceTest {
     @ParameterizedTest
     @NullAndEmptySource
     void createCard_emptyTags_throws422(List<String> tagIds) {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         assertThatThrownBy(() -> service.createCard("hello", "world", tagIds, "user-1"))
                 .isInstanceOf(ResponseStatusException.class)
@@ -174,7 +178,7 @@ class FlashcardServiceTest {
 
     @Test
     void createCard_sameDeckConflict_throws422() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Tag deckTag = new Tag("daily", "user-1");
         deckTag.setId("deck-id");
@@ -195,7 +199,7 @@ class FlashcardServiceTest {
 
     @Test
     void createCard_crossDeckConflict_allowsCreation() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Tag deckTag = new Tag("daily", "user-1");
         deckTag.setId("deck-id");
@@ -217,7 +221,7 @@ class FlashcardServiceTest {
 
     @Test
     void updateCardBack_updatesBackAndReturnsCard() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
         Card card = new Card("user-1", "hello", "old back");
         card.setId("card-1");
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
@@ -232,7 +236,7 @@ class FlashcardServiceTest {
 
     @Test
     void updateCardBack_emptyBack_throws422() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         assertThatThrownBy(() -> service.updateCardBack("user-1", "card-1", "   "))
                 .isInstanceOf(ResponseStatusException.class)
@@ -244,7 +248,7 @@ class FlashcardServiceTest {
 
     @Test
     void updateCardBack_cardNotFound_throws404() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
         when(cardRepository.findById("nonexistent")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateCardBack("user-1", "nonexistent", "new back"))
@@ -255,7 +259,7 @@ class FlashcardServiceTest {
 
     @Test
     void updateCardBack_wrongUser_throws404() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
         Card card = new Card("other-user", "hello", "old back");
         card.setId("card-1");
         when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
@@ -268,7 +272,7 @@ class FlashcardServiceTest {
 
     @Test
     void updateCard_frontConflict_throws422() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Card card = new Card("user-1", "hello", "world");
         card.setId("card-1");
@@ -292,7 +296,7 @@ class FlashcardServiceTest {
 
     @Test
     void updateCard_crossDeckConflict_allowsUpdate() {
-        var service = new FlashcardService(cardRepository, tagRepository);
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
 
         Card card = new Card("user-1", "hello", "world");
         card.setId("card-1");
@@ -312,5 +316,48 @@ class FlashcardServiceTest {
 
         assertThat(result.getFront()).isEqualTo("newword");
         verify(cardRepository).save(any(Card.class));
+    }
+
+    @Test
+    void deleteCard_alsoDeletesEnhancements() {
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
+        Card card = new Card("user-1", "hello", "world");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        service.deleteCard("user-1", "card-1");
+
+        verify(cardEnhancementRepository).deleteByCardId("card-1");
+        verify(cardRepository).delete(card);
+    }
+
+    @Test
+    void deleteCard_cardNotFound_throws404() {
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
+        when(cardRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteCard("user-1", "nonexistent"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(cardEnhancementRepository, never()).deleteByCardId(any());
+        verify(cardRepository, never()).delete(any(Card.class));
+    }
+
+    @Test
+    void deleteCard_wrongUser_throws404() {
+        var service = new FlashcardService(cardRepository, tagRepository, cardEnhancementRepository);
+        Card card = new Card("other-user", "hello", "world");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        assertThatThrownBy(() -> service.deleteCard("user-1", "card-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        verify(cardEnhancementRepository, never()).deleteByCardId(any());
+        verify(cardRepository, never()).delete(any(Card.class));
     }
 }

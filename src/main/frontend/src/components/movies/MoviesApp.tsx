@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Header } from "../Header/Header";
 import { MovieToolbar } from "./MovieToolbar";
 import { MovieList } from "./MovieList";
 import { MovieSearchModal } from "./MovieSearchModal";
@@ -87,6 +88,7 @@ export function MoviesApp(): JSX.Element {
 
   return (
     <div className={styles.app} data-testid="movies-page">
+      <Header />
       <MovieToolbar
         search={search}
         sort={sort}

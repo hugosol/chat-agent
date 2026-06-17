@@ -4,6 +4,9 @@ import com.hugosol.chatagent.dto.ForgetDeckResult;
 import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
+import com.hugosol.chatagent.model.CardEnhancement;
+import com.hugosol.chatagent.model.EnhancementStatus;
+import com.hugosol.chatagent.model.EnhancementType;
 import com.hugosol.chatagent.model.ReviewLog;
 import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.model.UserPreferences;
@@ -23,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -790,5 +794,101 @@ class ReviewServiceTest {
         reviewService.rescheduleAllCards("user-1");
 
         verify(cardRepository, never()).saveAll(anyList());
+    }
+
+    // --- buildEnhancementMap tests ---
+
+    @Test
+    void buildEnhancementMap_returnsNullWhenNoRecords() {
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void buildEnhancementMap_returnsPartialWhenOnlySubtitle() {
+        CardEnhancement sub = new CardEnhancement();
+        sub.setCardId("card-1");
+        sub.setType(EnhancementType.SUBTITLE);
+        sub.setStatus(EnhancementStatus.SUCCESS);
+        sub.setData("{\"movieTitle\":\"Inception\",\"imdbId\":\"tt1375666\",\"quote\":\"You mustn't be afraid to dream a little bigger, darling.\",\"timestamp\":\"01:23:45\",\"sceneSummary\":\"Eames shows off his dream-forging skills.\"}");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(sub));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNotNull();
+        assertThat(result).containsKey("movieQuote");
+        assertThat(result).doesNotContainKey("etymology");
+        var quote = (Map<String, Object>) result.get("movieQuote");
+        assertThat(quote.get("movieTitle")).isEqualTo("Inception");
+    }
+
+    @Test
+    void buildEnhancementMap_returnsPartialWhenOnlyEtymology() {
+        CardEnhancement ety = new CardEnhancement();
+        ety.setCardId("card-1");
+        ety.setType(EnhancementType.ETYMOLOGY);
+        ety.setStatus(EnhancementStatus.SUCCESS);
+        ety.setData("From Latin 'exemplum', meaning a sample or pattern.");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(ety));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNotNull();
+        assertThat(result).containsKey("etymology");
+        assertThat(result).doesNotContainKey("movieQuote");
+        assertThat(result.get("etymology")).isEqualTo("From Latin 'exemplum', meaning a sample or pattern.");
+    }
+
+    @Test
+    void buildEnhancementMap_handlesFailedStatus() {
+        CardEnhancement sub = new CardEnhancement();
+        sub.setCardId("card-1");
+        sub.setType(EnhancementType.SUBTITLE);
+        sub.setStatus(EnhancementStatus.FAILED);
+        sub.setError("No subtitles found");
+
+        CardEnhancement ety = new CardEnhancement();
+        ety.setCardId("card-1");
+        ety.setType(EnhancementType.ETYMOLOGY);
+        ety.setStatus(EnhancementStatus.SUCCESS);
+        ety.setData("From Old English.");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(sub, ety));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNotNull();
+        // FAILED subtitle should not be included as movieQuote
+        assertThat(result).doesNotContainKey("movieQuote");
+        // But SUCCESS etymology should be present
+        assertThat(result).containsKey("etymology");
+    }
+
+    @Test
+    void buildEnhancementMap_returnsMapWhenAllFailed() {
+        CardEnhancement sub = new CardEnhancement();
+        sub.setCardId("card-1");
+        sub.setType(EnhancementType.SUBTITLE);
+        sub.setStatus(EnhancementStatus.FAILED);
+        sub.setError("No subtitles found");
+
+        CardEnhancement ety = new CardEnhancement();
+        ety.setCardId("card-1");
+        ety.setType(EnhancementType.ETYMOLOGY);
+        ety.setStatus(EnhancementStatus.FAILED);
+        ety.setError("Etymology not available");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(sub, ety));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        // Records exist, so map is returned (not null)
+        // but map may be empty since all failed — cardToMap will filter it out
+        assertThat(result).isNotNull();
     }
 }

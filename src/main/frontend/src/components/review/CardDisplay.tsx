@@ -21,9 +21,25 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
   const [enhancing, setEnhancing] = useState(false);
   const [enhanceError, setEnhanceError] = useState("");
   const [localEnhancement, setLocalEnhancement] = useState<EnhancementData | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const activeEnhancement = enhancement || localEnhancement;
-  const hasEnhancement = !!(activeEnhancement?.movieQuote || activeEnhancement?.etymology);
+
+  const handleMagnifierClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowConfirm(true);
+  };
+
+  const handleConfirmEnhance = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowConfirm(false);
+    handleEnhance(e);
+  };
+
+  const handleCancelEnhance = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowConfirm(false);
+  };
 
   const handleFlip = () => {
     onFlip?.();
@@ -127,7 +143,7 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
             )}
           </div>
           {flipped && !editing && (
-            <div className={`${styles.cardBack} ${hasEnhancement || enhancing ? styles.scrollableBack : ""}`} data-testid="card-back">
+            <div className={`${styles.cardBack} ${activeEnhancement != null || enhancing ? styles.scrollableBack : ""}`} data-testid="card-back">
               <button
                 data-testid="edit-btn"
                 className={styles.ttsBtn}
@@ -148,42 +164,69 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
                 </button>
               )}
 
-              {activeEnhancement?.movieQuote && (
+              {activeEnhancement != null && (
                 <>
                   <hr className={styles.divider} />
                   <div className={styles.enhanceSection} data-testid="movie-quote-zone">
-                    <div className={styles.movieQuoteTitle}>
-                      {activeEnhancement.movieQuote.movieTitle} [{activeEnhancement.movieQuote.timestamp}]
-                    </div>
-                    <div className={styles.movieQuoteText}>
-                      "{activeEnhancement.movieQuote.quote}"
-                    </div>
-                    {activeEnhancement.sceneSummary && (
-                      <div className={styles.sceneSummary} data-testid="scene-summary">
-                        {activeEnhancement.sceneSummary}
-                      </div>
+                    {activeEnhancement?.movieQuote ? (
+                      <>
+                        <div className={styles.movieQuoteTitle}>
+                          {activeEnhancement.movieQuote.movieTitle} [{activeEnhancement.movieQuote.timestamp}]
+                        </div>
+                        <div className={styles.movieQuoteText}>
+                          "{activeEnhancement.movieQuote.quote}"
+                        </div>
+                        {activeEnhancement.sceneSummary && (
+                          <div className={styles.sceneSummary} data-testid="scene-summary">
+                            {activeEnhancement.sceneSummary}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <span data-testid="movie-quote-placeholder">【暂无电影台词数据】</span>
+                    )}
+                  </div>
+                  <hr className={styles.divider} />
+                  <div className={styles.enhanceSection} data-testid="etymology-zone">
+                    {activeEnhancement?.etymology ? (
+                      activeEnhancement.etymology
+                    ) : (
+                      <span data-testid="etymology-placeholder">【暂无词源数据】</span>
                     )}
                   </div>
                 </>
               )}
 
-              {activeEnhancement?.etymology && (
-                <>
-                  <hr className={styles.divider} />
-                  <div className={styles.enhanceSection} data-testid="etymology-zone">
-                    {activeEnhancement.etymology}
-                  </div>
-                </>
-              )}
-
-              {!hasEnhancement && !enhancing && (
+              {activeEnhancement == null && !enhancing && (
                 <button
                   data-testid="card-enhance-btn"
                   className={styles.enhanceBtn}
-                  onClick={handleEnhance}
+                  onClick={handleMagnifierClick}
                 >
-                  Card Enhance
+                  {"\uD83D\uDD0D"}
                 </button>
+              )}
+
+              {showConfirm && (
+                <div className={styles.loadingOverlay} data-testid="enhance-confirm-dialog">
+                  <div className={styles.enhanceError}>
+                    <p>是否获取更多信息？</p>
+                    <button
+                      data-testid="enhance-confirm-ok"
+                      className={styles.enhanceBtn}
+                      onClick={handleConfirmEnhance}
+                    >
+                      确认
+                    </button>
+                    <button
+                      data-testid="enhance-confirm-cancel"
+                      className={styles.enhanceBtn}
+                      onClick={handleCancelEnhance}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
               )}
 
               {enhancing && (

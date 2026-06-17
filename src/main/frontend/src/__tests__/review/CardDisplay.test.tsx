@@ -77,13 +77,14 @@ describe("CardDisplay", () => {
 
   // Enhancement tests
 
-  it("shows Card Enhance button when flipped and no enhancement", () => {
+  it("shows magnifier icon when flipped and no enhancement", () => {
     render(<CardDisplay front="hello" back="你好" flipped={true} onFlip={vi.fn()} />);
 
     expect(screen.getByTestId("card-enhance-btn")).toBeTruthy();
+    expect(screen.getByTestId("card-enhance-btn").textContent).toBe("\uD83D\uDD0D");
   });
 
-  it("does not show Card Enhance button when enhancement data is present", () => {
+  it("does not show magnifier when enhancement exists", () => {
     const enhancement = {
       movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
       sceneSummary: "梦境场景。",
@@ -92,6 +93,28 @@ describe("CardDisplay", () => {
     render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
 
     expect(screen.queryByTestId("card-enhance-btn")).toBeNull();
+  });
+
+  it("shows confirm dialog when magnifier is clicked", () => {
+    render(<CardDisplay front="hello" back="你好" flipped={true} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("card-enhance-btn"));
+
+    expect(screen.getByTestId("enhance-confirm-dialog")).toBeTruthy();
+    expect(screen.getByText("是否获取更多信息？")).toBeTruthy();
+  });
+
+  it("does not call API when confirm dialog is cancelled", () => {
+    const mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<CardDisplay front="hello" back="你好" flipped={true} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("card-enhance-btn"));
+    fireEvent.click(screen.getByTestId("enhance-confirm-cancel"));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.getByTestId("card-enhance-btn")).toBeTruthy();
   });
 
   it("shows movie quote zone when enhancement has movieQuote", () => {
@@ -117,26 +140,45 @@ describe("CardDisplay", () => {
     expect(screen.getByText("From Old English drēam.")).toBeTruthy();
   });
 
-  it("does not show movie quote zone when movieQuote is null", () => {
+  it("shows movie quote placeholder when enhancement exists but movieQuote is null", () => {
     const enhancement = {
       etymology: "From Old English.",
     };
     render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
 
-    expect(screen.queryByTestId("movie-quote-zone")).toBeNull();
+    expect(screen.getByTestId("movie-quote-zone")).toBeTruthy();
+    expect(screen.getByTestId("movie-quote-placeholder")).toBeTruthy();
+    expect(screen.getByText("【暂无电影台词数据】")).toBeTruthy();
   });
 
-  it("card back is scrollable when enhancement present", () => {
+  it("shows etymology placeholder when enhancement exists but etymology is null", () => {
     const enhancement = {
       movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
     };
     render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
 
+    expect(screen.getByTestId("etymology-zone")).toBeTruthy();
+    expect(screen.getByTestId("etymology-placeholder")).toBeTruthy();
+    expect(screen.getByText("【暂无词源数据】")).toBeTruthy();
+  });
+
+  it("does not show enhance button when enhancement is non-null but empty", () => {
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={{}} onFlip={vi.fn()} />);
+
+    expect(screen.queryByTestId("card-enhance-btn")).toBeNull();
+    expect(screen.getByTestId("movie-quote-placeholder")).toBeTruthy();
+    expect(screen.getByTestId("etymology-placeholder")).toBeTruthy();
+  });
+
+  it("card back is scrollable when enhancement exists (even without quote data)", () => {
+    // enhancement != null means records exist, back should be scrollable for enhanced layout
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={{}} onFlip={vi.fn()} />);
+
     const backEl = screen.getByTestId("card-back");
     expect(backEl.classList.contains("scrollableBack")).toBe(true);
   });
 
-  it("calls enhance API when button clicked", async () => {
+  it("calls enhance API when confirm dialog is confirmed", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
@@ -150,6 +192,7 @@ describe("CardDisplay", () => {
     render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} onFlip={vi.fn()} />);
 
     fireEvent.click(screen.getByTestId("card-enhance-btn"));
+    fireEvent.click(screen.getByTestId("enhance-confirm-ok"));
 
     expect(mockFetch).toHaveBeenCalledWith("/api/cards/card-1/enhance", expect.objectContaining({
       method: "POST",
@@ -167,7 +210,20 @@ describe("CardDisplay", () => {
     render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} onFlip={vi.fn()} />);
 
     fireEvent.click(screen.getByTestId("card-enhance-btn"));
+    fireEvent.click(screen.getByTestId("enhance-confirm-ok"));
 
     expect(screen.getByTestId("enhance-loading")).toBeTruthy();
+  });
+
+  it("hides magnifier during enhancement loading", () => {
+    const mockFetch = vi.fn().mockImplementation(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("card-enhance-btn"));
+    fireEvent.click(screen.getByTestId("enhance-confirm-ok"));
+
+    expect(screen.queryByTestId("card-enhance-btn")).toBeNull();
   });
 });
