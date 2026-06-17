@@ -25,10 +25,10 @@ AI 口语练习工具，兼具聊天练习和闪卡复习两大功能。通过 A
 git clone <repo-url>
 cd chat-agent
 
-# 1. 复制配置模板
-cp src/main/resources/application-local-template.yml src/main/resources/application-local.yml
+# 1. 复制配置模板到项目根目录
+cp src/main/resources/application-local-template.yml ./application-local.yml
 
-# 2. 编辑 application-local.yml，将 sk-**** / **** / subdl_**** 替换为你的真实 Key
+# 2. 编辑 ./application-local.yml，将 sk-**** / **** / subdl_**** 替换为你的真实 Key
 
 # 3. 启动（local profile）
 mvn spring-boot:run -Dspring-boot.run.profiles=local
@@ -43,7 +43,7 @@ mvn spring-boot:run
 
 浏览器打开 http://localhost:8080，默认账号 `admin` / `admin123`。
 
-`application-local.yml` 已被 `.gitignore` 忽略，不会提交到 Git。
+`application-local.yml` 放在项目根目录而非 `src/main/resources/`，有两个好处：Maven 打包时不会打进 JAR（避免 API Key 泄露到制品中），且 Spring Boot 会优先加载外部配置覆盖 classpath 内的 `application.yml`。文件已被 `.gitignore` 忽略，不会提交到 Git。
 
 ### Docker 部署
 
