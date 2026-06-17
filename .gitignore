@@ -24,5 +24,8 @@ src/main/resources/static/shared/*-bundle.*
 # Environment
 .env
 *.env
+
+# Local config (contains real API keys)
+application-local.yml
 /.run/
 /logs/

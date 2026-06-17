@@ -54,16 +54,20 @@ app:
       - /shared/*.css
       - /shared/react.production.min.js
       - /shared/react-dom.production.min.js
+  proxy:
+    enabled: false
+    host:
+    port: 0
   wiktionary:
     base-url: https://en.wiktionary.org
     connect-timeout: 5s
     max-retries: 2
-    proxy-host:
-    proxy-port: 0
-  wyzie:
-    base-url: https://sub.wyzie.io
   tmdb:
     base-url: https://api.themoviedb.org
+    connect-timeout: 10s
+    api-key: ${TMDB_API_KEY:****}
+  subdl:
+    api-key: ${SUBDL_API_KEY:subdl_****}
   llm:
     max-output-tokens:
       default: 2048
