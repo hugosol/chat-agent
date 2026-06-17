@@ -93,7 +93,12 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
       });
       if (resp.ok) {
         const data = await resp.json() as EnhancementData;
-        setLocalEnhancement(data);
+        // Only treat as enhancement if any data field is actually non-null
+        if (data.movieQuote != null || data.sceneSummary != null || data.etymology != null) {
+          setLocalEnhancement(data);
+        } else {
+          setEnhanceError("No enhancement data available");
+        }
       } else {
         setEnhanceError("Enhancement failed");
       }
@@ -232,12 +237,12 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
               {enhancing && (
                 <div className={styles.loadingOverlay} data-testid="enhance-loading">
                   <div className={styles.spinner} />
-                  {enhanceError && (
-                    <div className={styles.enhanceError} data-testid="enhance-error">
-                      {enhanceError}
-                      <button className={styles.enhanceBtn} onClick={handleEnhance}>Retry</button>
-                    </div>
-                  )}
+                </div>
+              )}
+              {!enhancing && enhanceError && (
+                <div className={styles.enhanceError} data-testid="enhance-error">
+                  {enhanceError}
+                  <button className={styles.enhanceBtn} onClick={handleEnhance}>Retry</button>
                 </div>
               )}
             </div>

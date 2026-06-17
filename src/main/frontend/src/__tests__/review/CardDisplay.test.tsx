@@ -226,4 +226,40 @@ describe("CardDisplay", () => {
 
     expect(screen.queryByTestId("card-enhance-btn")).toBeNull();
   });
+
+  it("shows magnifier again when enhance API returns empty data (both null)", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ sceneSummary: null, etymology: null }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("card-enhance-btn"));
+    fireEvent.click(screen.getByTestId("enhance-confirm-ok"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("card-enhance-btn")).toBeTruthy();
+    });
+  });
+
+  it("shows error persistently when enhance API fails", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("card-enhance-btn"));
+    fireEvent.click(screen.getByTestId("enhance-confirm-ok"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("enhance-error")).toBeTruthy();
+    });
+    // Magnifier should still be visible for retry
+    expect(screen.getByTestId("card-enhance-btn")).toBeTruthy();
+  });
 });
