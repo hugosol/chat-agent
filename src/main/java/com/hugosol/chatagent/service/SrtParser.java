@@ -65,11 +65,11 @@ public class SrtParser {
             // Strip HTML tags
             text = HTML_TAG_PATTERN.matcher(text).replaceAll("").trim();
 
-            // Generate wordsLower: lowercase, strip punctuation
-            String wordsLower = text.toLowerCase()
+            // Generate wordsLower: lowercase, strip punctuation, surround with spaces for boundary match
+            String wordsLower = " " + text.toLowerCase()
                     .replaceAll("[^a-z0-9\\s']", "")
                     .replaceAll("\\s+", " ")
-                    .trim();
+                    .trim() + " ";
 
             lineIdx++;
             results.add(new SubtitleLine(imdbId, movieTitle, startTime, endTime, text, wordsLower, lineIdx));

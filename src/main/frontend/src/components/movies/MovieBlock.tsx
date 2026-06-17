@@ -35,7 +35,9 @@ function statusClassName(status: string): string {
 
 export function MovieBlock({ movie, onDelete, onRetry }: MovieBlockProps): JSX.Element {
   const canDownload = movie.subtitleStatus === "PENDING" || movie.subtitleStatus === "FAILED";
-  const downloadLabel = movie.subtitleStatus === "FAILED" ? "重试" : "下载字幕";
+  const isRetry = movie.subtitleStatus === "FAILED";
+  const downloadIcon = isRetry ? "\uD83D\uDD04" : "\u2B07\uFE0F";
+  const downloadTitle = isRetry ? "重试" : "下载字幕";
 
   return (
     <div className={styles.block} data-testid="movie-block">
@@ -60,22 +62,26 @@ export function MovieBlock({ movie, onDelete, onRetry }: MovieBlockProps): JSX.E
       <div className={styles.actions}>
         {canDownload && (
           <button
-            className={`btn ${styles.actionBtn}`}
+            className={styles.iconBtn}
             data-testid="movie-download-btn"
+            title={downloadTitle}
+            aria-label={downloadTitle}
             onClick={() => {
               console.log("[MovieBlock] download clicked:", movie.imdbId, movie.title, movie.subtitleStatus);
               onRetry(movie);
             }}
           >
-            {downloadLabel}
+            {downloadIcon}
           </button>
         )}
         <button
-          className={`btn ${styles.actionBtn}`}
+          className={styles.iconBtn}
           data-testid="movie-delete-btn"
+          title="删除"
+          aria-label="删除"
           onClick={() => onDelete(movie)}
         >
-          删除
+          {"\uD83D\uDDD1\uFE0F"}
         </button>
       </div>
     </div>

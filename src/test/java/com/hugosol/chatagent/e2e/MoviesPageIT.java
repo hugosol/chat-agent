@@ -90,8 +90,9 @@ class MoviesPageIT extends E2ETestBase {
         // Default sort: title asc → Inception first, Matrix second
         assertThat(page.locator("[data-testid='movie-title']").first()).hasText("Inception");
 
-        // Change sort to release year descending
-        page.locator("[data-testid='movies-sort-select']").selectOption("releaseYear,desc");
+        // Change sort to release year descending via DropdownMenu
+        page.locator("[data-testid='movies-sort-btn']").click();
+        page.locator("[data-testid='movies-sort-option']").filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("年份 ↓")).click();
         page.waitForTimeout(300);
 
         // Now Matrix (1999) should be second, Inception (2010) first

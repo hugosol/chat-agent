@@ -102,8 +102,13 @@ describe("MoviesPage", () => {
       expect(screen.getAllByTestId("movie-title")).toHaveLength(3);
     });
 
-    const sortSelect = screen.getByTestId("movies-sort-select");
-    fireEvent.change(sortSelect, { target: { value: "releaseYear,desc" } });
+    // Open sort dropdown
+    fireEvent.click(screen.getByTestId("movies-sort-btn"));
+    // Click an option
+    const options = screen.getAllByTestId("movies-sort-option");
+    const yearDesc = options.find((o) => o.textContent === "年份 ↓");
+    expect(yearDesc).toBeDefined();
+    fireEvent.click(yearDesc!);
 
     await waitFor(() => {
       const calls = fetchMock.mock.calls.filter(

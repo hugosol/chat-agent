@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -56,8 +57,8 @@ class CardEnhanceServiceTest {
 
         SubtitleLine match = new SubtitleLine("tt001", "Inception", "00:05:00,000",
                 "00:05:03,000", "You mustn't be afraid to dream a little bigger.",
-                "you mustnt be afraid to dream a little bigger", 42);
-        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("%dream%")))
+                " you mustnt be afraid to dream a little bigger ", 42);
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
                 .thenReturn(List.of(match));
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt001"), eq(40), eq(44)))
                 .thenReturn(List.of(match));
@@ -144,5 +145,82 @@ class CardEnhanceServiceTest {
 
         assertThat(result.movieQuote()).isNull();
         verify(subtitleLineRepository, never()).findByImdbIdInAndWordsLowerLike(any(), any());
+    }
+
+    @Test
+    void multiMovie_picksFromMultipleMovies() {
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt001", "Inception", 2010, SubtitleStatus.DONE),
+                new WatchedMovie("user-1", "tt002", "The Matrix", 1999, SubtitleStatus.DONE),
+                new WatchedMovie("user-1", "tt003", "Shutter Island", 2010, SubtitleStatus.DONE)));
+
+        SubtitleLine m1 = new SubtitleLine("tt001", "Inception", "00:05:00,000",
+                "00:05:03,000", "You mustn't be afraid to dream.",
+                " you mustnt be afraid to dream ", 42);
+        SubtitleLine m2 = new SubtitleLine("tt002", "The Matrix", "00:10:00,000",
+                "00:10:03,000", "I dream of electric sheep.",
+                " i dream of electric sheep ", 10);
+        SubtitleLine m3 = new SubtitleLine("tt003", "Shutter Island", "00:15:00,000",
+                "00:15:03,000", "Was it all a dream?",
+                " was it all a dream ", 5);
+
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+                .thenReturn(List.of(m1, m2, m3));
+        when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(m1));
+
+        when(chatLanguageModel.chat(anyString())).thenReturn("Scene summary.");
+        when(wiktionaryClient.fetchEtymology("dream")).thenReturn(null);
+        when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
+
+        Set<String> possibleTitles = Set.of("Inception", "The Matrix", "Shutter Island");
+
+        boolean foundMultiple = false;
+        String lastTitle = null;
+        for (int i = 0; i < 20; i++) {
+            CardEnhanceService.EnhanceResult result = service.enhance("card-1", "user-1");
+            assertThat(result.movieQuote()).isNotNull();
+            assertThat(result.movieQuote().movieTitle()).isIn(possibleTitles);
+            if (lastTitle != null && !lastTitle.equals(result.movieQuote().movieTitle())) {
+                foundMultiple = true;
+            }
+            lastTitle = result.movieQuote().movieTitle();
+        }
+        assertThat(foundMultiple).as("Should pick from different imdbIds over multiple runs").isTrue();
+    }
+
+    @Test
+    void singleMovie_picksThatMovie() {
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt001", "Inception", 2010, SubtitleStatus.DONE)));
+
+        SubtitleLine match = new SubtitleLine("tt001", "Inception", "00:05:00,000",
+                "00:05:03,000", "You mustn't be afraid to dream.",
+                " you mustnt be afraid to dream ", 42);
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+                .thenReturn(List.of(match));
+        when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(match));
+
+        when(chatLanguageModel.chat(anyString())).thenReturn("Scene summary.");
+        when(wiktionaryClient.fetchEtymology("dream")).thenReturn(null);
+        when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
+
+        CardEnhanceService.EnhanceResult result = service.enhance("card-1", "user-1");
+
+        assertThat(result.movieQuote()).isNotNull();
+        assertThat(result.movieQuote().movieTitle()).isEqualTo("Inception");
     }
 }

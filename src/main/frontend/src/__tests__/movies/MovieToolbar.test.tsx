@@ -54,7 +54,7 @@ describe("MovieToolbar", () => {
     }, { timeout: 500 });
   });
 
-  it("renders sort dropdown with all options", () => {
+  it("renders sort dropdown with current selection as label", () => {
     render(
       <MovieToolbar
         search=""
@@ -65,15 +65,12 @@ describe("MovieToolbar", () => {
         onImportMovies={vi.fn()}
       />
     );
-    const select = screen.getByTestId("movies-sort-select") as HTMLSelectElement;
-    expect(select.value).toBe("title,asc");
-    const options = Array.from(select.options).map((o) => o.text);
-    expect(options).toContain("名称 A→Z");
-    expect(options).toContain("年份 ↓");
-    expect(options).toContain("添加时间 ↑");
+    // Sort trigger button shows the current selection label
+    const trigger = screen.getByTestId("movies-sort-btn");
+    expect(trigger.textContent).toBe("名称 A→Z");
   });
 
-  it("calls onSortChange when sort is changed", () => {
+  it("calls onSortChange when sort option is clicked", () => {
     const onSortChange = vi.fn();
     render(
       <MovieToolbar
@@ -85,8 +82,13 @@ describe("MovieToolbar", () => {
         onImportMovies={vi.fn()}
       />
     );
-    const select = screen.getByTestId("movies-sort-select");
-    fireEvent.change(select, { target: { value: "releaseYear,desc" } });
+    // Open the dropdown
+    fireEvent.click(screen.getByTestId("movies-sort-btn"));
+    // Click an option
+    const options = screen.getAllByTestId("movies-sort-option");
+    const yearDesc = options.find((o) => o.textContent === "年份 ↓");
+    expect(yearDesc).toBeDefined();
+    fireEvent.click(yearDesc!);
     expect(onSortChange).toHaveBeenCalledWith("releaseYear,desc");
   });
 

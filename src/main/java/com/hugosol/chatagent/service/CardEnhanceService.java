@@ -15,8 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class CardEnhanceService {
@@ -140,9 +143,8 @@ public class CardEnhanceService {
         }
 
         List<String> imdbIds = movies.stream().map(WatchedMovie::getImdbId).toList();
-        // Use substring match on wordsLower (space-delimited) — handles word at
-        // start/end of line and adjacent punctuation like "valhalla."
-        String pattern = "%" + word + "%";
+        // Use space-surrounded match on wordsLower (guarantees word boundaries)
+        String pattern = "% " + word + " %";
         List<SubtitleLine> matches = subtitleLineRepository.findByImdbIdInAndWordsLowerLike(imdbIds, pattern);
 
         if (matches.isEmpty()) {
@@ -150,7 +152,16 @@ public class CardEnhanceService {
             return null;
         }
 
-        SubtitleLine match = matches.get(0);
+        // Group by imdbId, pick the first (lowest lineIndex) from each movie, then randomly select one
+        List<SubtitleLine> candidates = new ArrayList<>(matches.stream()
+                .collect(Collectors.groupingBy(SubtitleLine::getImdbId,
+                        Collectors.minBy(java.util.Comparator.comparingInt(SubtitleLine::getLineIndex))))
+                .values().stream()
+                .filter(java.util.Optional::isPresent)
+                .map(java.util.Optional::get)
+                .toList());
+        Collections.shuffle(candidates);
+        SubtitleLine match = candidates.get(0);
         String movieTitle = match.getMovieTitle();
         String imdbId = match.getImdbId();
 
@@ -186,7 +197,7 @@ public class CardEnhanceService {
     private String generateSceneSummary(String movieTitle, List<SubtitleLine> context, String targetWord) {
         StringBuilder contextText = new StringBuilder();
         for (SubtitleLine line : context) {
-            String marker = line.getWordsLower().contains(targetWord) ? "  ← 目标词" : "";
+            String marker = line.getWordsLower().contains(" " + targetWord + " ") ? "  ← 目标词" : "";
             contextText.append("- ").append(line.getText()).append(marker).append("\n");
         }
 

@@ -32,7 +32,7 @@ class SrtParserTest {
         assertThat(lines.get(0).getStartTime()).isEqualTo("00:01:00,000");
         assertThat(lines.get(0).getEndTime()).isEqualTo("00:01:02,500");
         assertThat(lines.get(0).getText()).isEqualTo("Hello world.");
-        assertThat(lines.get(0).getWordsLower()).isEqualTo("hello world");
+        assertThat(lines.get(0).getWordsLower()).isEqualTo(" hello world ");
         assertThat(lines.get(0).getImdbId()).isEqualTo("tt001");
         assertThat(lines.get(0).getMovieTitle()).isEqualTo("Test Movie");
 
@@ -52,7 +52,7 @@ class SrtParserTest {
         List<SubtitleLine> lines = parser.parse(srt, "tt001", "Test Movie");
 
         assertThat(lines.get(0).getText()).isEqualTo("This is very important.");
-        assertThat(lines.get(0).getWordsLower()).isEqualTo("this is very important");
+        assertThat(lines.get(0).getWordsLower()).isEqualTo(" this is very important ");
     }
 
     @Test
@@ -97,7 +97,7 @@ class SrtParserTest {
 
         // Punctuation stripped, lowercase
         assertThat(lines.get(0).getWordsLower())
-                .isEqualTo("you mustn't be afraid to dream a little bigger darling");
+                .isEqualTo(" you mustn't be afraid to dream a little bigger darling ");
     }
 
     @Test
