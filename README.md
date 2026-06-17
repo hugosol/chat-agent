@@ -52,7 +52,7 @@ mvn spring-boot:run
 ```bash
 git clone <repo-url>
 cd chat-agent
-# 编辑 docker/docker-compose.yml，替换 DEEPSEEK_API_KEY、INITIAL_USER_PASSWORD 及宿主机路径（data + logs）
+# 编辑 docker/docker-compose.yml，替换 DEEPSEEK_API_KEY、TMDB_API_KEY、SUBDL_API_KEY、INITIAL_USER_PASSWORD 及宿主机路径（data + logs）
 docker compose -f docker/docker-compose.yml up -d
 ```
 
