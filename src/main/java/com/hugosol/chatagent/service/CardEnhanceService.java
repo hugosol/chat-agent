@@ -102,6 +102,30 @@ public class CardEnhanceService {
                     .findFirst().orElse(null);
         }
 
+        // For cached subtitle (when etymology-only retry), extract from existing
+        if (hasSubtitle && freshMovieQuote == null) {
+            try {
+                var sub = existing.stream()
+                        .filter(e -> e.getType() == EnhancementType.SUBTITLE && e.getStatus() == EnhancementStatus.SUCCESS)
+                        .findFirst();
+                if (sub.isPresent()) {
+                    var node = objectMapper.readTree(sub.get().getData());
+                    if (node.has("quote")) {
+                        freshMovieQuote = new MovieQuote(
+                                node.get("movieTitle").asText(),
+                                node.get("imdbId").asText(),
+                                node.get("quote").asText(),
+                                node.get("timestamp").asText());
+                    }
+                    if (node.has("sceneSummary")) {
+                        freshSceneSummary = node.get("sceneSummary").asText();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to extract cached subtitle for card {}: {}", cardId, e.getMessage());
+            }
+        }
+
         return new EnhanceResult(freshMovieQuote, freshSceneSummary, etymology);
     }
 
@@ -116,7 +140,9 @@ public class CardEnhanceService {
         }
 
         List<String> imdbIds = movies.stream().map(WatchedMovie::getImdbId).toList();
-        String pattern = "% " + word + " %";
+        // Use substring match on wordsLower (space-delimited) — handles word at
+        // start/end of line and adjacent punctuation like "valhalla."
+        String pattern = "%" + word + "%";
         List<SubtitleLine> matches = subtitleLineRepository.findByImdbIdInAndWordsLowerLike(imdbIds, pattern);
 
         if (matches.isEmpty()) {
@@ -165,14 +191,23 @@ public class CardEnhanceService {
         }
 
         String prompt = """
-                以下是一段来自电影《%s》的台词及其前后文。请用一两句中文字描述这句话发生的情境：
-                
+                你是电影台词分析助手。以下是电影《%s》中一段包含单词"%s"的台词及前后文。请用一两句中文描述这段台词发生的情境（谁在什么情况下对谁说了什么）。
+
                 台词上下文：
-                %s
-                场景摘要：""".formatted(movieTitle, contextText.toString());
+%s
+
+                请直接给出场景摘要，不要解释，不要引述原文：""".formatted(movieTitle, targetWord, contextText.toString());
 
         try {
-            return chatLanguageModel.chat(prompt).trim();
+            String result = chatLanguageModel.chat(prompt).trim();
+            log.info("generateSceneSummary for '{}': LLM returned {} chars: {}",
+                    targetWord, result.length(),
+                    result.length() > 100 ? result.substring(0, 100) + "..." : result);
+            if (result.isEmpty()) {
+                log.warn("generateSceneSummary for '{}': LLM returned empty string", targetWord);
+                return "(场景摘要生成失败：模型返回空)";
+            }
+            return result;
         } catch (Exception e) {
             log.warn("Scene summary generation failed: {}", e.getMessage());
             return "(场景摘要生成失败)";

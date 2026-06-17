@@ -57,7 +57,7 @@ class CardEnhanceServiceTest {
         SubtitleLine match = new SubtitleLine("tt001", "Inception", "00:05:00,000",
                 "00:05:03,000", "You mustn't be afraid to dream a little bigger.",
                 "you mustnt be afraid to dream a little bigger", 42);
-        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("%dream%")))
                 .thenReturn(List.of(match));
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt001"), eq(40), eq(44)))
                 .thenReturn(List.of(match));
