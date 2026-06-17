@@ -7,13 +7,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * Client for Subdl.com subtitle API.
@@ -50,34 +55,29 @@ public class SubdlClient {
 
         log.info("Subdl: downloadSrt start for {}", imdbId);
 
-        // Step 1: search by IMDB ID
-        List<int[]> candidates = searchSubtitles(imdbId);
-        if (candidates.isEmpty()) {
+        List<String> urls = searchSubtitles(imdbId);
+        if (urls.isEmpty()) {
             throw new RuntimeException("No subtitles found on Subdl for " + imdbId);
         }
 
-        // Step 2-3: try candidates until one downloads
         RuntimeException lastError = null;
-        for (int i = 0; i < candidates.size(); i++) {
-            int nId = candidates.get(i)[0];
-            int fileNId = candidates.get(i)[1];
+        for (int i = 0; i < urls.size(); i++) {
             try {
-                String srt = fetchSrt(nId, fileNId);
-                log.info("Subdl: downloadSrt done for {} via n_id={} file_n_id={} (candidate {}/{}), {} chars",
-                        imdbId, nId, fileNId, i + 1, candidates.size(), srt.length());
+                String srt = fetchSrt(urls.get(i));
+                log.info("Subdl: downloadSrt done for {} (candidate {}/{}), {} chars",
+                        imdbId, i + 1, urls.size(), srt.length());
                 return srt;
             } catch (RuntimeException e) {
-                log.warn("Subdl: candidate {}/{} (n_id={}, file_n_id={}) failed: {}",
-                        i + 1, candidates.size(), nId, fileNId, e.getMessage());
+                log.warn("Subdl: candidate {}/{} failed: {}", i + 1, urls.size(), e.getMessage());
                 lastError = e;
             }
         }
 
-        throw new RuntimeException("All " + candidates.size() + " Subdl candidates failed for " + imdbId
+        throw new RuntimeException("All " + urls.size() + " Subdl candidates failed for " + imdbId
                 + "; last error: " + (lastError != null ? lastError.getMessage() : "unknown"));
     }
 
-    private List<int[]> searchSubtitles(String imdbId) {
+    private List<String> searchSubtitles(String imdbId) {
         try {
             String url = "https://api.subdl.com/api/v1/subtitles"
                     + "?api_key=" + apiKey
@@ -99,21 +99,20 @@ public class SubdlClient {
                     rawBody.length() > 500 ? rawBody.substring(0, 500) + "..." : rawBody);
 
             JsonNode json = objectMapper.readTree(rawBody);
-            JsonNode results = json.get("results");
-            if (results == null || !results.isArray() || results.isEmpty()) {
+            JsonNode subtitles = json.get("subtitles");
+            if (subtitles == null || !subtitles.isArray() || subtitles.isEmpty()) {
                 throw new RuntimeException("No subtitles found on Subdl for " + imdbId);
             }
 
-            List<int[]> candidates = new ArrayList<>();
-            for (JsonNode item : results) {
-                JsonNode nIdNode = item.get("n_id");
-                JsonNode fileNIdNode = item.get("file_n_id");
-                if (nIdNode != null && fileNIdNode != null) {
-                    candidates.add(new int[]{nIdNode.asInt(), fileNIdNode.asInt()});
+            List<String> urls = new ArrayList<>();
+            for (JsonNode item : subtitles) {
+                JsonNode urlNode = item.get("url");
+                if (urlNode != null && !urlNode.asText().isBlank()) {
+                    urls.add(urlNode.asText());
                 }
             }
-            log.info("Subdl: found {} candidates for {}", candidates.size(), imdbId);
-            return candidates;
+            log.info("Subdl: found {} candidates for {}", urls.size(), imdbId);
+            return urls;
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -121,25 +120,45 @@ public class SubdlClient {
         }
     }
 
-    private String fetchSrt(int nId, int fileNId) {
+    private String fetchSrt(String relativeUrl) {
         try {
-            String url = "https://dl.subdl.com/subtitle/" + nId + "/" + fileNId
-                    + "?api_key=" + apiKey;
+            String fullUrl = "https://dl.subdl.com" + relativeUrl;
             var request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
+                    .uri(URI.create(fullUrl))
                     .GET()
                     .build();
-            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
 
             if (response.statusCode() != 200) {
-                String errBody = response.body();
+                String errBody = new String(response.body(), StandardCharsets.UTF_8);
                 log.error("Subdl download failed: HTTP {} body={}", response.statusCode(),
                         errBody.length() > 200 ? errBody.substring(0, 200) : errBody);
                 throw new RuntimeException("Subdl download returned HTTP " + response.statusCode()
-                        + " for n_id=" + nId + " file_n_id=" + fileNId);
+                        + " for " + relativeUrl);
             }
 
-            return response.body();
+            byte[] body = response.body();
+            // Subdl returns .zip files — extract the first .srt entry
+            try (var zis = new ZipInputStream(new ByteArrayInputStream(body))) {
+                ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (!entry.isDirectory() && entry.getName().toLowerCase().endsWith(".srt")) {
+                        var baos = new ByteArrayOutputStream();
+                        byte[] buf = new byte[4096];
+                        int len;
+                        while ((len = zis.read(buf)) > 0) {
+                            baos.write(buf, 0, len);
+                        }
+                        String srt = baos.toString(StandardCharsets.UTF_8);
+                        log.info("Subdl: extracted {} from zip ({} chars)", entry.getName(), srt.length());
+                        return srt;
+                    }
+                }
+            }
+            // If no .srt found, the body might be raw SRT (not zipped)
+            String rawText = new String(body, StandardCharsets.UTF_8);
+            log.info("Subdl: no .srt in zip, returning raw {} bytes", body.length);
+            return rawText;
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

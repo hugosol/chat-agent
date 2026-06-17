@@ -34,13 +34,16 @@ class SubtitleServiceTest {
     @Mock
     private OpenSubtitlesClient openSubtitlesClient;
 
+    @Mock
+    private SubdlClient subdlClient;
+
     private SrtParser srtParser;
     private SubtitleService service;
 
     @BeforeEach
     void setUp() {
         srtParser = new SrtParser(); // real parser, already tested
-        service = new SubtitleService(subtitleLineRepository, watchedMovieRepository, srtParser, openSubtitlesClient);
+        service = new SubtitleService(subtitleLineRepository, watchedMovieRepository, srtParser, openSubtitlesClient, subdlClient);
     }
 
     @Test
@@ -106,11 +109,13 @@ class SubtitleServiceTest {
                 .thenReturn(Optional.of(movie));
         when(openSubtitlesClient.downloadSrt("tt001"))
                 .thenThrow(new RuntimeException("Network error"));
+        when(subdlClient.downloadSrt("tt001"))
+                .thenThrow(new RuntimeException("Subdl also failed"));
 
         service.downloadSubtitles("tt001", "user-1");
 
         assertThat(movie.getSubtitleStatus()).isEqualTo(SubtitleStatus.FAILED);
-        assertThat(movie.getSubtitleError()).contains("Network error");
+        assertThat(movie.getSubtitleError()).contains("Subdl also failed");
     }
 
     @Test
