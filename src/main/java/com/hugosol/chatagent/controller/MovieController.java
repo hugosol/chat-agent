@@ -3,6 +3,10 @@ package com.hugosol.chatagent.controller;
 import com.hugosol.chatagent.model.WatchedMovie;
 import com.hugosol.chatagent.service.MovieService;
 import com.hugosol.chatagent.service.TmdbClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -22,6 +27,8 @@ import java.util.Map;
 @RequestMapping("/api")
 public class MovieController {
 
+    private static final Logger log = LoggerFactory.getLogger(MovieController.class);
+
     private final MovieService movieService;
 
     public MovieController(MovieService movieService) {
@@ -29,12 +36,13 @@ public class MovieController {
     }
 
     @GetMapping("/movies")
-    public ResponseEntity<List<Map<String, Object>>> listMovies() {
+    public ResponseEntity<Page<Map<String, Object>>> listMovies(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "title,asc") String sort,
+            Pageable pageable) {
         String userId = getUserId();
-        List<WatchedMovie> movies = movieService.listMovies(userId);
-        List<Map<String, Object>> result = movies.stream()
-                .map(this::movieToMap)
-                .toList();
+        Page<WatchedMovie> page = movieService.listMovies(userId, search, sort, pageable);
+        Page<Map<String, Object>> result = page.map(this::movieToMap);
         return ResponseEntity.ok(result);
     }
 
@@ -94,7 +102,9 @@ public class MovieController {
     @PostMapping("/movies/{imdbId}/download")
     public ResponseEntity<Map<String, Object>> redownloadSubtitles(@PathVariable String imdbId) {
         String userId = getUserId();
+        log.info("Download subtitles requested: imdbId={}, userId={}", imdbId, userId);
         movieService.redownloadSubtitles(imdbId, userId);
+        log.info("Download subtitles completed: imdbId={}", imdbId);
         Map<String, Object> response = new HashMap<>();
         response.put("status", "download_triggered");
         return ResponseEntity.ok(response);

@@ -32,7 +32,7 @@ class SubtitleServiceTest {
     private WatchedMovieRepository watchedMovieRepository;
 
     @Mock
-    private WyzieClient wyzieClient;
+    private OpenSubtitlesClient openSubtitlesClient;
 
     private SrtParser srtParser;
     private SubtitleService service;
@@ -40,7 +40,7 @@ class SubtitleServiceTest {
     @BeforeEach
     void setUp() {
         srtParser = new SrtParser(); // real parser, already tested
-        service = new SubtitleService(subtitleLineRepository, watchedMovieRepository, srtParser, wyzieClient);
+        service = new SubtitleService(subtitleLineRepository, watchedMovieRepository, srtParser, openSubtitlesClient);
     }
 
     @Test
@@ -48,7 +48,7 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.PENDING);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(wyzieClient.downloadSrt("tt001")).thenReturn("""
+        when(openSubtitlesClient.downloadSrt("tt001")).thenReturn("""
                 1
                 00:01:00,000 --> 00:01:02,500
                 Hello world.
@@ -83,7 +83,7 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.FAILED);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(wyzieClient.downloadSrt("tt001")).thenReturn("""
+        when(openSubtitlesClient.downloadSrt("tt001")).thenReturn("""
                 1
                 00:01:00,000 --> 00:01:02,500
                 New line.
@@ -104,12 +104,10 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.PENDING);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(wyzieClient.downloadSrt("tt001"))
+        when(openSubtitlesClient.downloadSrt("tt001"))
                 .thenThrow(new RuntimeException("Network error"));
 
-        assertThatThrownBy(() -> service.downloadSubtitles("tt001", "user-1"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Network error");
+        service.downloadSubtitles("tt001", "user-1");
 
         assertThat(movie.getSubtitleStatus()).isEqualTo(SubtitleStatus.FAILED);
         assertThat(movie.getSubtitleError()).contains("Network error");
@@ -120,7 +118,7 @@ class SubtitleServiceTest {
         WatchedMovie movie = new WatchedMovie("user-1", "tt001", "Test Movie", 2020, SubtitleStatus.PENDING);
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.of(movie));
-        when(wyzieClient.downloadSrt("tt001")).thenReturn("""
+        when(openSubtitlesClient.downloadSrt("tt001")).thenReturn("""
                 1
                 00:01:00,000 --> 00:01:02,500
                 Test.

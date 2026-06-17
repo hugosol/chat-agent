@@ -8,8 +8,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,7 +57,7 @@ class MovieServiceTest {
     }
 
     @Test
-    void importBatch_savesMoviesAndTriggersDownloads() {
+    void importBatch_savesMovies() {
         List<Map<String, String>> rows = List.of(
                 Map.of("title", "Inception", "imdbId", "tt1375666", "year", "2010"),
                 Map.of("title", "The Matrix", "imdbId", "tt0133093", "year", "1999")
@@ -64,11 +70,8 @@ class MovieServiceTest {
 
         service.importBatch(rows, "user-1");
 
-        // Both movies saved
         verify(watchedMovieRepository, times(2)).save(any());
-        // Subtitle downloads triggered for both
-        verify(subtitleService).downloadSubtitles("tt1375666", "user-1");
-        verify(subtitleService).downloadSubtitles("tt0133093", "user-1");
+        verify(subtitleService, never()).downloadSubtitles(any(), any());
     }
 
     @Test
@@ -87,37 +90,83 @@ class MovieServiceTest {
     }
 
     @Test
-    void importBatch_continuesOnSubtitleFailure() {
-        List<Map<String, String>> rows = List.of(
-                Map.of("title", "Bad Movie", "imdbId", "tt_bad", "year", "2020"),
-                Map.of("title", "Good Movie", "imdbId", "tt_good", "year", "2021")
-        );
-
-        when(watchedMovieRepository.findByUserIdAndImdbId(any(), any()))
-                .thenReturn(Optional.empty());
-        when(watchedMovieRepository.save(any()))
-                .thenAnswer(inv -> inv.getArgument(0));
-        doThrow(new RuntimeException("Download failed"))
-                .when(subtitleService).downloadSubtitles("tt_bad", "user-1");
-
-        // Should not throw — continues to next movie
-        service.importBatch(rows, "user-1");
-
-        verify(subtitleService).downloadSubtitles("tt_bad", "user-1");
-        verify(subtitleService).downloadSubtitles("tt_good", "user-1");
-    }
-
-    @Test
-    void listMovies_delegatesToRepo() {
+    void listMovies_returnsAllForUser() {
         List<WatchedMovie> movies = List.of(
                 new WatchedMovie("user-1", "tt001", "Movie A", 2020, SubtitleStatus.DONE),
                 new WatchedMovie("user-1", "tt002", "Movie B", 2021, SubtitleStatus.PENDING)
         );
-        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(movies);
+        Page<WatchedMovie> page = new PageImpl<>(movies);
+        when(watchedMovieRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        List<WatchedMovie> result = service.listMovies("user-1");
+        Page<WatchedMovie> result = service.listMovies("user-1", null, "title,asc", PageRequest.of(0, 10));
 
-        assertThat(result).hasSize(2);
+        assertThat(result.getContent()).hasSize(2);
+    }
+
+    @Test
+    void listMovies_filtersBySearch() {
+        List<WatchedMovie> movies = List.of(
+                new WatchedMovie("user-1", "tt001", "Inception", 2010, SubtitleStatus.DONE)
+        );
+        Page<WatchedMovie> page = new PageImpl<>(movies);
+        when(watchedMovieRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
+        Page<WatchedMovie> result = service.listMovies("user-1", "Incept", "title,asc", PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getTitle()).isEqualTo("Inception");
+    }
+
+    @Test
+    void listMovies_sortsByTitleAsc() {
+        when(watchedMovieRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.listMovies("user-1", null, "title,asc", PageRequest.of(0, 10));
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(watchedMovieRepository).findAll(any(Specification.class), captor.capture());
+        // Pageable without sort — sort is applied in Specification
+        assertThat(captor.getValue().getSort().isUnsorted()).isTrue();
+    }
+
+    @Test
+    void listMovies_sortsByReleaseYearDesc() {
+        when(watchedMovieRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.listMovies("user-1", null, "releaseYear,desc", PageRequest.of(0, 10));
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(watchedMovieRepository).findAll(any(Specification.class), captor.capture());
+        assertThat(captor.getValue().getPageNumber()).isEqualTo(0);
+        assertThat(captor.getValue().getPageSize()).isEqualTo(10);
+    }
+
+    @Test
+    void listMovies_sortsByCreateTimeAsc() {
+        when(watchedMovieRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.listMovies("user-1", null, "createTime,asc", PageRequest.of(0, 10));
+
+        verify(watchedMovieRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    void listMovies_paginates() {
+        List<WatchedMovie> allMovies = List.of(
+                new WatchedMovie("user-1", "tt001", "A", 2020, SubtitleStatus.DONE),
+                new WatchedMovie("user-1", "tt002", "B", 2021, SubtitleStatus.DONE),
+                new WatchedMovie("user-1", "tt003", "C", 2022, SubtitleStatus.DONE)
+        );
+        Page<WatchedMovie> page = new PageImpl<>(allMovies.subList(0, 2), PageRequest.of(0, 2), 3);
+        when(watchedMovieRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+
+        Page<WatchedMovie> result = service.listMovies("user-1", null, "title,asc", PageRequest.of(0, 2));
+
+        assertThat(result.getTotalElements()).isEqualTo(3);
+        assertThat(result.getContent()).hasSize(2);
     }
 
     @Test
@@ -143,7 +192,7 @@ class MovieServiceTest {
     }
 
     @Test
-    void addMovie_savesAndDownloads() {
+    void addMovie_savesWithPendingStatus() {
         when(watchedMovieRepository.findByUserIdAndImdbId("user-1", "tt001"))
                 .thenReturn(Optional.empty());
         when(watchedMovieRepository.save(any()))
@@ -153,7 +202,8 @@ class MovieServiceTest {
 
         assertThat(result.getTitle()).isEqualTo("Test Movie");
         assertThat(result.getUserId()).isEqualTo("user-1");
-        verify(subtitleService).downloadSubtitles("tt001", "user-1");
+        assertThat(result.getSubtitleStatus()).isEqualTo(SubtitleStatus.PENDING);
+        verify(subtitleService, never()).downloadSubtitles(any(), any());
     }
 
     @Test

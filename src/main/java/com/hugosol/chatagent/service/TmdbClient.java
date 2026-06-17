@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,10 +29,18 @@ public class TmdbClient {
     private final ObjectMapper objectMapper;
 
     public TmdbClient(@Value("${app.tmdb.api-key:}") String apiKey,
-                      @Value("${app.tmdb.base-url:https://api.themoviedb.org}") String baseUrl) {
+                      @Value("${app.tmdb.base-url:https://api.themoviedb.org}") String baseUrl,
+                      @Value("${app.tmdb.connect-timeout:10s}") Duration connectTimeout,
+                      @Value("${app.tmdb.proxy-host:}") String proxyHost,
+                      @Value("${app.tmdb.proxy-port:0}") int proxyPort) {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
-        this.httpClient = HttpClient.newHttpClient();
+        var builder = HttpClient.newBuilder()
+                .connectTimeout(connectTimeout);
+        if (proxyHost != null && !proxyHost.isBlank() && proxyPort > 0) {
+            builder.proxy(ProxySelector.of(new InetSocketAddress(proxyHost, proxyPort)));
+        }
+        this.httpClient = builder.build();
         this.objectMapper = new ObjectMapper();
     }
 

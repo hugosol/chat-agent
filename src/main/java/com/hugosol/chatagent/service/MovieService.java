@@ -9,6 +9,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,18 +80,55 @@ public class MovieService {
 
             WatchedMovie movie = new WatchedMovie(userId, imdbId, title, year, SubtitleStatus.PENDING);
             watchedMovieRepository.save(movie);
-
-            // Trigger subtitle download (best-effort, failure on one doesn't stop others)
-            try {
-                subtitleService.downloadSubtitles(imdbId, userId);
-            } catch (Exception e) {
-                log.error("Subtitle download failed for {} ({}): {}", title, imdbId, e.getMessage());
-            }
         }
     }
 
-    public List<WatchedMovie> listMovies(String userId) {
-        return watchedMovieRepository.findByUserId(userId);
+    public Page<WatchedMovie> listMovies(String userId, String search, String sortStr, Pageable pageable) {
+        Pageable pageableWithoutSort = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+
+        Specification<WatchedMovie> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("userId"), userId));
+
+            if (search != null && !search.isBlank()) {
+                predicates.add(cb.like(cb.lower(root.get("title")), "%" + search.toLowerCase() + "%"));
+            }
+
+            if (query != null) {
+                Sort sort = parseSort(sortStr);
+                if (sort.isSorted()) {
+                    for (Sort.Order order : sort) {
+                        if ("title".equals(order.getProperty())) {
+                            query.orderBy(order.isAscending()
+                                    ? cb.asc(cb.lower(root.get("title")))
+                                    : cb.desc(cb.lower(root.get("title"))));
+                        } else if ("releaseYear".equals(order.getProperty())) {
+                            query.orderBy(order.isAscending()
+                                    ? cb.asc(root.get("releaseYear"))
+                                    : cb.desc(root.get("releaseYear")));
+                        } else if ("createTime".equals(order.getProperty())) {
+                            query.orderBy(order.isAscending()
+                                    ? cb.asc(root.get("createTime"))
+                                    : cb.desc(root.get("createTime")));
+                        }
+                    }
+                }
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return watchedMovieRepository.findAll(spec, pageableWithoutSort);
+    }
+
+    private Sort parseSort(String sortStr) {
+        if (sortStr == null || sortStr.isBlank()) {
+            return Sort.unsorted();
+        }
+        String[] parts = sortStr.split(",");
+        String property = parts[0].trim();
+        Sort.Direction direction = parts.length > 1 && "desc".equalsIgnoreCase(parts[1].trim())
+                ? Sort.Direction.DESC : Sort.Direction.ASC;
+        return Sort.by(direction, property);
     }
 
     @Transactional
@@ -99,23 +144,22 @@ public class MovieService {
         return tmdbClient.search(query);
     }
 
-    @Transactional
+    /**
+     * Saves a movie with PENDING status. Subtitle download is triggered manually
+     * by the user via the retry/download endpoint.
+     */
     public WatchedMovie addMovie(String imdbId, String title, Integer year, String userId) {
+        return saveMovie(imdbId, title, year, userId);
+    }
+
+    @Transactional
+    WatchedMovie saveMovie(String imdbId, String title, Integer year, String userId) {
         Optional<WatchedMovie> existing = watchedMovieRepository.findByUserIdAndImdbId(userId, imdbId);
         if (existing.isPresent()) {
             return existing.get();
         }
-
         WatchedMovie movie = new WatchedMovie(userId, imdbId, title, year, SubtitleStatus.PENDING);
-        movie = watchedMovieRepository.save(movie);
-
-        try {
-            subtitleService.downloadSubtitles(imdbId, userId);
-        } catch (Exception e) {
-            log.error("Subtitle download failed for new movie {} ({}): {}", title, imdbId, e.getMessage());
-        }
-
-        return movie;
+        return watchedMovieRepository.save(movie);
     }
 
     @Transactional

@@ -5,6 +5,8 @@ import com.hugosol.chatagent.model.SubtitleStatus;
 import com.hugosol.chatagent.model.WatchedMovie;
 import com.hugosol.chatagent.repository.SubtitleLineRepository;
 import com.hugosol.chatagent.repository.WatchedMovieRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,19 +18,21 @@ import java.util.List;
 @Service
 public class SubtitleService {
 
+    private static final Logger log = LoggerFactory.getLogger(SubtitleService.class);
+
     private final SubtitleLineRepository subtitleLineRepository;
     private final WatchedMovieRepository watchedMovieRepository;
     private final SrtParser srtParser;
-    private final WyzieClient wyzieClient;
+    private final OpenSubtitlesClient openSubtitlesClient;
 
     public SubtitleService(SubtitleLineRepository subtitleLineRepository,
                            WatchedMovieRepository watchedMovieRepository,
                            SrtParser srtParser,
-                           WyzieClient wyzieClient) {
+                           OpenSubtitlesClient openSubtitlesClient) {
         this.subtitleLineRepository = subtitleLineRepository;
         this.watchedMovieRepository = watchedMovieRepository;
         this.srtParser = srtParser;
-        this.wyzieClient = wyzieClient;
+        this.openSubtitlesClient = openSubtitlesClient;
     }
 
     /**
@@ -49,14 +53,17 @@ public class SubtitleService {
         // Mark as downloading
         movie.setSubtitleStatus(SubtitleStatus.DOWNLOADING);
         watchedMovieRepository.save(movie);
+        log.info("Subtitle download started: imdbId={}, title={}", imdbId, movie.getTitle());
 
         try {
             // Clear old subtitle data (safe for retry)
             subtitleLineRepository.deleteByImdbId(imdbId);
 
             // Download and parse
-            String srtContent = wyzieClient.downloadSrt(imdbId);
+            String srtContent = openSubtitlesClient.downloadSrt(imdbId);
+            log.info("SRT downloaded: imdbId={}, length={}", imdbId, srtContent.length());
             List<SubtitleLine> lines = srtParser.parse(srtContent, imdbId, movie.getTitle());
+            log.info("SRT parsed: imdbId={}, lines={}", imdbId, lines.size());
 
             // Persist
             subtitleLineRepository.saveAll(lines);
@@ -66,13 +73,15 @@ public class SubtitleService {
             movie.setSubtitleLineCount(lines.size());
             movie.setSubtitleError(null);
             watchedMovieRepository.save(movie);
+            log.info("Subtitle download DONE: imdbId={}, lines={}", imdbId, lines.size());
 
         } catch (RuntimeException e) {
-            // Mark as failed, preserve error message
+            // Mark as failed, preserve error message.
+            // The FAILED status is the error signal; don't re-throw.
             movie.setSubtitleStatus(SubtitleStatus.FAILED);
             movie.setSubtitleError(e.getMessage());
             watchedMovieRepository.save(movie);
-            throw e;
+            log.error("Subtitle download FAILED: imdbId={}, error={}", imdbId, e.getMessage());
         }
     }
 }

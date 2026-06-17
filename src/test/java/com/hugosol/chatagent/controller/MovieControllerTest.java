@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -49,13 +51,46 @@ class MovieControllerTest {
     @Test
     void listMovies_returnsMovieList() throws Exception {
         WatchedMovie movie = new WatchedMovie("test-user", "tt001", "Inception", 2010, SubtitleStatus.DONE);
-        when(movieService.listMovies("test-user")).thenReturn(List.of(movie));
+        when(movieService.listMovies(eq("test-user"), eq(null), eq("title,asc"), any()))
+                .thenReturn(new PageImpl<>(List.of(movie)));
 
         mockMvc.perform(get("/api/movies"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].imdbId").value("tt001"))
-                .andExpect(jsonPath("$[0].title").value("Inception"))
-                .andExpect(jsonPath("$[0].subtitleStatus").value("DONE"));
+                .andExpect(jsonPath("$.content[0].imdbId").value("tt001"))
+                .andExpect(jsonPath("$.content[0].title").value("Inception"))
+                .andExpect(jsonPath("$.content[0].subtitleStatus").value("DONE"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void listMovies_acceptsSearchParam() throws Exception {
+        when(movieService.listMovies(eq("test-user"), eq("Incept"), eq("title,asc"), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/movies").param("search", "Incept"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listMovies_acceptsSortParam() throws Exception {
+        when(movieService.listMovies(eq("test-user"), eq(null), eq("releaseYear,desc"), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/movies").param("sort", "releaseYear,desc"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listMovies_acceptsPageableParams() throws Exception {
+        when(movieService.listMovies(eq("test-user"), eq(null), eq("title,asc"), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(1, 5), 0));
+
+        mockMvc.perform(get("/api/movies")
+                        .param("page", "1")
+                        .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.number").value(1))
+                .andExpect(jsonPath("$.size").value(5));
     }
 
     @Test

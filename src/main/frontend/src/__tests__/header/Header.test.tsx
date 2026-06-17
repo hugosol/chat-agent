@@ -210,6 +210,43 @@ describe("Header", () => {
     const link = await findByTestId("nav-tune-link");
     expect(link.getAttribute("data-active")).toBe("true");
   });
+
+  it("renders Movies nav link with correct href", async () => {
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    const link = (await findByTestId("nav-movies-link")) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/movies/index.html");
+    expect(link.textContent).toContain("Movies");
+  });
+
+  it("highlights Movies link on movies page path", async () => {
+    setPath("/movies/index.html");
+    const { findByTestId } = render(<Header />);
+    const link = await findByTestId("nav-movies-link");
+    expect(link.getAttribute("data-active")).toBe("true");
+  });
+
+  it("nav link order is Chat, Review, Manage, Tune, Movies, Settings, Profile", async () => {
+    setPath("/");
+    const { findByTestId } = render(<Header />);
+    // Open sidebar to expose links
+    const menuBtn = await findByTestId("nav-menu-btn");
+    fireEvent.click(menuBtn);
+
+    // Get all sidebar links by querying the sidebar container
+    const sidebar = await findByTestId("nav-sidebar");
+    const allLinks = sidebar.querySelectorAll("a");
+    const labels = Array.from(allLinks).map((el) => el.textContent?.trim());
+    expect(labels).toEqual([
+      "💬 Chat",
+      "📋 Manage",
+      "📝 Review",
+      "📐 Tune",
+      "🎬 Movies",
+      "⚙ 设置",
+      "👤 Profile",
+    ]);
+  });
 });
 
 describe("Header timezone auto-detection", () => {
