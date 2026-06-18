@@ -33,6 +33,18 @@ export interface ReviewCard {
   lastReview: string | null;
   firstReviewDate: string | null;
   createTime: string | null;
+  enhancement?: EnhancementData | null;
+}
+
+export interface EnhancementData {
+  movieQuote?: {
+    movieTitle: string;
+    imdbId: string;
+    quote: string;
+    timestamp: string;
+  } | null;
+  sceneSummary?: string | null;
+  etymology?: string | null;
 }
 
 export type PreviewInfo = Record<string, {

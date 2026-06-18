@@ -27,6 +27,9 @@ public class UserService {
     }
 
     public UserMeResponse getCurrentUser(Principal principal) {
+        if (principal == null) {
+            return new UserMeResponse("anonymous", false);
+        }
         String username = principal.getName();
         boolean admin = "admin".equals(username);
         return new UserMeResponse(username, admin);

@@ -1,0 +1,46 @@
+# ============================================================
+# 本地开发配置模板
+# 1. 复制本文件为 application-local.yml
+# 2. 将下面的 api-key 占位符替换为你自己申请的 key
+# 3. 如需代理，将 app.proxy.enabled 设为 true 并填入地址
+# ============================================================
+
+server:
+  port: 18080
+
+langchain4j:
+  openai:
+    chat-model:
+      api-key: sk-****          # ← 替换为 DeepSeek API Key
+
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+app:
+  # 代理（按需启用）
+  proxy:
+    enabled: false              # 设为 true 开启代理
+    host: 127.0.0.1
+    port: 10808
+
+  tmdb:
+    api-key: "****"             # ← 替换为 TMDB API Key (v3 auth)
+    connect-timeout: 10s
+
+  subdl:
+    api-key: subdl_****         # ← 替换为 Subdl API Key
+
+  initial-users:
+    - username: admin
+      password: 123
+
+  security:
+    permit-all-paths:
+      - /login/**
+      - /h2-console/**
+      - /shared/*.css
+      - /shared/react.production.min.js
+      - /shared/react-dom.production.min.js

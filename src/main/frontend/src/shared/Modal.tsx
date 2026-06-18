@@ -7,10 +7,11 @@ interface ModalProps {
   onClose: () => void;
   onSave?: () => void;
   saveLabel?: string;
+  saveDisabled?: boolean;
   danger?: boolean;
 }
 
-function Modal({ open, title, children, onClose, onSave, saveLabel = "Save", danger = false }: ModalProps): JSX.Element | null {
+function Modal({ open, title, children, onClose, onSave, saveLabel = "Save", saveDisabled = false, danger = false }: ModalProps): JSX.Element | null {
   if (!open) return null;
 
   return (
@@ -27,6 +28,7 @@ function Modal({ open, title, children, onClose, onSave, saveLabel = "Save", dan
               className={`btn ${danger ? "btn-danger" : "btn-primary"} btn-save`}
               data-testid="modal-save"
               onClick={onSave}
+              disabled={saveDisabled}
             >
               {saveLabel}
             </button>

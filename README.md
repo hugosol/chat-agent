@@ -9,18 +9,31 @@ AI 口语练习工具，兼具聊天练习和闪卡复习两大功能。通过 A
 - **Java 17+** / **Maven 3.9+**
 - **DeepSeek API Key**（[获取](https://platform.deepseek.com/api_keys)）
 
+### API Key 配置
+
+本项目依赖三个外部 API，需要自行申请 Key：
+
+| 服务 | 申请地址 | 配置位置 |
+|------|---------|---------|
+| DeepSeek | https://platform.deepseek.com/api_keys | `application-local.yml` |
+| TMDB | https://www.themoviedb.org/settings/api | `application-local.yml` |
+| Subdl | https://subdl.com/panel/api | `application-local.yml` |
+
 ### 本地启动
 
 ```bash
 git clone <repo-url>
 cd chat-agent
 
-# 方式 A：local profile（推荐，key 写入 gitignored 文件）
-# 创建 src/main/resources/application-local.yml，写入：
-#   langchain4j.openai.chat-model.api-key: sk-your-key
+# 1. 复制配置模板到项目根目录
+cp src/main/resources/application-local-template.yml ./application-local.yml
+
+# 2. 编辑 ./application-local.yml，将 sk-**** / **** / subdl_**** 替换为你的真实 Key
+
+# 3. 启动（local profile）
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 
-# 方式 B：环境变量
+# 或者：直接设环境变量启动（无需 local profile）
 # Windows:
 set DEEPSEEK_API_KEY=sk-your-key
 # macOS / Linux:
@@ -30,6 +43,8 @@ mvn spring-boot:run
 
 浏览器打开 http://localhost:8080，默认账号 `admin` / `admin123`。
 
+`application-local.yml` 放在项目根目录而非 `src/main/resources/`，有两个好处：Maven 打包时不会打进 JAR（避免 API Key 泄露到制品中），且 Spring Boot 会优先加载外部配置覆盖 classpath 内的 `application.yml`。文件已被 `.gitignore` 忽略，不会提交到 Git。
+
 ### Docker 部署
 
 **使用已发布镜像：**
@@ -37,7 +52,7 @@ mvn spring-boot:run
 ```bash
 git clone <repo-url>
 cd chat-agent
-# 编辑 docker/docker-compose.yml，替换 DEEPSEEK_API_KEY、INITIAL_USER_PASSWORD 及宿主机路径（data + logs）
+# 编辑 docker/docker-compose.yml，替换 DEEPSEEK_API_KEY、TMDB_API_KEY、SUBDL_API_KEY、INITIAL_USER_PASSWORD 及宿主机路径（data + logs）
 docker compose -f docker/docker-compose.yml up -d
 ```
 

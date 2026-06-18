@@ -1,0 +1,21 @@
+.listContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.loading,
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: #888;
+  font-size: 0.95em;
+  padding: 32px;
+}

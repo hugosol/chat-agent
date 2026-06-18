@@ -577,8 +577,10 @@ chat-agent/
 │   │   │   └── Rating.java                    // AGAIN/HARD/GOOD/EASY
 │   │
     │   ├── controller/                         // REST API
-    │   │   ├── FlashcardController.java       // POST /api/cards/add, GET /api/tags, import/export, forget, PATCH back
+    │   │   ├── FlashcardController.java       // POST /api/cards, GET /api/tags, import/export, forget, PATCH back
     │   │   ├── ReviewController.java          // GET /api/review/start, POST /api/review/next, stats, forget, preferences
+    │   │   ├── MovieController.java           // GET/POST/DELETE /api/movies, /api/movies/import/batch, /api/movies/search
+    │   │   ├── CardEnhanceController.java     // POST /api/cards/{id}/enhance
     │   │   ├── FsrsOptimizeController.java    // POST /api/fsrs/optimize (async + progress polling)
     │   │   └── TuneController.java            // GET /api/tune/review-count, optimize-logs, reschedule-logs
 │   │
@@ -641,9 +643,15 @@ chat-agent/
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED / FAILED
-│   │   └── AgentMode.java                  // 枚举: WORKPLACE_STANDUP / DAILY_TALK / JAPANESE_BUSINESS (含 displayName + templatePath)
+│   │   ├── AgentMode.java                  // 枚举: WORKPLACE_STANDUP / DAILY_TALK / JAPANESE_BUSINESS (含 displayName + templatePath)
+│   │   ├── WatchedMovie.java               // 已看电影（userId + imdbId + title + subtitleStatus）
+│   │   ├── SubtitleLine.java               // 字幕行（imdbId + movieTitle + text + wordsLower + lineIndex）
+│   │   ├── CardEnhancement.java            // 卡片增强数据（cardId + type + status + data JSON）
+│   │   ├── SubtitleStatus.java             // 枚举: PENDING / DOWNLOADING / DONE / FAILED
+│   │   ├── EnhancementStatus.java          // 枚举: PENDING / SUCCESS / FAILED
+│   │   └── EnhancementType.java            // 枚举: SUBTITLE / ETYMOLOGY
 │   │
-│   ├── repository/                         // Spring Data JPA（15 个）
+│   ├── repository/                         // Spring Data JPA（18 个）
 │   │   ├── UserRepository.java             // findByUsername
 │   │   ├── SessionRepository.java          // findByUserIdOrderByStartTimeDesc
 │   │   ├── MessageRepository.java
@@ -658,13 +666,23 @@ chat-agent/
 │   │   ├── UserProgressRepository.java     // findByUserId
 │   │   ├── UserLearningProfileRepository.java // findByUserIdAndTypeAndModeOrderByVersionDesc
 │   │   ├── MemoryCueRepository.java        // findBySessionId, findAllByStatus
-│   │   └── LlmCallLogRepository.java       // deleteByCreateTimeBefore
+│   │   ├── LlmCallLogRepository.java       // deleteByCreateTimeBefore
+│   │   ├── WatchedMovieRepository.java      // findByUserId + findByUserIdAndImdbId
+│   │   ├── SubtitleLineRepository.java      // findByImdbIdInAndWordsLowerLike + deleteByImdbId
+│   │   └── CardEnhancementRepository.java   // findByCardId
 │   │
 │   ├── service/                            // 业务服务
 │   │   ├── SessionService.java             // State 生命周期 + sessionToWs 映射 + TokenTracker
 │   │   ├── TurnProcessor.java              // 回合并行编排 (Conversation 流式 + Correction 图 + RAG 检索)
 │   │   ├── FlashcardService.java           // 闪卡创建（FSRS 初始化 + Tag upsert）+ 标签查询
-│   │   ├── ReviewService.java               // 复习核心（rateCard 含 FSRS 调度 + ReviewLog 记录 + rescheduleAllCards + forgetCard/Deck）
+│   │   ├── ReviewService.java               // 复习核心（rateCard 含 FSRS 调度 + ReviewLog 记录 + buildEnhancementMap + rescheduleAllCards + forgetCard/Deck）
+│   │   ├── MovieService.java               // 电影管理（CRUD + CSV 批量导入 + TMDB 搜索委派）
+│   │   ├── SubtitleService.java             // 字幕下载编排（Subdl API → SrtParser → SubtitleLine 持久化）
+│   │   ├── CardEnhanceService.java          // 卡片增强编排（本地字幕搜索 + Wiktionary 词源 + DeepSeek 场景摘要）
+│   │   ├── TmdbClient.java                  // TMDB API v3 客户端（电影搜索）
+│   │   ├── SubdlClient.java                 // Subdl API 客户端（字幕下载）
+│   │   ├── WiktionaryClient.java            // Wiktionary MediaWiki API 客户端（词源提取）
+│   │   ├── SrtParser.java                   // SRT 字幕格式解析器
 │   │   ├── UserPreferencesService.java      // 用户偏好读写（含 FSRS 参数 + 缓存清除）
 │   │   ├── FsrsOptimizeService.java         // 优化器编排（Adam 梯度下降 + reschedule + @Scheduled 每周定时）
 │   │   ├── CardBatchService.java            // 批量导入/导出编排

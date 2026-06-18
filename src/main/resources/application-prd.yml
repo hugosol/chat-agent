@@ -15,7 +15,16 @@ spring:
     username: sa
     password: chatagent-db
 
+langchain4j:
+  openai:
+    chat-model:
+      api-key: ${DEEPSEEK_API_KEY}
+
 app:
+  tmdb:
+    api-key: ${TMDB_API_KEY}
+  subdl:
+    api-key: ${SUBDL_API_KEY}
   initial-users:
     - username: admin
       password: ${INITIAL_USER_PASSWORD}

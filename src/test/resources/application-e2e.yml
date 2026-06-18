@@ -37,3 +37,9 @@ app:
   security:
     permit-all-paths:
       - /**
+  wiktionary:
+    base-url: http://localhost:19090
+  tmdb:
+    base-url: http://localhost:19090
+  subdl:
+    base-url: http://localhost:19090

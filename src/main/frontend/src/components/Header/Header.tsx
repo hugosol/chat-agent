@@ -70,6 +70,7 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
   const isManagePage = currentPath.startsWith("/manage/");
   const isReviewPage = currentPath.startsWith("/review/");
   const isTunePage = currentPath.startsWith("/tune/");
+  const isMoviesPage = currentPath.startsWith("/movies/");
   const isSettingsPage = currentPath.startsWith("/settings/");
   const isProfilePage = currentPath.startsWith("/profile/");
   const showToken = isChatPage;
@@ -159,6 +160,14 @@ function Header({ tokenPercent, activePanel, onTogglePanel }: HeaderProps): JSX.
             data-active={isTunePage ? "true" : "false"}
           >
             {"\uD83D\uDCD0"} Tune
+          </a>
+          <a
+            className={classes.navLink}
+            href="/movies/index.html"
+            data-testid="nav-movies-link"
+            data-active={isMoviesPage ? "true" : "false"}
+          >
+            {"\uD83C\uDFAC"} Movies
           </a>
           <a
             className={classes.navLink}

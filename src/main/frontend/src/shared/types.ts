@@ -43,3 +43,14 @@ export interface ConflictInfo {
 export interface CheckCardResponse {
   conflicts: ConflictInfo[];
 }
+
+export interface Movie {
+  id: string;
+  imdbId: string;
+  title: string;
+  year: number | null;
+  subtitleStatus: string;
+  subtitleLineCount: number | null;
+  subtitleError: string | null;
+  createTime: string | null;
+}

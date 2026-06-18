@@ -4,9 +4,13 @@ import com.hugosol.chatagent.dto.ForgetDeckResult;
 import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
+import com.hugosol.chatagent.model.CardEnhancement;
+import com.hugosol.chatagent.model.EnhancementStatus;
+import com.hugosol.chatagent.model.EnhancementType;
 import com.hugosol.chatagent.model.ReviewLog;
 import com.hugosol.chatagent.model.Tag;
 import com.hugosol.chatagent.model.UserPreferences;
+import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
 
@@ -21,11 +25,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -60,6 +61,9 @@ class ReviewServiceTest {
     @Mock
     private ExecutorService optimizerExecutor;
 
+    @Mock
+    private CardEnhancementRepository cardEnhancementRepository;
+
     private ReviewService reviewService;
     private static final Instant NOW = Instant.parse("2026-06-04T10:00:00Z");
 
@@ -71,7 +75,7 @@ class ReviewServiceTest {
             return null;
         }).when(optimizerExecutor).execute(any(Runnable.class));
         reviewService = new ReviewService(cardRepository, preferencesService, reviewLogRepository,
-                fsrsConfigService, optimizerExecutor);
+                fsrsConfigService, optimizerExecutor, cardEnhancementRepository);
         lenient().when(cardRepository.countByTagsIdAndCardState(anyString(), eq(0), anyString())).thenReturn(1000L);
     }
 
@@ -523,22 +527,11 @@ class ReviewServiceTest {
 
     @Test
     void computeTodayStart_normalHours_returnsToday() {
-        when(preferencesService.get("user-1")).thenReturn(defaultPreferences());
-        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(null);
-
-        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
-
-        Instant captured = todayStartCaptor.getValue();
-        ZoneId zone = ZoneId.of("+08:00");
-        ZonedDateTime nowInZone = ZonedDateTime.now(zone);
-        Instant expectedTodayStart = nowInZone.toLocalDate().atStartOfDay(zone).plusHours(6).toInstant();
-        assertThat(captured).isEqualTo(expectedTodayStart);
+        // 2026-06-16T12:00:00Z = 20:00 UTC+8, dayStartHour=6, before midnight threshold → today at 06:00
+        Instant now = Instant.parse("2026-06-16T12:00:00Z");
+        Instant result = reviewService.computeTodayStart(defaultPreferences(), now);
+        // 2026-06-16T06:00:00+08:00 = 2026-06-15T22:00:00Z
+        assertThat(result).isEqualTo(Instant.parse("2026-06-15T22:00:00Z"));
     }
 
     @Test
@@ -547,19 +540,11 @@ class ReviewServiceTest {
         prefs.setNewCardDailyLimit(20);
         prefs.setDayStartHour(23);
         prefs.setUtcOffset(8);
-        when(preferencesService.get("user-1")).thenReturn(prefs);
-
-        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(null);
-
-        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
-
-        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now().minus(1, ChronoUnit.HOURS));
+        // 2026-06-16T14:06:30Z = 22:06 UTC+8, dayStartHour=23, BEFORE threshold → yesterday at 23:00
+        Instant now = Instant.parse("2026-06-16T14:06:30Z");
+        Instant result = reviewService.computeTodayStart(prefs, now);
+        // 2026-06-15T23:00:00+08:00 = 2026-06-15T15:00:00Z
+        assertThat(result).isEqualTo(Instant.parse("2026-06-15T15:00:00Z"));
     }
 
     @Test
@@ -568,19 +553,11 @@ class ReviewServiceTest {
         prefs.setNewCardDailyLimit(20);
         prefs.setDayStartHour(0);
         prefs.setUtcOffset(8);
-        when(preferencesService.get("user-1")).thenReturn(prefs);
-
-        ArgumentCaptor<Instant> todayStartCaptor = ArgumentCaptor.forClass(Instant.class);
-        when(cardRepository.countByTagsIdAndLastReviewGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(eq("deck-1"), todayStartCaptor.capture(), anyString()))
-                .thenReturn(0L);
-        when(cardRepository.findFirstDueByTagsIdAndDueAfter(eq("deck-1"), any(Instant.class), anyString()))
-                .thenReturn(null);
-
-        reviewService.computeReviewStats("deck-1", "NEW_ONLY", "user-1");
-
-        assertThat(todayStartCaptor.getValue()).isBefore(Instant.now());
+        // 2026-06-16T14:06:30Z = 22:06 UTC+8, dayStartHour=0, AFTER threshold (22 >= 0) → today at 00:00
+        Instant now = Instant.parse("2026-06-16T14:06:30Z");
+        Instant result = reviewService.computeTodayStart(prefs, now);
+        // 2026-06-16T00:00:00+08:00 = 2026-06-15T16:00:00Z
+        assertThat(result).isEqualTo(Instant.parse("2026-06-15T16:00:00Z"));
     }
 
     @Test
@@ -817,5 +794,101 @@ class ReviewServiceTest {
         reviewService.rescheduleAllCards("user-1");
 
         verify(cardRepository, never()).saveAll(anyList());
+    }
+
+    // --- buildEnhancementMap tests ---
+
+    @Test
+    void buildEnhancementMap_returnsNullWhenNoRecords() {
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void buildEnhancementMap_returnsPartialWhenOnlySubtitle() {
+        CardEnhancement sub = new CardEnhancement();
+        sub.setCardId("card-1");
+        sub.setType(EnhancementType.SUBTITLE);
+        sub.setStatus(EnhancementStatus.SUCCESS);
+        sub.setData("{\"movieTitle\":\"Inception\",\"imdbId\":\"tt1375666\",\"quote\":\"You mustn't be afraid to dream a little bigger, darling.\",\"timestamp\":\"01:23:45\",\"sceneSummary\":\"Eames shows off his dream-forging skills.\"}");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(sub));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNotNull();
+        assertThat(result).containsKey("movieQuote");
+        assertThat(result).doesNotContainKey("etymology");
+        var quote = (Map<String, Object>) result.get("movieQuote");
+        assertThat(quote.get("movieTitle")).isEqualTo("Inception");
+    }
+
+    @Test
+    void buildEnhancementMap_returnsPartialWhenOnlyEtymology() {
+        CardEnhancement ety = new CardEnhancement();
+        ety.setCardId("card-1");
+        ety.setType(EnhancementType.ETYMOLOGY);
+        ety.setStatus(EnhancementStatus.SUCCESS);
+        ety.setData("From Latin 'exemplum', meaning a sample or pattern.");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(ety));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNotNull();
+        assertThat(result).containsKey("etymology");
+        assertThat(result).doesNotContainKey("movieQuote");
+        assertThat(result.get("etymology")).isEqualTo("From Latin 'exemplum', meaning a sample or pattern.");
+    }
+
+    @Test
+    void buildEnhancementMap_handlesFailedStatus() {
+        CardEnhancement sub = new CardEnhancement();
+        sub.setCardId("card-1");
+        sub.setType(EnhancementType.SUBTITLE);
+        sub.setStatus(EnhancementStatus.FAILED);
+        sub.setError("No subtitles found");
+
+        CardEnhancement ety = new CardEnhancement();
+        ety.setCardId("card-1");
+        ety.setType(EnhancementType.ETYMOLOGY);
+        ety.setStatus(EnhancementStatus.SUCCESS);
+        ety.setData("From Old English.");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(sub, ety));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        assertThat(result).isNotNull();
+        // FAILED subtitle should not be included as movieQuote
+        assertThat(result).doesNotContainKey("movieQuote");
+        // But SUCCESS etymology should be present
+        assertThat(result).containsKey("etymology");
+    }
+
+    @Test
+    void buildEnhancementMap_returnsMapWhenAllFailed() {
+        CardEnhancement sub = new CardEnhancement();
+        sub.setCardId("card-1");
+        sub.setType(EnhancementType.SUBTITLE);
+        sub.setStatus(EnhancementStatus.FAILED);
+        sub.setError("No subtitles found");
+
+        CardEnhancement ety = new CardEnhancement();
+        ety.setCardId("card-1");
+        ety.setType(EnhancementType.ETYMOLOGY);
+        ety.setStatus(EnhancementStatus.FAILED);
+        ety.setError("Etymology not available");
+
+        when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of(sub, ety));
+
+        var result = reviewService.buildEnhancementMap("card-1");
+
+        // Records exist, so map is returned (not null)
+        // but map may be empty since all failed — cardToMap will filter it out
+        assertThat(result).isNotNull();
     }
 }

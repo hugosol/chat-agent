@@ -34,7 +34,7 @@ cd src/main/frontend && npm test
 | `agent/MemoryCueAgentTest.java` | 话题切换检测、分段摘要生成 |
 | `agent/common/TaskRunnerTest.java` | 同步引擎、LLM 调用日志、ErrorStrategy |
 
-### Service（15 个测试类）
+### Service（16 个测试类）
 
 | 文件 | 说明 |
 |------|------|
@@ -53,6 +53,7 @@ cd src/main/frontend && npm test
 | `service/UserPreferencesServiceTest.java` | 用户偏好 CRUD |
 | `service/card/CardBatchServiceTest.java` | 批量导入/导出编排 |
 | `service/card/CardCsvParserTest.java` | CSV 解析、FSRS 状态序列化 |
+| `service/MovieServiceTest.java` | 电影查询（Specification 分页/搜索/排序）、批量导入、字幕下载触发 |
 
 ### Flashcard（4 个测试类）
 
@@ -63,12 +64,13 @@ cd src/main/frontend && npm test
 | `flashcard/FsrsOptimizerTest.java` | Adam 优化、数值梯度、BCELoss、py-fsrs 交叉验证 |
 | `flashcard/AleaPrngTest.java` | 确定性 PRNG、fuzz 分布 |
 
-### Controller（2 个测试类）
+### Controller（3 个测试类）
 
 | 文件 | 说明 |
 |------|------|
 | `controller/FlashcardControllerTest.java` | REST API：卡片 CRUD、Tag 列表、导入导出 |
 | `controller/ReviewControllerTest.java` | REST API：复习开始、评分、统计、牌组列表 |
+| `controller/MovieControllerTest.java` | REST API：电影列表（分页/搜索/排序）、TMDB 搜索、批量导入 |
 
 ### Repository & Model（13 个测试类）
 
@@ -97,7 +99,7 @@ cd src/main/frontend && npm test
 | `protocol/ProtocolDispatcherTest.java` | 客户端消息分发 |
 | `websocket/ChatMessageHandlerTest.java` | 协议消息处理、会话绑定 |
 
-### E2E 集成测试（11 个测试类）
+### E2E 集成测试（12 个测试类）
 
 | 文件 | 覆盖场景 |
 |------|---------|
@@ -112,6 +114,7 @@ cd src/main/frontend && npm test
 | `e2e/ReviewIT.java` | 复习：牌组/模式选择 → 翻牌评分 → 统计栏 → 完成页 → REVIEW_ONLY/NEW_ONLY/CRAM |
 | `e2e/SettingsPageIT.java` | 设置页：偏好保存验证 |
 | `e2e/AuthIT.java` | 登录/登出/会话验证 |
+| `e2e/MoviesPageIT.java` | 电影管理完整流程：列表分页/搜索/排序 → TMDB 搜索添加 → CSV 批量导入 → 删除确认 → 字幕下载重试 |
 
 > **计划**：`e2e/JapaneseBusinessIT.java`（JAPANESE_BUSINESS 模式完整会话）推迟到后续迭代，届时需验证：无纠错气泡、无 MemoryCue 生成、日语报告内容。
 
@@ -147,6 +150,17 @@ cd src/main/frontend && npm test
 | `manage/TagsTab.test.tsx` | 标签 Tab CRUD |
 | `manage/TagTable.test.tsx` | 标签表格交互 |
 
+### Movies 页面（6 个测试文件）
+
+| 文件 | 说明 |
+|------|------|
+| `movies/MoviesPage.test.tsx` | 电影列表：搜索/分页/排序/空状态/loading |
+| `movies/MovieBlock.test.tsx` | 行渲染：字幕状态图标（PENDING/DOWNLOADING/DONE/FAILED）、按钮显隐 |
+| `movies/MovieToolbar.test.tsx` | 工具栏：搜索输入、排序下拉、添加/导入按钮触发 |
+| `movies/MovieImportModal.test.tsx` | CSV 导入：文件选择、CSV 解析（跳表头）、成功/失败结果展示 |
+| `movies/MovieSearchModal.test.tsx` | TMDB 搜索：输入防抖、候选列表渲染、添加回调 |
+| `movies/MovieDeleteModal.test.tsx` | 删除确认弹窗：文案含字幕行数 |
+
 ### Review 页面（6 个测试文件）
 
 | 文件 | 说明 |
@@ -173,7 +187,7 @@ cd src/main/frontend && npm test
 
 | 文件 | 说明 |
 |------|------|
-| `header/Header.test.tsx` | 顶部导航、TokenBar、面板切换 |
+| `header/Header.test.tsx` | 顶部导航（Chat→Review→Manage→Tune→Movies→设置→Profile）、TokenBar、面板切换 |
 | `profile/ProfileApp.test.tsx` | 个人信息页 |
 | `profile/PasswordChangeForm.test.tsx` | 密码修改表单 |
 | `profile/UserManagement.test.tsx` | 用户管理（管理员） |

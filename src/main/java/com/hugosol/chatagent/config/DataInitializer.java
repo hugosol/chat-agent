@@ -66,6 +66,8 @@ public class DataInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.debug("Timezone column migration skipped or already applied: {}", e.getMessage());
         }
+
+        migrateWordsLowerSpaces();
     }
 
     private void migrateEnabledColumn() {
@@ -98,6 +100,18 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Migrated: redefined user_learning_profiles.mode column (removed old CHECK constraint)");
         } catch (Exception e) {
             log.debug("user_learning_profiles mode CHECK constraint migration skipped: {}", e.getMessage());
+        }
+    }
+
+    private void migrateWordsLowerSpaces() {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE subtitle_lines SET words_lower = ' ' || words_lower || ' ' WHERE words_lower NOT LIKE ' %'");
+            if (updated > 0) {
+                log.info("Migrated: added boundary spaces to {} subtitle_lines.words_lower rows", updated);
+            }
+        } catch (Exception e) {
+            log.debug("wordsLower spaces migration skipped: {}", e.getMessage());
         }
     }
 

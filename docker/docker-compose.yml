@@ -10,5 +10,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prd
       - DEEPSEEK_API_KEY=请替换为你的DeepSeek密钥
+      - TMDB_API_KEY=请替换为你的TMDB密钥
+      - SUBDL_API_KEY=请替换为你的Subdl密钥
       - INITIAL_USER_PASSWORD=请设置初始登录密码
     restart: unless-stopped

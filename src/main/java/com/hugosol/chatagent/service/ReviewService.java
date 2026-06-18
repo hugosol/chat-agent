@@ -8,10 +8,15 @@ import com.hugosol.chatagent.flashcard.FsrsScheduler;
 import com.hugosol.chatagent.flashcard.FsrsSchedulerConfig;
 import com.hugosol.chatagent.flashcard.Rating;
 import com.hugosol.chatagent.model.Card;
+import com.hugosol.chatagent.model.CardEnhancement;
+import com.hugosol.chatagent.model.EnhancementStatus;
+import com.hugosol.chatagent.model.EnhancementType;
 import com.hugosol.chatagent.model.ReviewLog;
 import com.hugosol.chatagent.model.UserPreferences;
+import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.ReviewLogRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
@@ -42,15 +47,18 @@ public class ReviewService {
     private final ReviewLogRepository reviewLogRepository;
     private final FsrsConfigService fsrsConfigService;
     private final ExecutorService optimizerExecutor;
+    private final CardEnhancementRepository cardEnhancementRepository;
 
     public ReviewService(CardRepository cardRepository, UserPreferencesService preferencesService,
                          ReviewLogRepository reviewLogRepository, FsrsConfigService fsrsConfigService,
-                         @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor) {
+                         @Qualifier("optimizerExecutor") ExecutorService optimizerExecutor,
+                         CardEnhancementRepository cardEnhancementRepository) {
         this.cardRepository = cardRepository;
         this.preferencesService = preferencesService;
         this.reviewLogRepository = reviewLogRepository;
         this.fsrsConfigService = fsrsConfigService;
         this.optimizerExecutor = optimizerExecutor;
+        this.cardEnhancementRepository = cardEnhancementRepository;
     }
 
     @Transactional
@@ -242,7 +250,7 @@ public class ReviewService {
     public Optional<Card> getNextCard(String deckId, String mode, String userId) {
         Instant now = Instant.now();
         UserPreferences prefs = preferencesService.get(userId);
-        Instant todayStart = computeTodayStart(prefs);
+        Instant todayStart = computeTodayStart(prefs, now);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
         return getNextCardInternal(deckId, mode, userId, prefs, now, todayStart, learnedToday);
     }
@@ -250,7 +258,7 @@ public class ReviewService {
     public NextCardAndStats getNextCardAndStats(String deckId, String mode, String userId) {
         Instant now = Instant.now();
         UserPreferences prefs = preferencesService.get(userId);
-        Instant todayStart = computeTodayStart(prefs);
+        Instant todayStart = computeTodayStart(prefs, now);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
 
         Optional<Card> card = getNextCardInternal(deckId, mode, userId, prefs, now, todayStart, learnedToday);
@@ -302,10 +310,10 @@ public class ReviewService {
         return learnedToday >= prefs.getNewCardDailyLimit();
     }
 
-    private Instant computeTodayStart(UserPreferences prefs) {
+    Instant computeTodayStart(UserPreferences prefs, Instant now) {
         int offsetHours = prefs.getUtcOffset() != null ? prefs.getUtcOffset() : 8;
         ZoneOffset offset = ZoneOffset.ofHours(offsetHours);
-        ZonedDateTime nowInZone = Instant.now().atZone(offset);
+        ZonedDateTime nowInZone = now.atZone(offset);
         LocalDate today = nowInZone.toLocalDate();
         if (nowInZone.getHour() < prefs.getDayStartHour()) {
             today = today.minusDays(1);
@@ -319,8 +327,8 @@ public class ReviewService {
             return new ReviewStats(0, 0, 0, 20, null, 0);
         }
         UserPreferences prefs = preferencesService.get(userId);
-        Instant todayStart = computeTodayStart(prefs);
         Instant now = Instant.now();
+        Instant todayStart = computeTodayStart(prefs, now);
         long learnedToday = cardRepository.countByTagsIdAndFirstReviewDateGreaterThanEqual(deckId, todayStart, userId);
         return computeStatsInternal(deckId, mode, userId, prefs, todayStart, learnedToday, now);
     }
@@ -357,5 +365,44 @@ public class ReviewService {
             case "CRAM" -> -1;
             default -> 0;
         };
+    }
+
+    /**
+     * Builds an enhancement data map for a card if any enhancement records exist.
+     * Returns null only if there are zero records in card_enhancements.
+     */
+    public Map<String, Object> buildEnhancementMap(String cardId) {
+        List<CardEnhancement> enhancements = cardEnhancementRepository.findByCardId(cardId);
+        if (enhancements.isEmpty()) {
+            return null;
+        }
+
+        Map<String, Object> result = new java.util.HashMap<>();
+        ObjectMapper mapper = new ObjectMapper();
+
+        for (CardEnhancement e : enhancements) {
+            if (e.getType() == EnhancementType.SUBTITLE && e.getStatus() == EnhancementStatus.SUCCESS) {
+                try {
+                    var node = mapper.readTree(e.getData());
+                    if (node.has("quote")) {
+                        Map<String, Object> quote = new java.util.HashMap<>();
+                        quote.put("movieTitle", node.get("movieTitle").asText());
+                        quote.put("imdbId", node.get("imdbId").asText());
+                        quote.put("quote", node.get("quote").asText());
+                        quote.put("timestamp", node.get("timestamp").asText());
+                        result.put("movieQuote", quote);
+                    }
+                    if (node.has("sceneSummary")) {
+                        result.put("sceneSummary", node.get("sceneSummary").asText());
+                    }
+                } catch (Exception ex) {
+                    // skip malformed data
+                }
+            } else if (e.getType() == EnhancementType.ETYMOLOGY && e.getStatus() == EnhancementStatus.SUCCESS) {
+                result.put("etymology", e.getData());
+            }
+        }
+
+        return result;
     }
 }

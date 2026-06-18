@@ -1,0 +1,6 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - env(safe-area-inset-top));
+  overflow: hidden;
+}

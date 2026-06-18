@@ -4,6 +4,7 @@ import com.hugosol.chatagent.dto.CheckCardResponse;
 import com.hugosol.chatagent.flashcard.FsrsScheduler;
 import com.hugosol.chatagent.model.Card;
 import com.hugosol.chatagent.model.Tag;
+import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.TagRepository;
 
@@ -31,10 +32,13 @@ public class FlashcardService {
 
     private final CardRepository cardRepository;
     private final TagRepository tagRepository;
+    private final CardEnhancementRepository cardEnhancementRepository;
 
-    public FlashcardService(CardRepository cardRepository, TagRepository tagRepository) {
+    public FlashcardService(CardRepository cardRepository, TagRepository tagRepository,
+                            CardEnhancementRepository cardEnhancementRepository) {
         this.cardRepository = cardRepository;
         this.tagRepository = tagRepository;
+        this.cardEnhancementRepository = cardEnhancementRepository;
     }
 
     @Transactional
@@ -269,6 +273,7 @@ public class FlashcardService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         card.getTags().clear();
+        cardEnhancementRepository.deleteByCardId(cardId);
         cardRepository.delete(card);
     }
 }
