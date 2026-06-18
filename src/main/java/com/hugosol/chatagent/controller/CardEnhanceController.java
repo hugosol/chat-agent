@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +39,34 @@ public class CardEnhanceController {
         }
         response.put("sceneSummary", result.sceneSummary());
         response.put("etymology", result.etymology());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/cards/{id}/enhance/requote")
+    public ResponseEntity<Map<String, Object>> requote(@PathVariable String id,
+                                                        @RequestBody Map<String, String> body) {
+        String userId = getUserId();
+        String excludeImdbId = body.get("imdbId");
+        String excludeTimestamp = body.get("timestamp");
+        CardEnhanceService.EnhanceResult result = cardEnhanceService.requote(id, userId, excludeImdbId, excludeTimestamp);
+
+        Map<String, Object> response = new HashMap<>();
+        if (result == null) {
+            response.put("found", false);
+        } else {
+            if (result.movieQuote() != null) {
+                Map<String, Object> quote = new HashMap<>();
+                quote.put("movieTitle", result.movieQuote().movieTitle());
+                quote.put("imdbId", result.movieQuote().imdbId());
+                quote.put("quote", result.movieQuote().quote());
+                quote.put("timestamp", result.movieQuote().timestamp());
+                response.put("movieQuote", quote);
+            }
+            if (result.sceneSummary() != null) {
+                response.put("sceneSummary", result.sceneSummary());
+            }
+            response.put("found", true);
+        }
         return ResponseEntity.ok(response);
     }
 

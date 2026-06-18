@@ -223,4 +223,111 @@ class CardEnhanceServiceTest {
         assertThat(result.movieQuote()).isNotNull();
         assertThat(result.movieQuote().movieTitle()).isEqualTo("Inception");
     }
+
+    // ── Requote tests ──
+
+    @Test
+    void requote_returnsNewQuoteExcludingCurrent() {
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt001", "Inception", 2010, SubtitleStatus.DONE),
+                new WatchedMovie("user-1", "tt002", "The Matrix", 1999, SubtitleStatus.DONE)));
+
+        SubtitleLine m1 = new SubtitleLine("tt001", "Inception", "00:05:00,000",
+                "00:05:03,000", "You mustn't be afraid to dream.",
+                " you mustnt be afraid to dream ", 42);
+        SubtitleLine m2 = new SubtitleLine("tt002", "The Matrix", "00:10:00,000",
+                "00:10:03,000", "I dream of electric sheep.",
+                " i dream of electric sheep ", 10);
+
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+                .thenReturn(List.of(m1, m2));
+        // m1 is excluded, so context fetched for m2
+        when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt002"), anyInt(), anyInt()))
+                .thenReturn(List.of(m2));
+
+        when(chatLanguageModel.chat(anyString())).thenReturn("Matrix scene.");
+        when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
+
+        assertThat(result).isNotNull();
+        assertThat(result.movieQuote().imdbId()).isEqualTo("tt002");
+        assertThat(result.movieQuote().quote()).isEqualTo("I dream of electric sheep.");
+        assertThat(result.sceneSummary()).isEqualTo("Matrix scene.");
+        verify(cardEnhancementRepository, atLeastOnce()).save(any(CardEnhancement.class));
+    }
+
+    @Test
+    void requote_noOtherMatch_returnsNull() {
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt001", "Inception", 2010, SubtitleStatus.DONE)));
+
+        SubtitleLine only = new SubtitleLine("tt001", "Inception", "00:05:00,000",
+                "00:05:03,000", "You mustn't be afraid to dream.",
+                " you mustnt be afraid to dream ", 42);
+
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+                .thenReturn(List.of(only));
+
+        CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
+
+        assertThat(result).isNull();
+        verify(cardEnhancementRepository, never()).save(any());
+    }
+
+    @Test
+    void requote_nullExclude_doesFullSearch() {
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt001", "Inception", 2010, SubtitleStatus.DONE)));
+
+        SubtitleLine match = new SubtitleLine("tt001", "Inception", "00:05:00,000",
+                "00:05:03,000", "You mustn't be afraid to dream.",
+                " you mustnt be afraid to dream ", 42);
+
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+                .thenReturn(List.of(match));
+        when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(match));
+
+        when(chatLanguageModel.chat(anyString())).thenReturn("Scene.");
+        when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", null, null);
+
+        assertThat(result).isNotNull();
+        assertThat(result.movieQuote().movieTitle()).isEqualTo("Inception");
+    }
+
+    @Test
+    void requote_cardNotFound_throwsException() {
+        when(cardRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.requote("nonexistent", "user-1", "tt001", "00:05:00"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void requote_noWatchedMovies_returnsNull() {
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of());
+
+        CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", null, null);
+
+        assertThat(result).isNull();
+    }
 }

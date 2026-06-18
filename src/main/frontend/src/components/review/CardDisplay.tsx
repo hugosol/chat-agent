@@ -22,8 +22,11 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
   const [enhanceError, setEnhanceError] = useState("");
   const [localEnhancement, setLocalEnhancement] = useState<EnhancementData | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [requoting, setRequoting] = useState(false);
+  const [requoteError, setRequoteError] = useState("");
+  const [showRequoteConfirm, setShowRequoteConfirm] = useState(false);
 
-  const activeEnhancement = enhancement || localEnhancement;
+  const activeEnhancement = localEnhancement || enhancement;
 
   const handleMagnifierClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -114,6 +117,70 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
     }
   };
 
+  const handleRequoteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowRequoteConfirm(true);
+  };
+
+  const handleRequoteConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowRequoteConfirm(false);
+    handleRequote(e);
+  };
+
+  const handleRequoteCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowRequoteConfirm(false);
+  };
+
+  const handleRequote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!cardId) return;
+    setRequoting(true);
+    setRequoteError("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const currentQuote = activeEnhancement?.movieQuote;
+      const body: Record<string, string> = {};
+      if (currentQuote) {
+        body.imdbId = currentQuote.imdbId;
+        body.timestamp = currentQuote.timestamp;
+      }
+      const resp = await fetch(`/api/cards/${cardId}/enhance/requote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: controller.signal,
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.found === false) {
+          setRequoteError("No other matching quote");
+        } else {
+          setLocalEnhancement((prev) => ({
+            ...prev,
+            movieQuote: data.movieQuote ?? null,
+            sceneSummary: data.sceneSummary ?? prev?.sceneSummary ?? null,
+            etymology: prev?.etymology ?? null,
+          }));
+        }
+      } else {
+        setRequoteError("Requote failed");
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setRequoteError("Request timed out");
+      } else {
+        setRequoteError("Network error");
+      }
+    } finally {
+      clearTimeout(timeout);
+      setRequoting(false);
+    }
+  };
+
   const showTtsFront = englishOnly(front).length > 0;
   const showTtsBack = englishOnly(back).length > 0;
 
@@ -151,18 +218,18 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
             <div className={`${styles.cardBack} ${activeEnhancement != null || enhancing ? styles.scrollableBack : ""}`} data-testid="card-back">
               <button
                 data-testid="edit-btn"
-                className={styles.ttsBtn}
+                className={styles.cornerTopLeft}
                 onClick={handleEdit}
               >
                 {"\u270E"}
               </button>
-              <div className={styles.enhanceSection} data-testid="definition-zone">
+              <div className={styles.definitionZone} data-testid="definition-zone">
                 <span className={styles.cardText}>{renderText(back)}</span>
               </div>
               {showTtsBack && (
                 <button
                   data-testid="tts-btn-back"
-                  className={styles.ttsBtn}
+                  className={styles.cornerTopRight}
                   onClick={(e) => { e.stopPropagation(); speakText(englishOnly(back)); }}
                 >
                   {"\uD83D\uDD0A"}
@@ -175,8 +242,26 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
                   <div className={styles.enhanceSection} data-testid="movie-quote-zone">
                     {activeEnhancement?.movieQuote ? (
                       <>
-                        <div className={styles.movieQuoteTitle}>
-                          {activeEnhancement.movieQuote.movieTitle} [{activeEnhancement.movieQuote.timestamp}]
+                        <div className={styles.movieQuoteHeader}>
+                          <span className={styles.movieQuoteTitle}>
+                            {activeEnhancement.movieQuote.movieTitle} [{activeEnhancement.movieQuote.timestamp}]
+                          </span>
+                          <span className={styles.movieQuoteActions}>
+                            <button
+                              data-testid="tts-btn-quote"
+                              className={styles.ttsBtn}
+                              onClick={(e) => { e.stopPropagation(); speakText(activeEnhancement.movieQuote!.quote); }}
+                            >
+                              {"\uD83D\uDD0A"}
+                            </button>
+                            <button
+                              data-testid="requote-btn"
+                              className={styles.ttsBtn}
+                              onClick={handleRequoteClick}
+                            >
+                              {"\uD83D\uDD04"}
+                            </button>
+                          </span>
                         </div>
                         <div className={styles.movieQuoteText}>
                           "{activeEnhancement.movieQuote.quote}"
@@ -188,7 +273,17 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
                         )}
                       </>
                     ) : (
-                      <span data-testid="movie-quote-placeholder">【暂无电影台词数据】</span>
+                      <>
+                        <span data-testid="movie-quote-placeholder">【暂无电影台词数据】</span>
+                        <button
+                          data-testid="requote-btn"
+                          className={styles.ttsBtn}
+                          onClick={handleRequoteClick}
+                          style={{ marginLeft: 8 }}
+                        >
+                          {"\uD83D\uDD04"}
+                        </button>
+                      </>
                     )}
                   </div>
                   <hr className={styles.divider} />
@@ -205,7 +300,7 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
               {activeEnhancement == null && !enhancing && (
                 <button
                   data-testid="card-enhance-btn"
-                  className={styles.enhanceBtn}
+                  className={styles.cornerBottomRight}
                   onClick={handleMagnifierClick}
                 >
                   {"\uD83D\uDD0D"}
@@ -243,6 +338,39 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
                 <div className={styles.enhanceError} data-testid="enhance-error">
                   {enhanceError}
                   <button className={styles.enhanceBtn} onClick={handleEnhance}>Retry</button>
+                </div>
+              )}
+
+              {showRequoteConfirm && (
+                <div className={styles.loadingOverlay} data-testid="requote-confirm-dialog">
+                  <div className={styles.enhanceError}>
+                    <p>{activeEnhancement?.movieQuote ? "替换为另一句电影台词？" : "搜索电影台词？"}</p>
+                    <button
+                      data-testid="requote-confirm-ok"
+                      className={styles.enhanceBtn}
+                      onClick={handleRequoteConfirm}
+                    >
+                      确认
+                    </button>
+                    <button
+                      data-testid="requote-confirm-cancel"
+                      className={styles.enhanceBtn}
+                      onClick={handleRequoteCancel}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {requoting && (
+                <div className={styles.loadingOverlay} data-testid="requote-loading">
+                  <div className={styles.spinner} />
+                </div>
+              )}
+              {!requoting && requoteError && (
+                <div className={styles.enhanceError} data-testid="requote-error">
+                  {requoteError}
                 </div>
               )}
             </div>

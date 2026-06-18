@@ -144,6 +144,10 @@ class CardEnhanceIT extends E2ETestBase {
         // Click Card Enhance
         page.locator("[data-testid=\"card-enhance-btn\"]").click();
 
+        // Wait for confirm dialog and click confirm
+        page.waitForSelector("[data-testid=\"enhance-confirm-dialog\"]");
+        page.locator("[data-testid=\"enhance-confirm-ok\"]").click();
+
         // Wait for loading overlay to appear then disappear
         page.waitForSelector("[data-testid=\"enhance-loading\"]");
         page.waitForSelector("[data-testid=\"movie-quote-zone\"]");

@@ -83,13 +83,38 @@
   font-size: 30px;
 }
 
+.cornerBtn {
+  composes: ttsBtn;
+  position: absolute;
+  z-index: 2;
+}
+
+.cornerTopLeft {
+  composes: cornerBtn;
+  top: 8px;
+  left: 8px;
+}
+
+.cornerTopRight {
+  composes: cornerBtn;
+  top: 8px;
+  right: 8px;
+}
+
+.cornerBottomRight {
+  composes: cornerBtn;
+  bottom: 8px;
+  right: 8px;
+}
+
 @media (hover: hover) {
   .card:not(.cardFlipped):hover {
     border-color: #2a6a96;
   }
 
   .ttsBtn:hover,
-  .ttsBtnBelow:hover {
+  .ttsBtnBelow:hover,
+  .cornerBtn:hover {
     background-color: #0f3460;
   }
 }
@@ -149,11 +174,18 @@
   max-height: 55vh;
 }
 
+.definitionZone {
+  width: 100%;
+  padding: 4px 0;
+}
+
 .enhanceSection {
+  width: 100%;
   padding: 4px 0;
 }
 
 .divider {
+  width: 100%;
   border: none;
   border-top: 1px solid #2a5a7a;
   margin: 8px 0;
@@ -228,4 +260,17 @@
   color: #e94560;
   font-size: 0.8rem;
   text-align: center;
+}
+
+.movieQuoteHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.movieQuoteActions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }

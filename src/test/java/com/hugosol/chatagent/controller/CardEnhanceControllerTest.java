@@ -9,6 +9,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.containsString;
+
+import org.springframework.http.MediaType;
 
 @WebMvcTest(CardEnhanceController.class)
 @WithMockUser(username = "test-user")
@@ -71,6 +74,52 @@ class CardEnhanceControllerTest {
                         org.springframework.http.HttpStatus.NOT_FOUND, "Card not found"));
 
         mockMvc.perform(post("/api/cards/nonexistent/enhance").with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void requote_returnsNewQuote() throws Exception {
+        CardEnhanceService.MovieQuote quote = new CardEnhanceService.MovieQuote(
+                "The Matrix", "tt0133093", "There is no spoon.", "00:10:00,000");
+        CardEnhanceService.EnhanceResult result = new CardEnhanceService.EnhanceResult(
+                quote, "Matrix training scene.", null);
+
+        when(cardEnhanceService.requote(eq("card-1"), eq("test-user"), eq("tt001"), eq("00:05:00")))
+                .thenReturn(result);
+
+        mockMvc.perform(post("/api/cards/card-1/enhance/requote")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"imdbId\":\"tt001\",\"timestamp\":\"00:05:00\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movieQuote.movieTitle").value("The Matrix"))
+                .andExpect(jsonPath("$.movieQuote.quote").value("There is no spoon."))
+                .andExpect(jsonPath("$.sceneSummary").value("Matrix training scene."));
+    }
+
+    @Test
+    void requote_returnsFoundFalseWhenNoOtherMatch() throws Exception {
+        when(cardEnhanceService.requote(eq("card-1"), eq("test-user"), eq("tt001"), eq("00:05:00")))
+                .thenReturn(null);
+
+        mockMvc.perform(post("/api/cards/card-1/enhance/requote")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"imdbId\":\"tt001\",\"timestamp\":\"00:05:00\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.found").value(false));
+    }
+
+    @Test
+    void requote_returnsNotFoundForUnknownCard() throws Exception {
+        when(cardEnhanceService.requote(eq("nonexistent"), eq("test-user"), any(), any()))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Card not found"));
+
+        mockMvc.perform(post("/api/cards/nonexistent/enhance/requote")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
                 .andExpect(status().isNotFound());
     }
 }

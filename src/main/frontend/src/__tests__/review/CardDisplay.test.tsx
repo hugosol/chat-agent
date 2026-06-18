@@ -12,6 +12,13 @@ describe("CardDisplay", () => {
       value: mockSpeechSynthesis,
       writable: true,
     });
+    (globalThis as Record<string, unknown>).SpeechSynthesisUtterance =
+      class MockSpeechSynthesisUtterance {
+        text = "";
+        lang = "";
+        rate = 1;
+        constructor(text: string) { this.text = text; }
+      };
     vi.restoreAllMocks();
   });
 
@@ -261,5 +268,160 @@ describe("CardDisplay", () => {
     });
     // Magnifier should still be visible for retry
     expect(screen.getByTestId("card-enhance-btn")).toBeTruthy();
+  });
+
+  // ── Quote TTS + Replace button tests ──
+
+  it("shows TTS and Replace buttons in movie quote zone when movieQuote exists", () => {
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream bigger", timestamp: "00:05:00" },
+      sceneSummary: "梦境场景。",
+    };
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    expect(screen.getByTestId("tts-btn-quote")).toBeTruthy();
+    expect(screen.getByTestId("requote-btn")).toBeTruthy();
+  });
+
+  it("TTS quote button calls speakText with quote text", () => {
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream bigger", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("tts-btn-quote"));
+
+    expect(window.speechSynthesis.speak).toHaveBeenCalled();
+    const utterance = (window.speechSynthesis.speak as ReturnType<typeof vi.fn>).mock.calls[0][0] as SpeechSynthesisUtterance;
+    expect(utterance.text).toBe("dream bigger");
+  });
+
+  it("shows Replace button in movie quote zone when movieQuote is null", () => {
+    const enhancement = { etymology: "From Old English." };
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    expect(screen.getByTestId("movie-quote-placeholder")).toBeTruthy();
+    expect(screen.getByTestId("requote-btn")).toBeTruthy();
+  });
+
+  it("shows Replace confirm dialog when requote button is clicked", () => {
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+
+    expect(screen.getByTestId("requote-confirm-dialog")).toBeTruthy();
+    expect(screen.getByText("替换为另一句电影台词？")).toBeTruthy();
+  });
+
+  it("shows search confirm dialog when requote clicked with no current quote", () => {
+    const enhancement = { etymology: "From Old English." };
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+
+    expect(screen.getByText("搜索电影台词？")).toBeTruthy();
+  });
+
+  it("does not call requote API when confirm dialog is cancelled", () => {
+    const mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+    fireEvent.click(screen.getByTestId("requote-confirm-cancel"));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("calls requote API with imdbId+timestamp when confirmed", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        found: true,
+        movieQuote: { movieTitle: "The Matrix", imdbId: "tt002", quote: "There is no spoon.", timestamp: "00:10:00" },
+        sceneSummary: "Matrix scene.",
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+    fireEvent.click(screen.getByTestId("requote-confirm-ok"));
+
+    expect(mockFetch).toHaveBeenCalledWith("/api/cards/card-1/enhance/requote", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ imdbId: "tt001", timestamp: "00:05:00" }),
+    }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/The Matrix/)).toBeTruthy();
+      expect(screen.getByText(/There is no spoon/)).toBeTruthy();
+    });
+  });
+
+  // ── Requote loading/error state tests ──
+
+  it("shows loading overlay during requote", () => {
+    const mockFetch = vi.fn().mockImplementation(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+    fireEvent.click(screen.getByTestId("requote-confirm-ok"));
+
+    expect(screen.getByTestId("requote-loading")).toBeTruthy();
+  });
+
+  it("shows error when requote API fails", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+    fireEvent.click(screen.getByTestId("requote-confirm-ok"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("requote-error")).toBeTruthy();
+    });
+  });
+
+  it("shows no-match message when requote returns found:false", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ found: false }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+    fireEvent.click(screen.getByTestId("requote-confirm-ok"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("requote-error")).toBeTruthy();
+      expect(screen.getByText("No other matching quote")).toBeTruthy();
+    });
   });
 });

@@ -132,6 +132,79 @@ public class CardEnhanceService {
         return new EnhanceResult(freshMovieQuote, freshSceneSummary, etymology);
     }
 
+    @Transactional
+    public EnhanceResult requote(String cardId, String userId, String excludeImdbId, String excludeTimestamp) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Card not found: " + cardId));
+
+        String word = card.getFront().trim().toLowerCase();
+
+        List<WatchedMovie> movies = watchedMovieRepository.findByUserId(userId);
+        if (movies.isEmpty()) {
+            log.info("requote: no watched movies for userId={}", userId);
+            return null;
+        }
+
+        List<String> imdbIds = movies.stream().map(WatchedMovie::getImdbId).toList();
+        String pattern = "% " + word + " %";
+        List<SubtitleLine> matches = subtitleLineRepository.findByImdbIdInAndWordsLowerLike(imdbIds, pattern);
+
+        if (matches.isEmpty()) {
+            log.info("requote: no subtitle match for word='{}' imdbIds={}", word, imdbIds);
+            return null;
+        }
+
+        // Group by imdbId, pick first from each movie, exclude current quote
+        List<SubtitleLine> candidates = new ArrayList<>(matches.stream()
+                .collect(Collectors.groupingBy(SubtitleLine::getImdbId,
+                        Collectors.minBy(java.util.Comparator.comparingInt(SubtitleLine::getLineIndex))))
+                .values().stream()
+                .filter(java.util.Optional::isPresent)
+                .map(java.util.Optional::get)
+                .filter(line -> !(excludeImdbId != null && excludeTimestamp != null
+                        && line.getImdbId().equals(excludeImdbId)
+                        && line.getStartTime().equals(excludeTimestamp)))
+                .toList());
+
+        if (candidates.isEmpty()) {
+            log.info("requote: no other candidates after exclusion for cardId={}", cardId);
+            return null;
+        }
+
+        Collections.shuffle(candidates);
+        SubtitleLine match = candidates.get(0);
+        String movieTitle = match.getMovieTitle();
+        String imdbId = match.getImdbId();
+
+        int start = Math.max(1, match.getLineIndex() - 2);
+        int end = match.getLineIndex() + 2;
+        List<SubtitleLine> context = subtitleLineRepository
+                .findByImdbIdAndLineIndexBetween(imdbId, start, end);
+
+        String sceneSummary = generateSceneSummary(movieTitle, context, word);
+
+        MovieQuote quote = new MovieQuote(movieTitle, imdbId, match.getText(), match.getStartTime());
+
+        try {
+            Map<String, Object> dataMap = new java.util.HashMap<>();
+            dataMap.put("movieTitle", movieTitle);
+            dataMap.put("imdbId", imdbId);
+            dataMap.put("quote", match.getText());
+            dataMap.put("timestamp", match.getStartTime());
+            if (sceneSummary != null) {
+                dataMap.put("sceneSummary", sceneSummary);
+            }
+            String data = objectMapper.writeValueAsString(dataMap);
+            saveEnhancement(cardId, EnhancementType.SUBTITLE, EnhancementStatus.SUCCESS,
+                    data, null, null);
+            log.info("Requote saved for card {}: {} [{}]", cardId, movieTitle, match.getStartTime());
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize requote data", e);
+        }
+
+        return new EnhanceResult(quote, sceneSummary, null);
+    }
+
     private SubtitleSearchResult searchSubtitle(String word, String userId, String cardId) {
         log.info("searchSubtitle: word='{}' userId='{}' cardId={}", word, userId, cardId);
         List<WatchedMovie> movies = watchedMovieRepository.findByUserId(userId);
