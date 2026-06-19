@@ -40,7 +40,7 @@ class CardEnhanceControllerTest {
     void enhance_returnsFullResult() throws Exception {
         CardEnhanceService.MovieQuote quote = new CardEnhanceService.MovieQuote(
                 "Inception", "tt1375666", "You mustn't be afraid to dream a little bigger.", "00:05:00,000");
-        CardEnhanceService.EnhanceResult result = new CardEnhanceService.EnhanceResult(
+        CardEnhanceService.EnhanceResult result = CardEnhanceService.EnhanceResult.found(
                 quote, "梦境中对话的场景。", "From Old English drēam.");
 
         when(cardEnhanceService.enhance(eq("card-1"), eq("test-user"))).thenReturn(result);
@@ -55,7 +55,7 @@ class CardEnhanceControllerTest {
 
     @Test
     void enhance_returnsPartialWhenNoSubtitleMatch() throws Exception {
-        CardEnhanceService.EnhanceResult result = new CardEnhanceService.EnhanceResult(
+        CardEnhanceService.EnhanceResult result = CardEnhanceService.EnhanceResult.found(
                 null, null, "From Old English.");
 
         when(cardEnhanceService.enhance(eq("card-1"), eq("test-user"))).thenReturn(result);
@@ -81,7 +81,7 @@ class CardEnhanceControllerTest {
     void requote_returnsNewQuote() throws Exception {
         CardEnhanceService.MovieQuote quote = new CardEnhanceService.MovieQuote(
                 "The Matrix", "tt0133093", "There is no spoon.", "00:10:00,000");
-        CardEnhanceService.EnhanceResult result = new CardEnhanceService.EnhanceResult(
+        CardEnhanceService.EnhanceResult result = CardEnhanceService.EnhanceResult.found(
                 quote, "Matrix training scene.", null);
 
         when(cardEnhanceService.requote(eq("card-1"), eq("test-user"), eq("tt001"), eq("00:05:00")))
@@ -100,14 +100,15 @@ class CardEnhanceControllerTest {
     @Test
     void requote_returnsFoundFalseWhenNoOtherMatch() throws Exception {
         when(cardEnhanceService.requote(eq("card-1"), eq("test-user"), eq("tt001"), eq("00:05:00")))
-                .thenReturn(null);
+                .thenReturn(CardEnhanceService.EnhanceResult.notFound("no_other_candidates"));
 
         mockMvc.perform(post("/api/cards/card-1/enhance/requote")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"imdbId\":\"tt001\",\"timestamp\":\"00:05:00\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.found").value(false));
+                .andExpect(jsonPath("$.found").value(false))
+                .andExpect(jsonPath("$.reason").value("no_other_candidates"));
     }
 
     @Test

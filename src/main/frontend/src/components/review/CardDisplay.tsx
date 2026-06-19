@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { speakText } from "../../shared/tts";
 import { englishOnly } from "../../shared/utils";
+import { showToast } from "../../shared/Toast";
 import type { EnhancementData, ReviewCard } from "./reviewTypes";
 import styles from "./CardDisplay.module.css";
 
@@ -23,7 +24,6 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
   const [localEnhancement, setLocalEnhancement] = useState<EnhancementData | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [requoting, setRequoting] = useState(false);
-  const [requoteError, setRequoteError] = useState("");
   const [showRequoteConfirm, setShowRequoteConfirm] = useState(false);
 
   const activeEnhancement = localEnhancement || enhancement;
@@ -137,7 +137,6 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
     e.stopPropagation();
     if (!cardId) return;
     setRequoting(true);
-    setRequoteError("");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
@@ -157,23 +156,34 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
       if (resp.ok) {
         const data = await resp.json();
         if (data.found === false) {
-          setRequoteError("No other matching quote");
+          const reason = data.reason;
+          if (reason === "no_movies") {
+            showToast("未导入任何电影，无法搜索台词");
+          } else if (reason === "no_subtitle_match") {
+            showToast("你的电影库中没有包含该词的对白");
+          } else if (reason === "no_other_candidates") {
+            showToast("该词仅有一处匹配，没有其他可替换的台词");
+          } else {
+            showToast("没有其他可替换的台词");
+          }
         } else {
+          const movieTitle = data.movieQuote?.movieTitle || "";
           setLocalEnhancement((prev) => ({
             ...prev,
             movieQuote: data.movieQuote ?? null,
             sceneSummary: data.sceneSummary ?? prev?.sceneSummary ?? null,
             etymology: prev?.etymology ?? null,
           }));
+          showToast(movieTitle ? `已替换为《${movieTitle}》的台词` : "已替换台词");
         }
       } else {
-        setRequoteError("Requote failed");
+        showToast("替换失败，请重试");
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        setRequoteError("Request timed out");
+        showToast("请求超时，请重试");
       } else {
-        setRequoteError("Network error");
+        showToast("网络错误");
       }
     } finally {
       clearTimeout(timeout);
@@ -366,11 +376,6 @@ export function CardDisplay({ front, back, cardId, flipped, enhancement, onFlip,
               {requoting && (
                 <div className={styles.loadingOverlay} data-testid="requote-loading">
                   <div className={styles.spinner} />
-                </div>
-              )}
-              {!requoting && requoteError && (
-                <div className={styles.enhanceError} data-testid="requote-error">
-                  {requoteError}
                 </div>
               )}
             </div>

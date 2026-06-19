@@ -20,6 +20,8 @@ describe("CardDisplay", () => {
         constructor(text: string) { this.text = text; }
       };
     vi.restoreAllMocks();
+    // Clean up any lingering toast elements from previous tests
+    document.querySelectorAll('[data-testid="toast"]').forEach(el => el.remove());
   });
 
   it("renders front text when not flipped", () => {
@@ -365,7 +367,7 @@ describe("CardDisplay", () => {
     }));
 
     await waitFor(() => {
-      expect(screen.getByText(/The Matrix/)).toBeTruthy();
+      expect(screen.getByTestId("movie-quote-zone").textContent).toContain("The Matrix");
       expect(screen.getByText(/There is no spoon/)).toBeTruthy();
     });
   });
@@ -387,7 +389,7 @@ describe("CardDisplay", () => {
     expect(screen.getByTestId("requote-loading")).toBeTruthy();
   });
 
-  it("shows error when requote API fails", async () => {
+  it("shows toast when requote API fails", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
     vi.stubGlobal("fetch", mockFetch);
 
@@ -400,11 +402,33 @@ describe("CardDisplay", () => {
     fireEvent.click(screen.getByTestId("requote-confirm-ok"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("requote-error")).toBeTruthy();
+      expect(screen.getByTestId("toast")).toBeTruthy();
+      expect(screen.getByText("替换失败，请重试")).toBeTruthy();
     });
   });
 
-  it("shows no-match message when requote returns found:false", async () => {
+  it("shows toast with reason when requote returns found:false with reason", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ found: false, reason: "no_subtitle_match" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+    fireEvent.click(screen.getByTestId("requote-confirm-ok"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toast")).toBeTruthy();
+      expect(screen.getByText("你的电影库中没有包含该词的对白")).toBeTruthy();
+    });
+  });
+
+  it("shows generic toast when requote returns found:false without reason", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ found: false }),
@@ -420,8 +444,33 @@ describe("CardDisplay", () => {
     fireEvent.click(screen.getByTestId("requote-confirm-ok"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("requote-error")).toBeTruthy();
-      expect(screen.getByText("No other matching quote")).toBeTruthy();
+      expect(screen.getByTestId("toast")).toBeTruthy();
+      expect(screen.getByText("没有其他可替换的台词")).toBeTruthy();
+    });
+  });
+
+  it("shows success toast when requote returns a new match", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        found: true,
+        movieQuote: { movieTitle: "The Matrix", imdbId: "tt002", quote: "There is no spoon.", timestamp: "00:10:00" },
+        sceneSummary: "Matrix scene.",
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const enhancement = {
+      movieQuote: { movieTitle: "Inception", imdbId: "tt001", quote: "dream", timestamp: "00:05:00" },
+    };
+    render(<CardDisplay front="hello" back="你好" cardId="card-1" flipped={true} enhancement={enhancement} onFlip={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("requote-btn"));
+    fireEvent.click(screen.getByTestId("requote-confirm-ok"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toast")).toBeTruthy();
+      expect(screen.getByText(/已替换为《The Matrix》的台词/)).toBeTruthy();
     });
   });
 });

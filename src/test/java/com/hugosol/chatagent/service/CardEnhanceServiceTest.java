@@ -255,7 +255,7 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
 
-        assertThat(result).isNotNull();
+        assertThat(result.movieQuote()).isNotNull();
         assertThat(result.movieQuote().imdbId()).isEqualTo("tt002");
         assertThat(result.movieQuote().quote()).isEqualTo("I dream of electric sheep.");
         assertThat(result.sceneSummary()).isEqualTo("Matrix scene.");
@@ -281,7 +281,8 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
 
-        assertThat(result).isNull();
+        assertThat(result.movieQuote()).isNull();
+        assertThat(result.notFoundReason()).isEqualTo("no_other_candidates");
         verify(cardEnhancementRepository, never()).save(any());
     }
 
@@ -308,7 +309,7 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", null, null);
 
-        assertThat(result).isNotNull();
+        assertThat(result.movieQuote()).isNotNull();
         assertThat(result.movieQuote().movieTitle()).isEqualTo("Inception");
     }
 
@@ -330,7 +331,8 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", null, null);
 
-        assertThat(result).isNull();
+        assertThat(result.movieQuote()).isNull();
+        assertThat(result.notFoundReason()).isEqualTo("no_movies");
     }
 
     @Test
@@ -362,7 +364,7 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
 
-        assertThat(result).isNotNull();
+        assertThat(result.movieQuote()).isNotNull();
         assertThat(result.movieQuote().imdbId()).isEqualTo("tt002");
         assertThat(result.movieQuote().quote()).isEqualTo("I dream of electric sheep.");
         assertThat(result.sceneSummary()).isEqualTo("Matrix scene.");
@@ -390,7 +392,8 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
 
-        assertThat(result).isNull();
+        assertThat(result.movieQuote()).isNull();
+        assertThat(result.notFoundReason()).isEqualTo("no_subtitle_match");
         verify(subtitleLineRepository).countByImdbId("tt001");
         verify(cardEnhancementRepository, never()).save(any());
     }
