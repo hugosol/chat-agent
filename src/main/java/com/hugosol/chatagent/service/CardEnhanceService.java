@@ -145,6 +145,20 @@ public class CardEnhanceService {
             return null;
         }
 
+        // If the excluded movie no longer has subtitle data (e.g. movie was deleted),
+        // ignore the exclusion and do a fresh full search.
+        final String effExcludeImdbId;
+        final String effExcludeTimestamp;
+        if (excludeImdbId != null
+                && subtitleLineRepository.countByImdbId(excludeImdbId) == 0) {
+            log.info("requote: excluded imdbId={} has no subtitle lines, ignoring exclusion", excludeImdbId);
+            effExcludeImdbId = null;
+            effExcludeTimestamp = null;
+        } else {
+            effExcludeImdbId = excludeImdbId;
+            effExcludeTimestamp = excludeTimestamp;
+        }
+
         List<String> imdbIds = movies.stream().map(WatchedMovie::getImdbId).toList();
         String pattern = "% " + word + " %";
         List<SubtitleLine> matches = subtitleLineRepository.findByImdbIdInAndWordsLowerLike(imdbIds, pattern);
@@ -161,9 +175,9 @@ public class CardEnhanceService {
                 .values().stream()
                 .filter(java.util.Optional::isPresent)
                 .map(java.util.Optional::get)
-                .filter(line -> !(excludeImdbId != null && excludeTimestamp != null
-                        && line.getImdbId().equals(excludeImdbId)
-                        && line.getStartTime().equals(excludeTimestamp)))
+                .filter(line -> !(effExcludeImdbId != null && effExcludeTimestamp != null
+                        && line.getImdbId().equals(effExcludeImdbId)
+                        && line.getStartTime().equals(effExcludeTimestamp)))
                 .toList());
 
         if (candidates.isEmpty()) {
