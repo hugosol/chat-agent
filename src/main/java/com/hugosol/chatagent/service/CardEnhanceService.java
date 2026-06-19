@@ -181,17 +181,30 @@ public class CardEnhanceService {
             return EnhanceResult.notFound("no_subtitle_match");
         }
 
-        // Group by imdbId, pick first from each movie, exclude current quote
-        List<SubtitleLine> candidates = new ArrayList<>(matches.stream()
-                .collect(Collectors.groupingBy(SubtitleLine::getImdbId,
-                        Collectors.minBy(java.util.Comparator.comparingInt(SubtitleLine::getLineIndex))))
-                .values().stream()
-                .filter(java.util.Optional::isPresent)
-                .map(java.util.Optional::get)
-                .filter(line -> !(effExcludeImdbId != null && effExcludeTimestamp != null
-                        && line.getImdbId().equals(effExcludeImdbId)
-                        && line.getStartTime().equals(effExcludeTimestamp)))
-                .toList());
+        // Group by imdbId, then build candidates:
+        // - Single movie: all occurrences except the excluded one are candidates
+        // - Multiple movies: pick first occurrence per movie, then exclude current
+        Map<String, List<SubtitleLine>> byMovie = matches.stream()
+                .collect(Collectors.groupingBy(SubtitleLine::getImdbId));
+
+        List<SubtitleLine> candidates;
+        if (byMovie.size() == 1) {
+            candidates = new ArrayList<>(byMovie.values().iterator().next().stream()
+                    .filter(line -> !(effExcludeImdbId != null && effExcludeTimestamp != null
+                            && line.getImdbId().equals(effExcludeImdbId)
+                            && line.getStartTime().equals(effExcludeTimestamp)))
+                    .toList());
+        } else {
+            candidates = new ArrayList<>(byMovie.values().stream()
+                    .map(lines -> lines.stream()
+                            .min(java.util.Comparator.comparingInt(SubtitleLine::getLineIndex)))
+                    .filter(java.util.Optional::isPresent)
+                    .map(java.util.Optional::get)
+                    .filter(line -> !(effExcludeImdbId != null && effExcludeTimestamp != null
+                            && line.getImdbId().equals(effExcludeImdbId)
+                            && line.getStartTime().equals(effExcludeTimestamp)))
+                    .toList());
+        }
 
         if (candidates.isEmpty()) {
             log.info("requote: no other candidates after exclusion for cardId={}", cardId);
