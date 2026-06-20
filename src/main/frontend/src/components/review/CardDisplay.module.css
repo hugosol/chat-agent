@@ -14,7 +14,7 @@
   min-height: 200px;
   border: none;
   border-radius: var(--radius-sm);
-  background: var(--bg-sheikah-panel);
+  background: var(--bg-sheikah);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -27,14 +27,18 @@
 .card::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 10%;
-  right: 10%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0.6;
-  z-index: 1;
+  inset: 0;
   pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: overlay;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(60, 211, 252, 0.04) 1px,
+    rgba(60, 211, 252, 0.04) 2px
+  );
+  border-radius: var(--radius-sm);
 }
 
 .card::after {
