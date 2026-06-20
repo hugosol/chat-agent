@@ -251,10 +251,11 @@ class CardEnhanceServiceTest {
 
         when(chatLanguageModel.chat(anyString())).thenReturn("Matrix scene.");
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(subtitleLineRepository.countByImdbId("tt001")).thenReturn(1);
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
 
-        assertThat(result).isNotNull();
+        assertThat(result.movieQuote()).isNotNull();
         assertThat(result.movieQuote().imdbId()).isEqualTo("tt002");
         assertThat(result.movieQuote().quote()).isEqualTo("I dream of electric sheep.");
         assertThat(result.sceneSummary()).isEqualTo("Matrix scene.");
@@ -276,10 +277,12 @@ class CardEnhanceServiceTest {
 
         when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
                 .thenReturn(List.of(only));
+        when(subtitleLineRepository.countByImdbId("tt001")).thenReturn(1);
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
 
-        assertThat(result).isNull();
+        assertThat(result.movieQuote()).isNull();
+        assertThat(result.notFoundReason()).isEqualTo("no_other_candidates");
         verify(cardEnhancementRepository, never()).save(any());
     }
 
@@ -306,7 +309,7 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", null, null);
 
-        assertThat(result).isNotNull();
+        assertThat(result.movieQuote()).isNotNull();
         assertThat(result.movieQuote().movieTitle()).isEqualTo("Inception");
     }
 
@@ -328,6 +331,119 @@ class CardEnhanceServiceTest {
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", null, null);
 
-        assertThat(result).isNull();
+        assertThat(result.movieQuote()).isNull();
+        assertThat(result.notFoundReason()).isEqualTo("no_movies");
+    }
+
+    @Test
+    void requote_excludeRefersToDeletedMovie_doesFreshSearch() {
+        // Card was enhanced with a quote from tt001, but tt001 subtitle lines
+        // have been deleted (movie removed). Another movie tt002 still has
+        // matching subtitles. The guard should detect stale exclusion and
+        // perform a fresh full search, returning the tt002 match.
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt002", "The Matrix", 1999, SubtitleStatus.DONE)));
+
+        // tt001 subtitles are gone
+        when(subtitleLineRepository.countByImdbId("tt001")).thenReturn(0);
+
+        SubtitleLine m2 = new SubtitleLine("tt002", "The Matrix", "00:10:00,000",
+                "00:10:03,000", "I dream of electric sheep.",
+                " i dream of electric sheep ", 10);
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+                .thenReturn(List.of(m2));
+        when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt002"), anyInt(), anyInt()))
+                .thenReturn(List.of(m2));
+
+        when(chatLanguageModel.chat(anyString())).thenReturn("Matrix scene.");
+        when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
+
+        assertThat(result.movieQuote()).isNotNull();
+        assertThat(result.movieQuote().imdbId()).isEqualTo("tt002");
+        assertThat(result.movieQuote().quote()).isEqualTo("I dream of electric sheep.");
+        assertThat(result.sceneSummary()).isEqualTo("Matrix scene.");
+        verify(subtitleLineRepository).countByImdbId("tt001");
+    }
+
+    @Test
+    void requote_excludeRefersToDeletedMovie_noOtherMatch_returnsNull() {
+        // Card was enhanced with a quote from tt001, but tt001 subtitle lines
+        // are gone AND no other movies have matching subtitles. The guard
+        // should clear the exclusion, but the full search finds nothing.
+        Card card = new Card("user-1", "uniqueWord", "独特词");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt002", "The Matrix", 1999, SubtitleStatus.DONE)));
+
+        // tt001 subtitles are gone
+        when(subtitleLineRepository.countByImdbId("tt001")).thenReturn(0);
+
+        // tt002 doesn't have this word either
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% uniqueword %")))
+                .thenReturn(List.of());
+
+        CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
+
+        assertThat(result.movieQuote()).isNull();
+        assertThat(result.notFoundReason()).isEqualTo("no_subtitle_match");
+        verify(subtitleLineRepository).countByImdbId("tt001");
+        verify(cardEnhancementRepository, never()).save(any());
+    }
+
+    @Test
+    void requote_singleMovieMultipleOccurrences_returnsDifferentOccurrence() {
+        // Single movie with 3 occurrences of "dream". Exclude the first one —
+        // requote should return one of the remaining occurrences (same movie,
+        // different position).
+        Card card = new Card("user-1", "dream", "梦");
+        card.setId("card-1");
+        when(cardRepository.findById("card-1")).thenReturn(Optional.of(card));
+
+        when(watchedMovieRepository.findByUserId("user-1")).thenReturn(List.of(
+                new WatchedMovie("user-1", "tt001", "Inception", 2010, SubtitleStatus.DONE)));
+
+        when(subtitleLineRepository.countByImdbId("tt001")).thenReturn(3);
+
+        SubtitleLine m1 = new SubtitleLine("tt001", "Inception", "00:05:00,000",
+                "00:05:03,000", "You mustn't be afraid to dream.",
+                " you mustnt be afraid to dream ", 5);
+        SubtitleLine m2 = new SubtitleLine("tt001", "Inception", "00:10:00,000",
+                "00:10:03,000", "A dream within a dream.",
+                " a dream within a dream ", 10);
+        SubtitleLine m3 = new SubtitleLine("tt001", "Inception", "00:20:00,000",
+                "00:20:03,000", "Was it all a dream?",
+                " was it all a dream ", 20);
+
+        when(subtitleLineRepository.findByImdbIdInAndWordsLowerLike(anyList(), eq("% dream %")))
+                .thenReturn(List.of(m1, m2, m3));
+        // Context query: lineIndex ± 2 (any of the three could be selected)
+        when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt001"), anyInt(), anyInt()))
+                .thenReturn(List.of(m2));
+
+        when(chatLanguageModel.chat(anyString())).thenReturn("梦境场景。");
+        when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Run multiple times to verify we never get the excluded occurrence
+        boolean foundDifferent = false;
+        for (int i = 0; i < 20; i++) {
+            CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
+
+            assertThat(result.movieQuote()).isNotNull();
+            assertThat(result.movieQuote().imdbId()).isEqualTo("tt001");
+            assertThat(result.movieQuote().timestamp()).isNotEqualTo("00:05:00,000");
+            if ("00:20:00,000".equals(result.movieQuote().timestamp())) {
+                foundDifferent = true;
+            }
+        }
+        assertThat(foundDifferent).as("Should sometimes pick a different occurrence").isTrue();
+        verify(cardEnhancementRepository, atLeastOnce()).save(any(CardEnhancement.class));
     }
 }

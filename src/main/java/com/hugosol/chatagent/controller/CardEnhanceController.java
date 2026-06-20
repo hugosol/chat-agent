@@ -51,8 +51,11 @@ public class CardEnhanceController {
         CardEnhanceService.EnhanceResult result = cardEnhanceService.requote(id, userId, excludeImdbId, excludeTimestamp);
 
         Map<String, Object> response = new HashMap<>();
-        if (result == null) {
+        if (result.movieQuote() == null) {
             response.put("found", false);
+            if (result.notFoundReason() != null) {
+                response.put("reason", result.notFoundReason());
+            }
         } else {
             if (result.movieQuote() != null) {
                 Map<String, Object> quote = new HashMap<>();

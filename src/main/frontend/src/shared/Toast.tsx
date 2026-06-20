@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
+import styles from "./Toast.module.css";
 
 interface ToastProps {
   message: string;
@@ -14,7 +15,7 @@ function Toast({ message, duration = 2100, onClose }: ToastProps): JSX.Element {
   }, [duration, onClose]);
 
   return (
-    <div className="flashcard-toast show" data-testid="toast">
+    <div className={styles.toast} data-testid="toast">
       {message}
     </div>
   );

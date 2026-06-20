@@ -49,7 +49,20 @@ public class CardEnhanceService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public record EnhanceResult(MovieQuote movieQuote, String sceneSummary, String etymology) {}
+    /**
+     * Enhancement result. When {@code movieQuote} is non-null, enhancement succeeded.
+     * When {@code movieQuote} is null, {@code notFoundReason} carries a machine-readable
+     * reason code for the frontend to display an appropriate message.
+     */
+    public record EnhanceResult(MovieQuote movieQuote, String sceneSummary, String etymology,
+                                 String notFoundReason) {
+        public static EnhanceResult found(MovieQuote quote, String summary, String etymology) {
+            return new EnhanceResult(quote, summary, etymology, null);
+        }
+        public static EnhanceResult notFound(String reason) {
+            return new EnhanceResult(null, null, null, reason);
+        }
+    }
     public record MovieQuote(String movieTitle, String imdbId, String quote, String timestamp) {}
     private record SubtitleSearchResult(MovieQuote movieQuote, String sceneSummary) {}
 
@@ -129,7 +142,7 @@ public class CardEnhanceService {
             }
         }
 
-        return new EnhanceResult(freshMovieQuote, freshSceneSummary, etymology);
+        return EnhanceResult.found(freshMovieQuote, freshSceneSummary, etymology);
     }
 
     @Transactional
@@ -142,7 +155,21 @@ public class CardEnhanceService {
         List<WatchedMovie> movies = watchedMovieRepository.findByUserId(userId);
         if (movies.isEmpty()) {
             log.info("requote: no watched movies for userId={}", userId);
-            return null;
+            return EnhanceResult.notFound("no_movies");
+        }
+
+        // If the excluded movie no longer has subtitle data (e.g. movie was deleted),
+        // ignore the exclusion and do a fresh full search.
+        final String effExcludeImdbId;
+        final String effExcludeTimestamp;
+        if (excludeImdbId != null
+                && subtitleLineRepository.countByImdbId(excludeImdbId) == 0) {
+            log.info("requote: excluded imdbId={} has no subtitle lines, ignoring exclusion", excludeImdbId);
+            effExcludeImdbId = null;
+            effExcludeTimestamp = null;
+        } else {
+            effExcludeImdbId = excludeImdbId;
+            effExcludeTimestamp = excludeTimestamp;
         }
 
         List<String> imdbIds = movies.stream().map(WatchedMovie::getImdbId).toList();
@@ -151,24 +178,37 @@ public class CardEnhanceService {
 
         if (matches.isEmpty()) {
             log.info("requote: no subtitle match for word='{}' imdbIds={}", word, imdbIds);
-            return null;
+            return EnhanceResult.notFound("no_subtitle_match");
         }
 
-        // Group by imdbId, pick first from each movie, exclude current quote
-        List<SubtitleLine> candidates = new ArrayList<>(matches.stream()
-                .collect(Collectors.groupingBy(SubtitleLine::getImdbId,
-                        Collectors.minBy(java.util.Comparator.comparingInt(SubtitleLine::getLineIndex))))
-                .values().stream()
-                .filter(java.util.Optional::isPresent)
-                .map(java.util.Optional::get)
-                .filter(line -> !(excludeImdbId != null && excludeTimestamp != null
-                        && line.getImdbId().equals(excludeImdbId)
-                        && line.getStartTime().equals(excludeTimestamp)))
-                .toList());
+        // Group by imdbId, then build candidates:
+        // - Single movie: all occurrences except the excluded one are candidates
+        // - Multiple movies: pick first occurrence per movie, then exclude current
+        Map<String, List<SubtitleLine>> byMovie = matches.stream()
+                .collect(Collectors.groupingBy(SubtitleLine::getImdbId));
+
+        List<SubtitleLine> candidates;
+        if (byMovie.size() == 1) {
+            candidates = new ArrayList<>(byMovie.values().iterator().next().stream()
+                    .filter(line -> !(effExcludeImdbId != null && effExcludeTimestamp != null
+                            && line.getImdbId().equals(effExcludeImdbId)
+                            && line.getStartTime().equals(effExcludeTimestamp)))
+                    .toList());
+        } else {
+            candidates = new ArrayList<>(byMovie.values().stream()
+                    .map(lines -> lines.stream()
+                            .min(java.util.Comparator.comparingInt(SubtitleLine::getLineIndex)))
+                    .filter(java.util.Optional::isPresent)
+                    .map(java.util.Optional::get)
+                    .filter(line -> !(effExcludeImdbId != null && effExcludeTimestamp != null
+                            && line.getImdbId().equals(effExcludeImdbId)
+                            && line.getStartTime().equals(effExcludeTimestamp)))
+                    .toList());
+        }
 
         if (candidates.isEmpty()) {
             log.info("requote: no other candidates after exclusion for cardId={}", cardId);
-            return null;
+            return EnhanceResult.notFound("no_other_candidates");
         }
 
         Collections.shuffle(candidates);
@@ -202,7 +242,7 @@ public class CardEnhanceService {
             log.error("Failed to serialize requote data", e);
         }
 
-        return new EnhanceResult(quote, sceneSummary, null);
+        return EnhanceResult.found(quote, sceneSummary, null);
     }
 
     private SubtitleSearchResult searchSubtitle(String word, String userId, String cardId) {
@@ -345,6 +385,6 @@ public class CardEnhanceService {
             }
         }
 
-        return new EnhanceResult(movieQuote, sceneSummary, etymology);
+        return EnhanceResult.found(movieQuote, sceneSummary, etymology);
     }
 }
