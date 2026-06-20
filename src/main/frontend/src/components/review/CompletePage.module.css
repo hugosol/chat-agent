@@ -86,10 +86,20 @@
   font-style: italic;
   cursor: pointer;
   position: relative;
-  background: transparent;
-  color: var(--text-muted);
+  background: var(--bg-golden);
+  color: var(--warning);
   border-radius: var(--radius-sm);
   transition: all var(--duration-base) var(--ease-default);
+}
+
+.backBtn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(252, 196, 19, 0.3);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: border-color var(--duration-base) var(--ease-default);
 }
 
 .backBtn:focus-visible {
@@ -99,8 +109,10 @@
 
 @media (hover: hover) {
   .backBtn:hover {
-    background: var(--bg-surface);
-    color: var(--tan);
+    box-shadow: var(--glow-golden);
+  }
+  .backBtn:hover::after {
+    border-color: var(--warning);
   }
   .backBtn:active {
     transform: scale(0.98);

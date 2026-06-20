@@ -14,7 +14,7 @@
   min-height: 200px;
   border: none;
   border-radius: var(--radius-sm);
-  background: var(--bg-sheikah);
+  background: var(--bg-sheikah-panel);
   cursor: pointer;
   display: flex;
   flex-direction: column;
