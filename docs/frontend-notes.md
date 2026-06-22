@@ -265,8 +265,9 @@ import styles from "./ComponentName.module.css";
 
 | 面板类型 | 定位方式 | 原因 |
 |---------|---------|------|
-| **浮层面板**（需覆盖在聊天内容之上） | `position: fixed` | FlashcardPanel 的两阶段录入面板需浮于消息列表上方 |
+| **浮层面板**（需覆盖在聊天内容之上） | `position: absolute` | FlashcardPanel 的两阶段录入面板浮于 `.mainLayout`（`position: relative`）上方 |
 | **辅助面板**（不遮挡主内容，属于页面布局的一部分） | 流式布局 | DebugPanel 放在 Footer 之后，自然跟随页面流 |
+| **Flashcard 切换按钮** | DebugPanel 工具栏内 | 2026-06 重构：从 FlashcardPanel 中移出的独立 toggle 按钮现在渲染在 DebugPanel 的工具栏 flex 行内，通过 `margin-left: auto` 右对齐 |
 
 **DebugPanel 从 fixed 改为流式：**
 
@@ -275,6 +276,7 @@ import styles from "./ComponentName.module.css";
 | 定位 | `position: fixed; bottom: 0; z-index: 500` | 普通文档流，`flex-shrink: 0` |
 | 在页面中的位置 | 固定在视口底部，覆盖 Footer | 排在 Footer 之后，自然位于页面底部 |
 | 与 Footer 的关系 | z-index 堆叠，iOS Safari 上被 body 的 `100vh` 误差推离视口 | 同一父组件（`#app`）内的兄弟元素，不存在覆盖关系 |
+| Flashcard toggle | 独立渲染在 FlashcardPanel 中，独占一行 | 移入 DebugPanel 工具栏，与 Log/Clear 按钮同行 |
 
 改为流式布局不产生新耦合——DebugPanel 和 Footer 在 `chat-entry.tsx` 中已是同一 `AppContent` 组件内的兄弟元素，无论 fixed 还是 flow 都是这个关系。
 
@@ -282,12 +284,17 @@ import styles from "./ComponentName.module.css";
 ```css
 .debugPanel {
   /* 删除了 position: fixed / bottom / left / right / z-index */
-  background: rgba(0, 0, 0, 0.92);
-  border-top: 1px solid #333;
+  background: var(--bg-overlay);
+  border-top: 1px solid var(--border);
   max-height: 35vh;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+}
+
+.flashcardToggle {
+  margin-left: auto;
+  /* ... */
 }
 ```
 

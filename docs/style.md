@@ -19,14 +19,13 @@ Chat Agent 前端 Zelda: Breath of the Wild 风格改造的视觉决策记录。
 
 | Token | 值 | 用途 |
 |-------|-----|------|
-| `--bg-page` | `#1a1a1a` | 页面底色 |
-| `--bg-surface` | `rgba(0, 0, 0, 0.6)` | 标准面板/按钮 |
-| `--bg-sheikah` | `rgba(10, 20, 40, 0.85)` | 希卡按钮 |
-| `--bg-golden` | `#2e2418` | 金色面板（不透明） |
-| `--bg-item` | `rgba(60, 58, 52, 0.8)` | 物品槽（备用） |
-| `--bg-elevated` | `rgba(30, 30, 28, 0.9)` | 浮层面板 |
-| `--bg-input` | `rgba(0, 0, 0, 0.4)` | 输入框 |
-| `--bg-overlay` | `rgba(0, 0, 0, 0.85)` | 遮罩 |
+| `--bg-page` | `#0d1117` | 页面底色（GitHub 暗蓝，微蓝调） |
+| `--bg-surface` | `rgba(0, 0, 0, 0.6)` | 交互按压态、少数遗留面板 |
+| `--bg-sheikah` | `rgba(10, 20, 40, 0.85)` | 面板/侧边栏/Modal/工具栏（主力面板色） |
+| `--bg-golden` | `#2e2418` | User 消息气泡、纠正条目（暖金不透明） |
+| `--bg-elevated` | `rgba(30, 30, 28, 0.9)` | 浮层面板（少量使用） |
+| `--bg-input` | `rgba(10, 20, 40, 0.45)` | 输入框/下拉（浅希卡蓝半透明） |
+| `--bg-overlay` | `rgba(0, 0, 0, 0.85)` | Debug 面板遮罩 |
 | `--bg-correction` | `rgba(10, 20, 10, 0.6)` | 纠错气泡 |
 
 ### 文字色
@@ -34,7 +33,7 @@ Chat Agent 前端 Zelda: Breath of the Wild 风格改造的视觉决策记录。
 | Token | 值 | 用途 |
 |-------|-----|------|
 | `--text-main` | `#E9E1D1` | 主文字 |
-| `--text-muted` | `rgba(233, 225, 209, 0.6)` | 次要文字 |
+| `--text-muted` | `rgba(233, 225, 209, 0.75)` | 次要文字 |
 | `--text-accent` | `#E2D146` | 黄色强调 |
 | `--text-danger` | `#F15050` | 红色警告 |
 | `--text-success` | `#6FD49C` | 绿色成功 |
@@ -94,6 +93,74 @@ Chat Agent 前端 Zelda: Breath of the Wild 风格改造的视觉决策记录。
 | **editCancelBtn** | ghost | 透明 | 悬停显形 |
 | **editSaveBtn** | 保留绿 | `--success` | 不变 |
 
+### Chat 页面
+
+| 组件 | 底色 | 装饰 |
+|------|------|------|
+| **User 消息气泡** | `--bg-golden` `#2e2418` | 暖金不透明，与 Agent 蓝色对比 |
+| **Agent 消息气泡** | `--bg-sheikah` | 暗蓝 + 细边框 |
+| **纠错气泡** | `--bg-correction` | 暗绿 + 左侧 `--accent` 色条 |
+| **发送按钮** | `--accent` `#3CD3FC` | 亮青固体 + `::after` 希卡辉光边框 |
+| **Start/End 按钮** | `--accent` / `--danger` | 同全局 btn-primary / btn-danger |
+| **Report 关闭按钮** | `--accent-dark` `#0A8DD7` | 深海蓝 + 辉光悬停 |
+
+### Manage 页面
+
+| 组件 | 底色 | 装饰 |
+|------|------|------|
+| **CardBlock 卡片** | `#0c2440` 闪卡深蓝 | 不透明 + 蓝辉光悬停 |
+| **Tab 侧边栏** | `--bg-sheikah` | 暗蓝面板 |
+| **Dropdown 菜单** | `--bg-sheikah` | 暗蓝面板 |
+| **创建按钮** | `--accent` | 亮青固体 |
+| **遗忘按钮** | `--warning` | 金色 |
+
+### Settings / Tune / Profile / Movies 页面
+
+| 组件 | 底色 | 装饰 |
+|------|------|------|
+| **Section 标题** | `--accent` 文字色 | 希卡蓝，醒目 |
+| **表格表头** | `--accent` 文字色 | 同上 |
+| **工具栏** | `--bg-sheikah` | 暗蓝面板 |
+| **分页按钮** | `--accent-dark` | 深海蓝，active: `--accent` |
+| **空状态** | `::before` 光环圆圈 | `--accent-dim` 边框 + 辉光 |
+
+### 全局新模式下
+
+#### 全局扫描线纹理
+
+```css
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(60, 211, 252, 0.04) 1px,
+    rgba(60, 211, 252, 0.04) 2px
+  );
+}
+```
+
+#### 希卡加载动画
+
+```css
+@keyframes sheikah-spin { to { transform: rotate(360deg); } }
+@keyframes sheikah-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(60,211,252,0.3); }
+  50% { box-shadow: 0 0 14px rgba(60,211,252,0.6), 0 0 20px rgba(10,141,215,0.4); }
+}
+.spinner {
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: sheikah-spin 0.8s linear infinite, sheikah-pulse 2s ease-in-out infinite;
+}
+```
+
 ### 闪卡纹理配方（SheikahScanlines 纯 CSS 版）
 
 ```css
@@ -121,7 +188,7 @@ Chat Agent 前端 Zelda: Breath of the Wild 风格改造的视觉决策记录。
 /* 所有 Zelda 风格按钮/面板的标准模式 */
 .component {
   position: relative;
-  background: var(--bg-surface);
+  background: var(--bg-sheikah); /* 面板底色（按钮用 --accent-dark，主操作用 --accent） */
   border-radius: var(--radius-sm);
 }
 .component::after {
@@ -146,6 +213,12 @@ Chat Agent 前端 Zelda: Breath of the Wild 风格改造的视觉决策记录。
 | 闪卡 golden 不透明 `#2e2418` | ⚠️ 可见但无质感 | 纯色平面缺乏层次 |
 | 闪卡 deep navy `#0c2440` | ⚠️ 可用 | 不如 midnight 有科技感 |
 | **闪卡 midnight + 渐变 + 扫描线 + 光晕** | ✅ 选中 | 蓝调清晰 + 石板纹理 + 深度感 |
+| 页面背景 `#0d1117`（GitHub 暗蓝） | ✅ 选中 | 微蓝调，比纯黑 `#1a1a1a` 更明亮，与蓝色面板统一 |
+| 按钮 `--accent-dark` `#0A8DD7`（深海蓝） | ✅ 选中 | 固体蓝色，替换暖灰 `--bg-elevated`，层次清晰 |
+| 面板统一 `--bg-sheikah` | ✅ 选中 | 13 处 `--bg-surface`（近黑）统一改为暗蓝半透明 |
+| User 气泡 `--bg-golden` | ✅ 选中 | 暖金不透明，与 Agent 的 `--bg-sheikah` 冷暖对比 |
+| 全局扫描线 `body::before` | ✅ 选中 | CRT 纹理，科技质感，opacity 0.04 不影响可读性 |
+| 空状态装饰光环 | ✅ 选中 | `--accent-dim` 圆圈 + 辉光，终结"空页面一片黑" |
 
 ## 未改动（功能层保护）
 
