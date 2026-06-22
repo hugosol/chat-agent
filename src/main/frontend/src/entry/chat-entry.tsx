@@ -76,6 +76,8 @@ function AppContent({
     React.createElement(DebugPanel, {
       isOpen: activePanel === "debug",
       onToggle: () => togglePanel("debug"),
+      onFlashcardToggle: () => togglePanel("flashcard"),
+      flashcardActive: activePanel === "flashcard",
     }),
     React.createElement(FlashcardPanel, {
       isOpen: activePanel === "flashcard",

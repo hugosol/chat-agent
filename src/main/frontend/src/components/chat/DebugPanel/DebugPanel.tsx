@@ -5,9 +5,11 @@ import styles from "./DebugPanel.module.css";
 interface DebugPanelProps {
   isOpen: boolean;
   onToggle: () => void;
+  onFlashcardToggle?: () => void;
+  flashcardActive?: boolean;
 }
 
-export function DebugPanel({ isOpen, onToggle }: DebugPanelProps): React.ReactElement {
+export function DebugPanel({ isOpen, onToggle, onFlashcardToggle, flashcardActive }: DebugPanelProps): React.ReactElement {
   const [entries, setEntries] = useState<DebugEntry[]>([]);
 
   useEffect(() => {
@@ -26,10 +28,20 @@ export function DebugPanel({ isOpen, onToggle }: DebugPanelProps): React.ReactEl
     { className: styles.debugPanel },
     React.createElement(
       "div",
-      { style: { display: "flex", gap: 6, padding: "4px 8px", borderBottom: "1px solid #333", flexShrink: 0 } },
+      { style: { display: "flex", gap: 6, padding: "4px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 } },
       React.createElement("button", { onClick: onToggle, className: styles.toggleBtn }, "Log"),
       isOpen &&
-        React.createElement("button", { onClick: handleClear, className: styles.clearBtn }, "Clear")
+        React.createElement("button", { onClick: handleClear, className: styles.clearBtn }, "Clear"),
+      onFlashcardToggle &&
+        React.createElement(
+          "button",
+          {
+            "data-testid": "flashcard-toggle",
+            className: flashcardActive ? `${styles.flashcardToggle} ${styles.active}` : styles.flashcardToggle,
+            onClick: onFlashcardToggle,
+          },
+          "anki"
+        )
     ),
     isOpen &&
       React.createElement(

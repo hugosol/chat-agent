@@ -77,15 +77,6 @@ export function FlashcardPanel({ isOpen, onToggle }: FlashcardPanelProps): React
     React.Fragment,
     null,
     React.createElement(
-      "button",
-      {
-        "data-testid": "flashcard-toggle",
-        className: styles.toggleBtn,
-        onClick: onToggle,
-      },
-      "anki"
-    ),
-    React.createElement(
       "div",
       {
         "data-testid": "flashcard-panel",

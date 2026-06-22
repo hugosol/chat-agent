@@ -8,25 +8,6 @@
   align-items: center;
   gap: 16px;
   min-width: 0;
-  padding-left: 8px;
-}
-
-/* ── Sheikah Eye Icon ── */
-.navRoot::before {
-  content: '';
-  display: block;
-  width: 22px;
-  height: 20px;
-  flex-shrink: 0;
-  background: currentColor;
-  color: var(--accent);
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 22'%3E%3Cpath d='M12 0C5.4 0 0 4.5 0 11c0 6.5 5.4 11 12 11s12-4.5 12-11c0-6.5-5.4-11-12-11zm0 18c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z'/%3E%3Ccircle cx='12' cy='11' r='4'/%3E%3Cpath d='M12 6l2 5-2 5-2-5z' fill='%233CD3FC'/%3E%3C/svg%3E");
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 22'%3E%3Cpath d='M12 0C5.4 0 0 4.5 0 11c0 6.5 5.4 11 12 11s12-4.5 12-11c0-6.5-5.4-11-12-11zm0 18c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z'/%3E%3Ccircle cx='12' cy='11' r='4'/%3E%3Cpath d='M12 6l2 5-2 5-2-5z' fill='%233CD3FC'/%3E%3C/svg%3E");
-  mask-size: contain;
-  -webkit-mask-size: contain;
-  mask-repeat: no-repeat;
-  -webkit-mask-repeat: no-repeat;
-  filter: drop-shadow(0 0 6px var(--accent-glow));
 }
 
 /* ── Sidebar ── */
