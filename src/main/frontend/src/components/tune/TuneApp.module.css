@@ -96,6 +96,18 @@
   padding: 16px;
 }
 
+.empty::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 24px;
+  margin: 0 auto 10px;
+  border: 2px solid var(--accent-dim);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(60, 211, 252, 0.15);
+  opacity: 0.4;
+}
+
 /* ── Pager ── */
 
 .pager {

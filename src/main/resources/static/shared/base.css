@@ -17,6 +17,24 @@ body {
     height: 100vh;
     overflow: hidden;
     padding-top: env(safe-area-inset-top);
+    position: relative;
+}
+
+/* ── Global Sheikah Scanline Texture ── */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 1px,
+        rgba(60, 211, 252, 0.04) 1px,
+        rgba(60, 211, 252, 0.04) 2px
+    );
 }
 
 .hidden {
@@ -274,4 +292,24 @@ select option {
 
 .flashcard-toast.show {
     animation: flashcardToastFade 2s forwards;
+}
+
+/* ── Sheikah Loading Spinner ── */
+@keyframes sheikah-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes sheikah-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(60, 211, 252, 0.3); }
+    50% { box-shadow: 0 0 14px rgba(60, 211, 252, 0.6), 0 0 20px rgba(10, 141, 215, 0.4); }
+}
+
+.spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: sheikah-spin 0.8s linear infinite, sheikah-pulse 2s ease-in-out infinite;
 }
