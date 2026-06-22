@@ -1,14 +1,20 @@
+/* ============================================
+   Movie Block — List Item (Zelda Theme)
+   ============================================ */
+
 .block {
   display: flex;
   align-items: center;
   gap: 5px;
   padding: 5px 10px;
-  border-bottom: 1px solid #1a3a5c;
-  transition: background 0.15s;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--duration-fast) var(--ease-default);
 }
 
-.block:hover {
-  background: rgba(26, 82, 118, 0.15);
+@media (hover: hover) {
+  .block:hover {
+    background: var(--bg-input);
+  }
 }
 
 .info {
@@ -21,7 +27,7 @@
 
 .title {
   font-size: 0.85em;
-  color: #e0e0e0;
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -29,7 +35,7 @@
 
 .year {
   font-size: 0.6em;
-  color: #888;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -44,15 +50,15 @@
 }
 
 .statusPending {
-  color: #888;
+  color: var(--text-muted);
 }
 
 .statusDone {
-  color: rgb(39, 174, 96);
+  color: var(--success);
 }
 
 .statusFailed {
-  color: rgb(231, 76, 60);
+  color: var(--danger);
 }
 
 .actions {
@@ -69,17 +75,21 @@
   height: 20px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 1.1em;
   line-height: 1;
   padding: 0;
-  transition: background 0.15s, border-color 0.15s;
+  color: var(--text-muted);
+  transition: background var(--duration-fast) var(--ease-default),
+              border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
 @media (hover: hover) {
   .iconBtn:hover {
-    background: rgba(26, 82, 118, 0.2);
-    border-color: #1a5276;
+    background: var(--bg-input);
+    border-color: var(--border);
+    color: var(--text-main);
   }
 }

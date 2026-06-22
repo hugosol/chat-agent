@@ -1,10 +1,16 @@
+/* ============================================
+   Header — Global Navigation (Zelda Theme)
+   ============================================ */
+
 .navRoot {
   display: flex;
-  border-top: 5px solid #1a1a2e;
+  border-top: 5px solid var(--bg-surface);
   align-items: center;
   gap: 16px;
   min-width: 0;
 }
+
+/* ── Sidebar ── */
 
 .navSidebar {
   position: fixed;
@@ -12,11 +18,11 @@
   right: 0;
   bottom: 0;
   width: 200px;
-  background: #0d1b2a;
-  border-left: 1px solid #0f3460;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
   z-index: 500;
   transform: translateX(100%);
-  transition: transform 0.25s ease;
+  transition: transform var(--duration-base) var(--ease-default);
   display: flex;
   flex-direction: column;
 }
@@ -31,21 +37,24 @@
   justify-content: space-between;
   padding: 8px 10px;
   font-size: 0.85em;
-  color: #aaa;
-  border-bottom: 1px solid #0f3460;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-title);
 }
 
 .navSidebarHeader button {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 1.2em;
   cursor: pointer;
   padding: 0 4px;
 }
 
-.navSidebarHeader button:hover {
-  color: #e94560;
+@media (hover: hover) {
+  .navSidebarHeader button:hover {
+    color: var(--accent);
+  }
 }
 
 .navSidebarLinks {
@@ -57,38 +66,49 @@
 .navLink {
   display: block;
   padding: 10px 16px;
-  color: #aaa;
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 0.9em;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.navLink:hover {
-  background: #16213e;
-  color: #e0e0e0;
+@media (hover: hover) {
+  .navLink:hover {
+    background: var(--bg-input);
+    color: var(--text-main);
+  }
 }
 
 .navLink[data-active="true"] {
-  color: #e94560;
-  background: #1a1a2e;
+  color: var(--accent);
+  background: var(--bg-elevated);
 }
+
+/* ── Menu Button ── */
 
 .navMenuBtn {
   margin-left: auto;
   padding: 4px 10px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  color: #aaa;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   font-size: 0.75em;
   cursor: pointer;
   white-space: nowrap;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.navMenuBtn:hover {
-  color: #e94560;
-  border-color: #e94560;
+@media (hover: hover) {
+  .navMenuBtn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
 }
+
+/* ── Token Usage Bar ── */
 
 .tokenBarContainer {
   display: flex;
@@ -99,14 +119,14 @@
 
 .tokenBarLabel {
   font-size: 0.7em;
-  color: #888;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
 .tokenBar {
   flex: 1;
   height: 6px;
-  background: #0f3460;
+  background: var(--bg-input);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -114,17 +134,19 @@
 .tokenBarFill {
   height: 100%;
   width: 0%;
-  background: #27ae60;
+  background: var(--accent);
   transition: width 0.3s, background-color 0.3s;
   border-radius: 3px;
 }
 
 .tokenBarPct {
   font-size: 0.7em;
-  color: #888;
+  color: var(--text-muted);
   min-width: 35px;
   text-align: right;
 }
+
+/* ── Logout ── */
 
 .logoutForm {
   position: absolute;
@@ -143,20 +165,27 @@
   white-space: nowrap;
 }
 
+/* ── User Area ── */
+
 .userArea {
   position: relative;
   padding: 4px 12px;
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.75em;
   white-space: nowrap;
-  border: 1px solid #0f3460;
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.userArea:hover {
-  color: #e94560;
-  border-color: #e94560;
+@media (hover: hover) {
+  .userArea:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: var(--glow-blue);
+  }
 }
 
 .userLabel {

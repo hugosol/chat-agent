@@ -1,27 +1,35 @@
+/* ============================================
+   Card Block — Flashcard List Item (Zelda Theme)
+   ============================================ */
+
 .block {
-  background: #16213e;
-  border: 1px solid #0f3460;
-  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   padding: 12px;
   margin-bottom: 8px;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
 }
 
-.block:hover {
-  border-color: #e94560;
+@media (hover: hover) {
+  .block:hover {
+    border-color: var(--accent);
+    box-shadow: var(--glow-blue);
+  }
 }
 
 .front {
   font-size: 1em;
-  font-weight: 600;
-  color: #e0e0e0;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-main);
   margin-bottom: 4px;
 }
 
 .back {
   font-size: 0.85em;
-  color: #888;
+  color: var(--text-muted);
   margin-bottom: 6px;
   overflow: hidden;
   display: -webkit-box;
@@ -37,6 +45,8 @@
   margin-bottom: 6px;
 }
 
+/* ── Actions ── */
+
 .actions {
   display: flex;
   gap: 6px;
@@ -44,17 +54,21 @@
 
 .actions button {
   background: transparent;
-  border: 1px solid #333;
-  color: #888;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.75em;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.actions button:hover {
-  color: #e94560;
-  border-color: #e94560;
+@media (hover: hover) {
+  .actions button:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
 }
 
 .ttsBtn {
@@ -62,9 +76,11 @@
   cursor: pointer;
   font-size: 0.85em;
   opacity: 0.5;
-  transition: opacity 0.15s;
+  transition: opacity var(--duration-fast);
 }
 
-.ttsBtn:hover {
-  opacity: 1;
+@media (hover: hover) {
+  .ttsBtn:hover {
+    opacity: 1;
+  }
 }

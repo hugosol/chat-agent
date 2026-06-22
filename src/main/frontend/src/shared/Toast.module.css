@@ -3,14 +3,24 @@
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.82);
-  color: #fff;
+  background: var(--bg-surface);
+  color: var(--text-main);
   padding: 10px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
-  z-index: 10000;
+  z-index: var(--z-toast);
   white-space: nowrap;
-  animation: toastIn 0.25s ease-out;
+  pointer-events: none;
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.toast::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
   pointer-events: none;
 }
 

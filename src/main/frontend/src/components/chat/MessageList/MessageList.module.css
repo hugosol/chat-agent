@@ -1,7 +1,11 @@
+/* ============================================
+   Message List — Chat Bubbles (Zelda Theme)
+   ============================================ */
+
 .message {
     padding: 8px 12px;
     margin-bottom: 8px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: 16px;
     line-height: 1.5;
     max-width: 85%;
@@ -14,31 +18,39 @@
 }
 
 .role {
-    font-weight: 600;
+    font-weight: var(--font-weight-bold);
     font-size: 0.75em;
     display: block;
     margin-bottom: 2px;
 }
 
+/* ── User Message (right-aligned, warm tone) ── */
+
 .messageUser {
-    background: #0f3460;
+    background: var(--bg-elevated);
     margin-left: auto;
     text-align: right;
+    border: 1px solid var(--border);
 }
 
 .messageUser .role {
-    color: #4fc3f7;
+    color: var(--accent);
 }
 
+/* ── Agent Message (left-aligned, cool tone) ── */
+
 .messageAgent {
-    background: #16213e;
+    background: var(--bg-sheikah);
     margin-right: auto;
     position: relative;
+    border: 1px solid var(--border);
 }
 
 .messageAgent .role {
-    color: #66bb6a;
+    color: var(--success);
 }
+
+/* ── Play Button ── */
 
 .btnPlay {
     position: absolute;
@@ -50,24 +62,30 @@
     cursor: pointer;
     opacity: 0.6;
     padding: 2px 4px;
-    transition: opacity 0.2s;
+    transition: opacity var(--duration-fast);
+    color: var(--text-muted);
 }
 
-.btnPlay:hover {
-    opacity: 1;
+@media (hover: hover) {
+    .btnPlay:hover {
+        opacity: 1;
+        color: var(--accent);
+    }
 }
+
+/* ── Correction Bubble ── */
 
 .correctionBubble {
     composes: message;
-    background: #1a2a1a;
+    background: var(--bg-correction);
     margin-right: auto;
-    border-left: 3px solid #e94560;
+    border-left: 3px solid var(--accent);
     font-size: 0.8em;
     max-width: 70%;
 }
 
 .correctionBubble .role {
-    color: #e94560;
+    color: var(--accent);
 }
 
 .correctionBubble .contentText {
@@ -75,11 +93,13 @@
     line-height: 1.6;
 }
 
+/* ── Streaming Cursor ── */
+
 .streamCursor {
     display: inline-block;
     width: 2px;
     height: 1em;
-    background: #e94560;
+    background: var(--accent);
     animation: blink 0.8s infinite;
     vertical-align: text-bottom;
     margin-left: 1px;

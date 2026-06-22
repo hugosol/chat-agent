@@ -1,29 +1,44 @@
+/* ============================================
+   Report Modal — Session Report (Zelda Theme)
+   ============================================ */
+
 .overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .modal {
-  background: #16213e;
-  border: 1px solid #0f3460;
-  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 24px;
   max-width: 600px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
+  position: relative;
+}
+
+.modal::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-lg) - 4px);
+  pointer-events: none;
 }
 
 .title {
-  color: #e94560;
+  font-family: var(--font-title);
+  color: var(--accent);
   margin-bottom: 16px;
 }
 
@@ -34,12 +49,12 @@
 }
 
 .sectionLabel {
-  color: #4fc3f7;
+  color: var(--accent);
 }
 
 .section p {
   margin-top: 4px;
-  color: #ccc;
+  color: var(--text-main);
 }
 
 .closeBtn {
@@ -47,16 +62,40 @@
   width: 100%;
   padding: 10px;
   margin-top: 20px;
-  border: 1px solid #0f3460;
-  border-radius: 6px;
-  background: #0f3460;
-  color: #e0e0e0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-main);
   font-size: 0.9em;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
+  font-style: italic;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+  position: relative;
 }
 
-.closeBtn:hover {
-  background: #1a5276;
+.closeBtn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: border-color var(--duration-fast) var(--ease-default);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .closeBtn:hover {
+    background: var(--bg-elevated);
+    box-shadow: var(--glow-blue);
+  }
+  .closeBtn:hover::after {
+    border-color: var(--border-active);
+  }
 }

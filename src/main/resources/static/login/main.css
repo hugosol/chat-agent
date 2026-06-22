@@ -1,3 +1,37 @@
+/* ============================================
+   Chat Agent — Login Page (Zelda Theme)
+   Self-contained: defines :root tokens locally
+   since this page does not load the Vite bundle.
+   ============================================ */
+
+:root {
+    --bg-page: #66645D;
+    --bg-surface: rgba(0, 0, 0, 0.6);
+    --bg-input: rgba(0, 0, 0, 0.4);
+    --text-main: #E9E1D1;
+    --text-muted: rgba(233, 225, 209, 0.6);
+    --text-inverse: #1a1a1a;
+    --accent: #3CD3FC;
+    --accent-dark: #0A8DD7;
+    --accent-glow: #4FC0FF;
+    --border: rgba(226, 222, 211, 0.3);
+    --border-focus: #3CD3FC;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --duration-fast: 0.15s;
+    --duration-base: 0.25s;
+    --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+    --font-title: 'Hylia Serif', 'Cinzel', Georgia, serif;
+    --font-body: system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+    --font-weight-medium: 500;
+    --font-weight-bold: 700;
+    --shadow-dark: 0 0 11px rgba(0, 0, 0, 0.8);
+    --glow-blue: 0 0 8px #4FC0FF;
+    --glow-sheikah: 0 0 10px #4FC0FF, 0 1px 11px #0A8DD7;
+    --tan: #E2DED3;
+}
+
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -5,9 +39,9 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #1a1a2e;
-    color: #e0e0e0;
+    font-family: var(--font-body);
+    background: var(--bg-page);
+    color: var(--text-main);
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -21,31 +55,42 @@ body {
 }
 
 .login-card {
-    background: #16213e;
-    border-radius: 12px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
     padding: 2rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-dark);
+    position: relative;
+}
+
+.login-card::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius-lg) - 4px);
+    pointer-events: none;
 }
 
 .login-title {
+    font-family: var(--font-title);
     font-size: 1.5rem;
-    color: #e94560;
+    color: var(--tan);
     text-align: center;
     margin-bottom: 0.25rem;
 }
 
 .login-subtitle {
     font-size: 0.85rem;
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     margin-bottom: 1.5rem;
 }
 
 .login-error {
-    background: rgba(233, 69, 96, 0.15);
-    border: 1px solid #e94560;
-    color: #e94560;
-    border-radius: 6px;
+    background: rgba(241, 80, 80, 0.15);
+    border: 1px solid #F15050;
+    color: #F15050;
+    border-radius: var(--radius-md);
     padding: 0.6rem 0.8rem;
     margin-bottom: 1rem;
     font-size: 0.85rem;
@@ -63,27 +108,29 @@ body {
 .form-group label {
     display: block;
     font-size: 0.8rem;
-    color: #aaa;
+    color: var(--text-muted);
     margin-bottom: 0.3rem;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .form-group input[type="text"],
 .form-group input[type="password"] {
     width: 100%;
     padding: 0.65rem 0.8rem;
-    background: #0f3460;
-    border: 1px solid #1a1a4e;
-    border-radius: 6px;
-    color: #e0e0e0;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-main);
     font-size: 0.95rem;
-    transition: border-color 0.2s;
+    transition: border-color var(--duration-fast) var(--ease-default),
+                box-shadow var(--duration-fast) var(--ease-default);
 }
 
 .form-group input[type="text"]:focus,
 .form-group input[type="password"]:focus {
     outline: none;
-    border-color: #e94560;
+    border-color: var(--border-focus);
+    box-shadow: var(--glow-blue);
 }
 
 .checkbox-group {
@@ -95,7 +142,7 @@ body {
 .checkbox-group input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: #e94560;
+    accent-color: var(--accent);
 }
 
 .checkbox-group label {
@@ -106,17 +153,34 @@ body {
 .btn-login {
     width: 100%;
     padding: 0.7rem;
-    background: #e94560;
-    color: #fff;
+    background: var(--accent);
+    color: var(--text-inverse);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-bold);
+    font-style: italic;
     cursor: pointer;
-    transition: background 0.2s;
-    margin-top: 0.5rem;
+    transition: background var(--duration-fast) var(--ease-default),
+                box-shadow var(--duration-fast) var(--ease-default);
+    position: relative;
+}
+
+.btn-login::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px solid var(--accent-glow);
+    border-radius: calc(var(--radius-md) - 2px);
+    pointer-events: none;
 }
 
 .btn-login:hover {
-    background: #d63852;
+    background: var(--accent-dark);
+    box-shadow: var(--glow-sheikah);
+}
+
+.btn-login:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }

@@ -1,6 +1,12 @@
+/* ============================================
+   Card Toolbar — Deck Tabs + Search (Zelda Theme)
+   ============================================ */
+
 .toolbar {
   margin-bottom: 12px;
 }
+
+/* ── Deck Tabs ── */
 
 .deckTabs {
   display: flex;
@@ -10,32 +16,43 @@
 
 .deckTab {
   padding: 6px 14px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-bottom: none;
-  border-radius: 6px 6px 0 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   font-size: 0.8em;
-  color: #888;
+  color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
 .deckTab:first-child {
   border-left-width: 2px;
+  border-left-color: var(--border-active);
 }
 
 @media (hover: hover) {
   .deckTab:hover {
-    background: #16213e;
-    color: #e0e0e0;
+    background: var(--bg-elevated);
+    color: var(--text-main);
   }
 }
 
 .activeTab {
-  background: #e94560;
-  color: #fff;
-  border-color: #e94560;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
 }
+
+@media (hover: hover) {
+  .activeTab:hover {
+    background: var(--accent-dark);
+    color: var(--text-inverse);
+  }
+}
+
+/* ── Toolbar Row ── */
 
 .toolbarRow {
   display: flex;
@@ -57,17 +74,19 @@
   flex-shrink: 0;
 }
 
+/* ── Deck Forget Button ── */
+
 .deckForgetBtn {
-  background: #b8860b;
-  border: 1px solid #b8860b;
-  color: #fff;
+  background: var(--warning);
+  border: 1px solid var(--warning);
+  color: var(--text-inverse);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.8em;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   line-height: 1;
-  transition: opacity 0.2s;
+  transition: opacity var(--duration-fast);
   white-space: nowrap;
 }
 
@@ -77,21 +96,36 @@
   }
 }
 
+/* ── Create Button ── */
+
 .createBtn {
-  background: #e94560;
-  border: 1px solid #e94560;
-  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--text-inverse);
   padding: 4px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.9em;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
+  font-style: italic;
   line-height: 1;
-  transition: opacity 0.2s;
+  transition: background var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+  position: relative;
+}
+
+.createBtn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--accent-glow);
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 @media (hover: hover) {
   .createBtn:hover {
-    opacity: 0.85;
+    background: var(--accent-dark);
+    box-shadow: var(--glow-sheikah);
   }
 }

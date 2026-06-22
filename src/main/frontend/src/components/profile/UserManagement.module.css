@@ -1,7 +1,13 @@
+/* ============================================
+   User Management — Admin Panel (Zelda Theme)
+   ============================================ */
+
 .root {
   padding: 16px;
   max-width: 600px;
   margin: 0 auto;
+  padding-top: env(safe-area-inset-top, 16px);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
 .header {
@@ -12,24 +18,35 @@
 }
 
 .title {
+  font-family: var(--font-title);
   font-size: 1rem;
-  color: #e0e0e0;
+  color: var(--tan);
   margin: 0;
 }
 
+/* ── Create Button ── */
+
 .createBtn {
   padding: 6px 14px;
-  background: #e94560;
-  color: #fff;
+  background: var(--accent);
+  color: var(--text-inverse);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.8em;
+  font-style: italic;
   cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
 }
 
-.createBtn:hover {
-  background: #d63852;
+@media (hover: hover) {
+  .createBtn:hover {
+    background: var(--accent-dark);
+    box-shadow: var(--glow-sheikah);
+  }
 }
+
+/* ── Table ── */
 
 .table {
   width: 100%;
@@ -40,19 +57,19 @@
 .table th {
   text-align: left;
   padding: 8px 10px;
-  border-bottom: 1px solid #0f3460;
-  color: #888;
-  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
 }
 
 .table td {
   padding: 8px 10px;
-  border-bottom: 1px solid #16213e;
-  color: #ccc;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-main);
 }
 
 .dateCell {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.9em;
 }
 
@@ -63,45 +80,54 @@
 
 .actionBtn {
   padding: 3px 8px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 3px;
-  color: #aaa;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   font-size: 0.75em;
   cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.actionBtn:hover {
-  color: #e94560;
-  border-color: #e94560;
+@media (hover: hover) {
+  .actionBtn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
 }
+
+/* ── Modal Content ── */
 
 .modalBody {
   padding: 8px 0;
-  color: #ccc;
+  color: var(--text-main);
 }
 
 .modalLabel {
   display: block;
   font-size: 0.75em;
-  color: #888;
+  color: var(--text-muted);
   margin: 8px 0 4px;
 }
 
 .modalInput {
   width: 100%;
   padding: 7px 10px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  color: #e0e0e0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
   font-size: 0.9em;
   box-sizing: border-box;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
 }
 
 .modalInput:focus {
   outline: none;
-  border-color: #e94560;
+  border-color: var(--border-focus);
+  box-shadow: var(--glow-blue);
 }
 
 .passwordRow {
@@ -112,20 +138,29 @@
 
 .togglePwdBtn {
   padding: 4px 8px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 3px;
-  color: #aaa;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   font-size: 0.75em;
   cursor: pointer;
   white-space: nowrap;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+}
+
+@media (hover: hover) {
+  .togglePwdBtn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
 }
 
 .modalError {
-  background: rgba(231, 76, 60, 0.15);
-  border: 1px solid #e74c3c;
-  color: #e74c3c;
-  border-radius: 4px;
+  background: rgba(241, 80, 80, 0.15);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-size: 0.75em;
   margin-top: 8px;

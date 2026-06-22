@@ -1,17 +1,20 @@
+/* ============================================
+   Flashcard Panel — Two-Stage Card Creation (Zelda Theme)
+   ============================================ */
+
 .panel {
-  position: fixed;
+  position: absolute;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 1000px;
-  z-index: 600;
-  background: rgba(0, 0, 0, 0.92);
-  border-top: 1px solid #333;
-  font-size: 0.85em;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
   max-height: 70vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  z-index: var(--z-dropdown);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 .panel[aria-expanded="false"] {
@@ -19,102 +22,100 @@
 }
 
 .toggleBtn {
-  position: fixed;
-  bottom: 4px;
-  right: 8px;
-  z-index: 599;
-  padding: 2px 10px;
-  border: none;
-  border-radius: 3px;
-  font-size: 10px;
+  padding: 4px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.8em;
   cursor: pointer;
-  background: #333;
-  color: #aaa;
-  font-family: monospace;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.toggleBtn:hover {
-  background: #555;
-  color: #fff;
+@media (hover: hover) {
+  .toggleBtn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  border-bottom: 1px solid #333;
-  flex-shrink: 0;
+  margin-bottom: 12px;
 }
 
 .title {
-  color: #27ae60;
-  font-weight: bold;
+  font-family: var(--font-title);
+  font-size: 1em;
+  color: var(--tan);
 }
 
 .closeBtn {
-  background: transparent;
-  color: #888;
+  background: none;
   border: none;
+  color: var(--text-muted);
   font-size: 1.2em;
   cursor: pointer;
   padding: 0 4px;
 }
 
-.closeBtn:hover {
-  color: #e94560;
+@media (hover: hover) {
+  .closeBtn:hover {
+    color: var(--accent);
+  }
 }
+
+/* ── Input Stages ── */
 
 .stage {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 8px 10px;
-  flex-shrink: 0;
-}
-
-.stage2 {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  overflow-y: auto;
-  padding: 8px 10px;
   gap: 8px;
 }
 
+.stage2 {
+  composes: stage;
+  margin-top: 8px;
+}
+
 .frontInput {
-  height: 32px;
-  padding: 4px 8px;
-  background: #16213e;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  color: #e0e0e0;
-  font-size: 16px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 0.9em;
   outline: none;
-  box-sizing: border-box;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
 }
 
 .frontInput:focus,
 .textarea:focus,
 .tagInput:focus {
-  border-color: #27ae60;
+  border-color: var(--border-focus);
+  box-shadow: var(--glow-blue);
 }
 
 .textarea {
-  width: 100%;
-  min-height: 48px;
-  padding: 6px 8px;
-  background: #16213e;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  color: #e0e0e0;
-  font-size: 16px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 0.9em;
   outline: none;
   resize: vertical;
   font-family: inherit;
-  box-sizing: border-box;
+  min-height: 60px;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
 }
+
+/* ── Tag Area ── */
 
 .tagArea {
   position: relative;
@@ -125,43 +126,48 @@
   flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 4px;
-  min-height: 0;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   padding: 2px 6px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   font-size: 0.8em;
-  color: #e0e0e0;
+  color: var(--text-main);
 }
 
 .chipRemove {
   cursor: pointer;
-  color: #888;
-  font-size: 16px;
-  line-height: 1;
+  opacity: 0.6;
+  color: var(--text-muted);
 }
 
-.chipRemove:hover {
-  color: #e94560;
+@media (hover: hover) {
+  .chipRemove:hover {
+    opacity: 1;
+    color: var(--accent);
+  }
 }
 
 .tagInput {
   width: 100%;
-  height: 30px;
-  padding: 4px 8px;
-  background: #16213e;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  color: #e0e0e0;
+  padding: 6px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
   font-size: 0.85em;
   outline: none;
-  box-sizing: border-box;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+}
+
+.tagInput::placeholder {
+  color: var(--text-muted);
 }
 
 .suggestions {
@@ -169,40 +175,55 @@
   top: 100%;
   left: 0;
   right: 0;
-  max-height: 120px;
+  margin-top: 2px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 140px;
   overflow-y: auto;
-  background: #16213e;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  z-index: 10;
+  z-index: var(--z-dropdown);
 }
 
 .suggestionItem {
-  padding: 4px 8px;
-  cursor: pointer;
+  padding: 6px 10px;
   font-size: 0.85em;
-  color: #aaa;
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
-.suggestionItem:hover {
-  background: #0f3460;
-  color: #e0e0e0;
+@media (hover: hover) {
+  .suggestionItem:hover {
+    background: var(--bg-input);
+    color: var(--text-main);
+  }
 }
+
+/* ── Buttons ── */
 
 .btn {
-  padding: 6px 14px;
-  border-radius: 4px;
-  color: #aaa;
-  font-size: 0.85em;
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  white-space: nowrap;
-  background: #0f3460;
-  border: 1px solid #1a5276;
+  font-size: 0.85em;
+  font-weight: var(--font-weight-medium);
+  font-style: italic;
+  transition: background var(--duration-fast) var(--ease-default),
+              border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  position: relative;
 }
 
-.btn:hover {
-  background: #1a5276;
-  color: #e0e0e0;
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: border-color var(--duration-fast) var(--ease-default);
 }
 
 .btn:disabled {
@@ -210,30 +231,52 @@
   cursor: not-allowed;
 }
 
-.btnPrimary {
-  background: #27ae60;
-  border-color: #27ae60;
-  color: #fff;
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-.btnPrimary:hover:not(:disabled) {
-  background: #2ecc71;
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    background: var(--bg-input);
+    box-shadow: var(--glow-blue);
+  }
+  .btn:hover:not(:disabled)::after {
+    border-color: var(--border-active);
+  }
+}
+
+.btnPrimary {
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
+}
+
+.btnPrimary::after {
+  border-color: var(--accent-glow);
+}
+
+@media (hover: hover) {
+  .btnPrimary:hover:not(:disabled) {
+    background: var(--accent-dark);
+    box-shadow: var(--glow-sheikah);
+  }
 }
 
 .continueBtn {
-  composes: btn btnPrimary;
-  flex-shrink: 0;
+  composes: btn;
+  margin-top: 6px;
 }
 
 .saveBtn {
   composes: btn btnPrimary;
-  margin-top: 4px;
+  margin-top: 12px;
 }
 
 .error {
-  color: #e74c3c;
-  font-size: 12px;
-  padding: 4px 0;
+  color: var(--danger);
+  font-size: 0.8em;
+  margin-top: 4px;
 }
 
 .toast {
@@ -242,16 +285,19 @@
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 20px;
-  background: rgba(39, 174, 96, 0.9);
-  color: #fff;
-  border-radius: 4px;
+  background: var(--success);
+  color: var(--text-inverse);
+  border-radius: var(--radius-sm);
   font-size: 0.85em;
-  z-index: 650;
-  animation: toastFade 2s forwards;
+  z-index: var(--z-toast);
 }
 
 @keyframes toastFade {
   0% { opacity: 1; }
   70% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+.toast {
+  animation: toastFade 2s forwards;
 }

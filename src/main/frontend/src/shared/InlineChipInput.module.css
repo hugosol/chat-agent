@@ -4,16 +4,19 @@
   align-items: center;
   gap: 4px;
   padding: 4px 6px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   min-height: 34px;
   cursor: text;
   position: relative;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
 }
 
 .container:focus-within {
-  border-color: #e94560;
+  border-color: var(--border-focus);
+  box-shadow: var(--glow-blue);
 }
 
 .chip {
@@ -21,22 +24,26 @@
   align-items: center;
   gap: 2px;
   padding: 1px 6px;
-  background: #1a5276;
+  background: var(--bg-elevated);
   border-radius: 3px;
   font-size: 0.8em;
-  color: #e0e0e0;
+  color: var(--text-main);
   white-space: nowrap;
+  border: 1px solid var(--border);
 }
 
 .remove {
   cursor: pointer;
   opacity: 0.6;
   margin-left: 2px;
+  color: var(--text-muted);
 }
 
-.remove:hover {
-  opacity: 1;
-  color: #e94560;
+@media (hover: hover) {
+  .remove:hover {
+    opacity: 1;
+    color: var(--accent);
+  }
 }
 
 .input {
@@ -45,13 +52,13 @@
   border: none;
   outline: none;
   background: transparent;
-  color: #e0e0e0;
+  color: var(--text-main);
   font-size: 0.85em;
   padding: 2px 0;
 }
 
 .input::placeholder {
-  color: #666;
+  color: var(--text-muted);
 }
 
 .suggestions {
@@ -60,22 +67,24 @@
   left: 0;
   right: 0;
   margin-top: 2px;
-  background: #16213e;
-  border: 1px solid #0f3460;
-  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   max-height: 160px;
   overflow-y: auto;
-  z-index: 10;
+  z-index: var(--z-dropdown);
 }
 
 .suggestion {
   padding: 6px 10px;
   font-size: 0.85em;
-  color: #aaa;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
-.suggestion:hover {
-  background: #0f3460;
-  color: #e0e0e0;
+@media (hover: hover) {
+  .suggestion:hover {
+    background: var(--bg-input);
+    color: var(--text-main);
+  }
 }
