@@ -28,7 +28,7 @@
 .groupTitle {
   font-size: 13px;
   font-weight: var(--font-weight-bold);
-  color: var(--text-muted);
+  color: var(--accent);
   margin: 0 0 14px;
   text-transform: uppercase;
   letter-spacing: 0.5px;

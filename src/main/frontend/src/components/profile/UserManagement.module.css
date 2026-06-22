@@ -58,7 +58,7 @@
   text-align: left;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--accent);
   font-weight: var(--font-weight-medium);
 }
 
