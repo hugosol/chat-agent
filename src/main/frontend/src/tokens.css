@@ -15,7 +15,7 @@
 
 :root {
   /* ── Page & Surface Backgrounds ── */
-  --bg-page:              #66645D;
+  --bg-page:              #1a1a1a;
   --bg-surface:           rgba(0, 0, 0, 0.6);
   --bg-elevated:          rgba(30, 30, 28, 0.9);
   --bg-input:             rgba(0, 0, 0, 0.4);
