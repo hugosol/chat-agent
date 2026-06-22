@@ -32,7 +32,7 @@
   left: 0;
   margin-top: 4px;
   min-width: 100%;
-  background: var(--bg-surface);
+  background: var(--bg-sheikah);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   z-index: var(--z-dropdown);

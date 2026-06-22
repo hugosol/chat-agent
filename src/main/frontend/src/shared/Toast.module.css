@@ -3,7 +3,7 @@
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--bg-surface);
+  background: var(--bg-sheikah);
   color: var(--text-main);
   padding: 10px 24px;
   border-radius: var(--radius-sm);

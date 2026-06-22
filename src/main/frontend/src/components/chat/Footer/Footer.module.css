@@ -4,7 +4,7 @@
 
 .footer {
   padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg-surface);
+  background: var(--bg-sheikah);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -40,7 +40,7 @@
 }
 
 .select option {
-  background: var(--bg-surface);
+  background: var(--bg-sheikah);
   color: var(--text-main);
 }
 

@@ -16,7 +16,7 @@
 }
 
 .modal {
-  background: var(--bg-surface);
+  background: var(--bg-sheikah);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 24px;
@@ -64,7 +64,7 @@
   margin-top: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
+  background: var(--accent-dark);
   color: var(--text-main);
   font-size: 0.9em;
   font-weight: var(--font-weight-medium);
@@ -79,7 +79,7 @@
   content: '';
   position: absolute;
   inset: 3px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-dim);
   border-radius: 2px;
   pointer-events: none;
   transition: border-color var(--duration-fast) var(--ease-default);
@@ -92,10 +92,10 @@
 
 @media (hover: hover) {
   .closeBtn:hover {
-    background: var(--bg-elevated);
-    box-shadow: var(--glow-blue);
+    background: var(--accent);
+    box-shadow: var(--glow-sheikah);
   }
   .closeBtn:hover::after {
-    border-color: var(--border-active);
+    border-color: var(--accent-glow);
   }
 }

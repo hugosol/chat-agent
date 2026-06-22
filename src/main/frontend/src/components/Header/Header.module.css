@@ -18,7 +18,7 @@
   right: 0;
   bottom: 0;
   width: 200px;
-  background: var(--bg-surface);
+  background: var(--bg-sheikah);
   border-left: 1px solid var(--border);
   z-index: 500;
   transform: translateX(100%);

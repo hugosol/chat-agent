@@ -28,7 +28,7 @@
 
   /* ── Text Colors ── */
   --text-main:            #E9E1D1;
-  --text-muted:           rgba(233, 225, 209, 0.6);
+  --text-muted:           rgba(233, 225, 209, 0.75);
   --text-inverse:         #1a1a1a;
   --text-accent:          #E2D146;
   --text-danger:          #F15050;

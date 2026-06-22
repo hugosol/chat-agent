@@ -127,7 +127,7 @@ body {
 }
 
 .modal-content {
-    background: var(--bg-surface);
+    background: var(--bg-sheikah);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 24px;
@@ -216,7 +216,7 @@ select:focus {
 }
 
 select option {
-    background: var(--bg-surface);
+    background: var(--bg-sheikah);
     color: var(--text-main);
 }
 

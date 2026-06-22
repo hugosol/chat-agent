@@ -6,7 +6,7 @@
 
 :root {
     --bg-page: #66645D;
-    --bg-surface: rgba(0, 0, 0, 0.6);
+    --bg-surface: rgba(10, 20, 40, 0.85);
     --bg-input: rgba(0, 0, 0, 0.4);
     --text-main: #E9E1D1;
     --text-muted: rgba(233, 225, 209, 0.6);
