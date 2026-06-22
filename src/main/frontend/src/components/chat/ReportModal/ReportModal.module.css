@@ -38,6 +38,7 @@
 
 .title {
   font-family: var(--font-title);
+  font-size: 1.2em;
   color: var(--accent);
   margin-bottom: 16px;
 }
