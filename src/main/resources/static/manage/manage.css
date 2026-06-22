@@ -32,7 +32,7 @@
 }
 
 .pagination button {
-    background: var(--bg-input);
+    background: var(--accent-dark);
     border: 1px solid var(--border);
     color: var(--text-muted);
     padding: 8px 16px;

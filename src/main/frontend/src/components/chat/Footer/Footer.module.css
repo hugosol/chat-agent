@@ -57,7 +57,7 @@
   transition: background var(--duration-fast) var(--ease-default),
               border-color var(--duration-fast) var(--ease-default),
               box-shadow var(--duration-fast) var(--ease-default);
-  background: var(--bg-surface);
+  background: var(--accent-dark);
   color: var(--text-main);
   position: relative;
 }
@@ -66,7 +66,7 @@
   content: '';
   position: absolute;
   inset: 3px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-dim);
   border-radius: 2px;
   pointer-events: none;
   transition: border-color var(--duration-fast) var(--ease-default);
@@ -84,11 +84,11 @@
 
 @media (hover: hover) {
   .btn:hover:not(:disabled) {
-    background: var(--bg-input);
-    box-shadow: var(--glow-blue);
+    background: var(--accent);
+    box-shadow: var(--glow-sheikah);
   }
   .btn:hover:not(:disabled)::after {
-    border-color: var(--border-active);
+    border-color: var(--accent-glow);
   }
 }
 
