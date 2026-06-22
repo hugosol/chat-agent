@@ -1,24 +1,29 @@
+/* ============================================
+   Status Bar — Connection State (Zelda Theme)
+   ============================================ */
+
 .statusBar {
   padding: 8px 16px;
   text-align: center;
   font-size: 0.85em;
-  border-top: 1px solid #0f3460;
+  border-top: 1px solid var(--border);
   min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: var(--bg-page);
 }
 
 .indicator {
   padding: 4px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
 }
 
-.connecting { color: #888; }
-.connected { color: #66bb6a; }
-.userturn { color: #66bb6a; }
-.processing { color: #f39c12; }
-.warning { color: #e74c3c; font-weight: bold; }
-.error { color: #e74c3c; background: #2c1a1a; }
-.disconnected { color: #888; }
+.connecting { color: var(--text-muted); }
+.connected { color: var(--success); }
+.userturn { color: var(--success); }
+.processing { color: var(--warning); }
+.warning { color: var(--danger); font-weight: var(--font-weight-bold); }
+.error { color: var(--danger); background: var(--bg-surface); }
+.disconnected { color: var(--text-muted); }

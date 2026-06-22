@@ -1,8 +1,9 @@
 /* ============================================
-   Manage App Layout — Zelda Theme
+   Shared page layout — Zelda Theme
+   Consumed by all page entry points.
    ============================================ */
 
-.app {
+.page {
   display: flex;
   flex-direction: column;
   height: calc(100vh - env(safe-area-inset-top));
@@ -11,13 +12,13 @@
   background: var(--bg-page);
 }
 
-.layout {
-  display: flex;
+.content {
   flex: 1;
+  display: flex;
   overflow: hidden;
 }
 
-.content {
+.scrollable {
   flex: 1;
   overflow-y: auto;
   padding: 16px;

@@ -1,15 +1,19 @@
+/* ============================================
+   Correction Sidebar — Overlay Panel (Zelda Theme)
+   ============================================ */
+
 .sidebar {
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
   width: 260px;
-  border-left: 1px solid #0f3460;
-  background: #0d1b2a;
+  border-left: 1px solid var(--border);
+  background: var(--bg-sheikah);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 10;
+  z-index: var(--z-dropdown);
 }
 
 .sidebar[aria-expanded="false"] {
@@ -22,23 +26,28 @@
   justify-content: flex-start;
   padding: 8px 10px;
   font-size: 0.75em;
-  color: #aaa;
-  border-bottom: 1px solid #0f3460;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  font-family: var(--font-title);
 }
 
 .header button {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 1.2em;
   cursor: pointer;
   padding: 0 4px;
 }
 
-.header button:hover {
-  color: #e94560;
+@media (hover: hover) {
+  .header button:hover {
+    color: var(--accent);
+  }
 }
+
+/* ── Floating Toggle Badge ── */
 
 .toggleBtn {
   position: absolute;
@@ -47,23 +56,30 @@
   transform: translateY(-50%);
   z-index: 11;
   padding: 4px 10px;
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  color: #aaa;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   font-size: 0.75em;
   cursor: pointer;
   white-space: nowrap;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.toggleBtn:hover {
-  color: #e94560;
-  border-color: #e94560;
+@media (hover: hover) {
+  .toggleBtn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: var(--glow-blue);
+  }
 }
 
 .badge {
-  color: #e94560;
+  color: var(--accent);
 }
+
+/* ── Content ── */
 
 .content {
   flex: 1;
@@ -73,23 +89,23 @@
 
 .empty {
   text-align: center;
-  color: #555;
+  color: var(--text-muted);
   font-size: 0.8em;
   padding: 20px 8px;
 }
 
 .item {
-  background: #16213e;
-  border-radius: 6px;
+  background: var(--bg-golden);
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   margin-bottom: 6px;
   font-size: 0.75em;
-  border-left: 3px solid #e94560;
+  border-left: 3px solid var(--accent);
 }
 
 .itemType {
-  font-weight: 600;
-  color: #e94560;
+  font-weight: var(--font-weight-bold);
+  color: var(--accent);
   margin-bottom: 4px;
   font-size: 0.85em;
 }
@@ -103,23 +119,25 @@
 }
 
 .original {
-  color: #e74c3c;
+  color: var(--danger);
   text-decoration: line-through;
 }
 
 .arrow {
-  color: #888;
+  color: var(--text-muted);
 }
 
 .corrected {
-  color: #27ae60;
-  font-weight: 500;
+  color: var(--success);
+  font-weight: var(--font-weight-medium);
 }
 
 .explanation {
-  color: #aaa;
+  color: var(--text-muted);
   line-height: 1.4;
 }
+
+/* ── Mobile ── */
 
 @media (max-width: 700px) {
   .sidebar {

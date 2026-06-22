@@ -1,6 +1,11 @@
+/* ============================================
+   Movies App Layout — Zelda Theme
+   ============================================ */
+
 .app {
   display: flex;
   flex-direction: column;
   height: calc(100vh - env(safe-area-inset-top));
   overflow: hidden;
+  background: var(--bg-page);
 }

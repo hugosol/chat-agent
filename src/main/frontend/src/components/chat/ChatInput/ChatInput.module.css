@@ -1,42 +1,65 @@
+/* ============================================
+   Chat Input — Bottom Bar (Zelda Theme)
+   ============================================ */
+
 .bar {
   display: flex;
   gap: 8px;
   padding: 10px 16px;
-  border-top: 1px solid #0f3460;
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--bg-page);
 }
 
 .input {
   flex: 1;
   padding: 12px 14px;
-  background: #0f3460;
-  color: #e0e0e0;
-  border: 1px solid #1a5276;
-  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   font-size: 1em;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
 }
 
 .input:focus {
-  border-color: #e94560;
+  border-color: var(--border-focus);
+  box-shadow: var(--glow-blue);
 }
 
 .input:disabled {
   opacity: 0.5;
 }
 
+.input::placeholder {
+  color: var(--text-muted);
+}
+
 .sendBtn {
-  background: #e94560;
-  color: #fff;
+  background: var(--accent);
+  color: var(--text-inverse);
   border: none;
   padding: 12px 22px;
   font-size: 0.95em;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s;
+  font-weight: var(--font-weight-medium);
+  font-style: italic;
+  transition: background var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+  position: relative;
+}
+
+.sendBtn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--accent-glow);
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 .sendBtn:active {
@@ -48,6 +71,14 @@
   cursor: not-allowed;
 }
 
-.sendBtn:hover:not(:disabled) {
-  background: #c73a54;
+.sendBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .sendBtn:hover:not(:disabled) {
+    background: var(--accent-dark);
+    box-shadow: var(--glow-sheikah);
+  }
 }

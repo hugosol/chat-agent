@@ -1,0 +1,93 @@
+/* ============================================
+   Chat Agent — Zelda Design Tokens
+   Extracted from zelda-hyrule-ui v0.4.0 src/styles/variables.less
+   Consumed by all CSS Modules via var() references.
+   ============================================ */
+
+/* ── Hylia Serif (Zelda title font) ── */
+@font-face {
+  font-family: 'Hylia Serif';
+  src: url('./assets/fonts/HyliaSerif.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ── Page & Surface Backgrounds ── */
+  --bg-page:              #0d1117;
+  --bg-surface:           rgba(0, 0, 0, 0.6);
+  --bg-elevated:          rgba(30, 30, 28, 0.9);
+  --bg-input:             rgba(10, 20, 40, 0.45);
+  --bg-overlay:           rgba(0, 0, 0, 0.85);
+  --bg-correction:        rgba(10, 20, 10, 0.6);
+  --bg-sheikah:           rgba(10, 20, 40, 0.85);
+  --bg-sheikah-panel:      #0A8DD7;
+  --bg-golden:            #2e2418;
+  --bg-item:              rgba(60, 58, 52, 0.8);
+
+  /* ── Text Colors ── */
+  --text-main:            #E9E1D1;
+  --text-muted:           rgba(233, 225, 209, 0.75);
+  --text-inverse:         #1a1a1a;
+  --text-accent:          #E2D146;
+  --text-danger:          #F15050;
+  --text-success:         #6FD49C;
+
+  /* ── Sheikah Blue (accent, replaces #e94560) ── */
+  --accent:               #3CD3FC;
+  --accent-dark:          #0A8DD7;
+  --accent-glow:          #4FC0FF;
+  --accent-dim:           rgba(60, 211, 252, 0.5);
+
+  /* ── Tan / Border Colors ── */
+  --tan:                  #E2DED3;
+  --border:               rgba(226, 222, 211, 0.3);
+  --border-active:        rgba(226, 222, 211, 0.6);
+  --border-focus:         #3CD3FC;
+
+  /* ── Functional Colors ── */
+  --danger:               #F15050;
+  --danger-hover:         rgba(241, 80, 80, 0.3);
+  --success:              #6FD49C;
+  --warning:              #FCC413;
+
+  /* ── Rating Button Colors (FSRS semantic, preserved) ── */
+  --rating-again:         #e74c3c;
+  --rating-hard:          #e67e22;
+  --rating-good:          #27ae60;
+  --rating-easy:          #3498db;
+
+  /* ── Shadows & Glows ── */
+  --shadow-sm:            0 0 11px rgba(0, 0, 0, 0.8);
+  --glow-sheikah:         0 0 10px #4FC0FF, 0 1px 11px #0A8DD7;
+  --glow-blue:            0 0 8px #4FC0FF;
+  --glow-hover:           inset 0 0 7px 3px rgba(246, 231, 152, 0.5),
+                           0 0 12px 1px rgba(227, 227, 200, 0.8);
+  --glow-golden:          0 0 6px #FFB800, 0 0 8px #FFDB7E, 0 0 10px #FFB904;
+
+  /* ── Typography ── */
+  --font-title:           'Hylia Serif', 'Cinzel', Georgia, serif;
+  --font-body:            system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --font-mono:            'SF Mono', 'Roboto Mono', Consolas, monospace;
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-bold:     700;
+
+  /* ── Border Radius ── */
+  --radius-sm:            4px;
+  --radius-md:            8px;
+  --radius-lg:            12px;
+
+  /* ── Animation ── */
+  --duration-fast:        0.15s;
+  --duration-base:        0.25s;
+  --duration-slow:        0.4s;
+  --ease-default:         cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Z-Index ── */
+  --z-dropdown:           100;
+  --z-modal-backdrop:     900;
+  --z-modal:              1000;
+  --z-toast:              1100;
+}

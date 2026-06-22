@@ -1,3 +1,8 @@
+/* ============================================
+   Chat Agent — Manage Page Global Styles (Zelda Theme)
+   Loaded after base.css, before Vite manage-bundle.css.
+   ============================================ */
+
 .manage-layout {
     display: flex;
     flex: 1;
@@ -6,15 +11,29 @@
 
 .empty-state {
     text-align: center;
-    color: #555;
+    color: var(--text-muted);
     padding: 40px 16px;
     font-size: 0.9em;
+}
+
+.empty-state::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 36px;
+    margin: 0 auto 16px;
+    border: 2px solid var(--accent-dim);
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(60, 211, 252, 0.2);
+    opacity: 0.6;
 }
 
 .empty-state button {
     margin-top: 12px;
     display: inline-block;
 }
+
+/* ── Pagination ── */
 
 .pagination {
     display: flex;
@@ -25,24 +44,29 @@
 }
 
 .pagination button {
-    background: #0f3460;
-    border: 1px solid #1a5276;
-    color: #888;
+    background: var(--accent-dark);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
     padding: 8px 16px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     font-size: 0.95em;
+    transition: border-color var(--duration-fast) var(--ease-default),
+                color var(--duration-fast) var(--ease-default);
 }
 
-.pagination button:hover:not(:disabled) {
-    color: #e0e0e0;
-    border-color: #e94560;
+@media (hover: hover) {
+    .pagination button:hover:not(:disabled) {
+        color: var(--text-main);
+        border-color: var(--accent);
+        box-shadow: var(--glow-blue);
+    }
 }
 
 .pagination button.active {
-    background: #e94560;
-    color: #fff;
-    border-color: #e94560;
+    background: var(--accent);
+    color: var(--text-inverse);
+    border-color: var(--accent);
 }
 
 .pagination button:disabled {
@@ -50,33 +74,41 @@
     cursor: not-allowed;
 }
 
+/* ── Card Detail Items ── */
+
 .detail-item {
     margin-bottom: 10px;
 }
 
 .detail-item .detail-label {
-    color: #4fc3f7;
+    color: var(--accent);
     font-size: 0.75em;
     margin-bottom: 2px;
 }
 
 .detail-item .detail-value {
-    color: #e0e0e0;
+    color: var(--text-main);
     font-size: 0.9em;
     white-space: pre-line;
 }
+
+/* ── Card TTS Button ── */
 
 .card-tts-btn {
     margin-left: 4px;
     cursor: pointer;
     font-size: 0.85em;
     opacity: 0.5;
-    transition: opacity 0.15s;
+    transition: opacity var(--duration-fast);
 }
 
-.card-tts-btn:hover {
-    opacity: 1;
+@media (hover: hover) {
+    .card-tts-btn:hover {
+        opacity: 1;
+    }
 }
+
+/* ── Checkbox Row ── */
 
 .checkbox-row {
     display: flex;
@@ -87,6 +119,7 @@
 
 .checkbox-row input[type="checkbox"] {
     width: auto;
+    accent-color: var(--accent);
 }
 
 .checkbox-row label {

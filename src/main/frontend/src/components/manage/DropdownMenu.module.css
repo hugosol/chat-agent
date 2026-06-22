@@ -1,22 +1,28 @@
+/* ============================================
+   Dropdown Menu — Zelda Theme
+   ============================================ */
+
 .container {
   position: relative;
 }
 
 .trigger {
-  background: #0f3460;
-  border: 1px solid #1a5276;
-  color: #888;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.75em;
   white-space: nowrap;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
 @media (hover: hover) {
   .trigger:hover {
-    color: #e0e0e0;
-    border-color: #e94560;
+    color: var(--text-main);
+    border-color: var(--accent);
   }
 }
 
@@ -26,10 +32,10 @@
   left: 0;
   margin-top: 4px;
   min-width: 100%;
-  background: #16213e;
-  border: 1px solid #1a5276;
-  border-radius: 4px;
-  z-index: 100;
+  background: var(--bg-sheikah);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  z-index: var(--z-dropdown);
   overflow: hidden;
 }
 
@@ -39,21 +45,23 @@
   padding: 6px 14px;
   background: transparent;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.75em;
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
   box-sizing: border-box;
+  transition: background var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
 @media (hover: hover) {
   .item:hover {
-    background: #0f3460;
-    color: #e0e0e0;
+    background: var(--bg-input);
+    color: var(--text-main);
   }
 }
 
 .selected {
-  color: #e94560;
+  color: var(--accent);
 }

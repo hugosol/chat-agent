@@ -1,3 +1,4 @@
+import "../tokens.css";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ChatProvider, useChatContext } from "../state/ChatContext";
@@ -75,6 +76,8 @@ function AppContent({
     React.createElement(DebugPanel, {
       isOpen: activePanel === "debug",
       onToggle: () => togglePanel("debug"),
+      onFlashcardToggle: () => togglePanel("flashcard"),
+      flashcardActive: activePanel === "flashcard",
     }),
     React.createElement(FlashcardPanel, {
       isOpen: activePanel === "flashcard",

@@ -12,21 +12,52 @@
   width: 100%;
   max-width: 360px;
   min-height: 200px;
-  border: 2px solid #1a5276;
-  border-radius: 16px;
-  background: #1a3a6a;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, #0c2440 0%, #0a1e36 100%);
+  box-shadow: 0 0 16px rgba(60, 211, 252, 0.06);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: box-shadow var(--duration-base) var(--ease-default);
   position: relative;
 }
 
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: overlay;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(60, 211, 252, 0.07) 1px,
+    rgba(60, 211, 252, 0.07) 2px
+  );
+  border-radius: var(--radius-sm);
+}
+
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--accent-dim);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: border-color var(--duration-base) var(--ease-default);
+}
+
 .cardFlipped {
-  border-color: #1a5276;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
+}
+
+.cardFlipped::after {
+  border-color: var(--accent);
 }
 
 .cardInner {
@@ -46,7 +77,7 @@
 }
 
 .cardBack {
-  border-top: 1px solid #1a5276;
+  border-top: 1px solid var(--border);
 }
 
 .cardText {
@@ -54,17 +85,18 @@
   text-align: center;
   word-break: break-word;
   line-height: 1.4;
+  color: var(--text-main);
 }
 
 .tapHint {
   font-size: 13px;
-  color: #aaa;
+  color: var(--text-muted);
   margin: 0 0 16px;
 }
 
 .ttsBtn {
   background: none;
-  border: 1px solid #1a5276;
+  border: 1px solid var(--border);
   border-radius: 50%;
   width: 36px;
   height: 36px;
@@ -73,7 +105,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s;
+  transition: background-color var(--duration-fast) var(--ease-default),
+              border-color var(--duration-fast) var(--ease-default);
+  color: var(--text-main);
 }
 
 .ttsBtnBelow {
@@ -108,33 +142,42 @@
 }
 
 @media (hover: hover) {
+  .card:not(.cardFlipped):hover::after {
+    border-color: var(--accent);
+  }
   .card:not(.cardFlipped):hover {
-    border-color: #2a6a96;
+    box-shadow: var(--glow-blue);
   }
 
   .ttsBtn:hover,
   .ttsBtnBelow:hover,
   .cornerBtn:hover {
-    background-color: #0f3460;
+    background-color: var(--bg-input);
+    border-color: var(--border-active);
   }
 }
 
 .editArea {
   padding: 12px 16px;
-  border-top: 1px solid #1a5276;
+  border-top: 1px solid var(--border);
 }
 
 .editTextarea {
   width: 100%;
   min-height: 80px;
-  background: #0d1b36;
-  color: #e0e0e0;
-  border: 1px solid #2a4070;
-  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   padding: 8px;
   font-size: 16px;
   resize: vertical;
   box-sizing: border-box;
+}
+
+.editTextarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
 }
 
 .editBtns {
@@ -146,12 +189,14 @@
 
 .editSaveBtn {
   padding: 4px 14px;
-  background: #27ae60;
-  color: #fff;
+  background: var(--success);
+  color: var(--text-inverse);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-default);
 }
 
 .editSaveBtn:disabled {
@@ -161,12 +206,24 @@
 
 .editCancelBtn {
   padding: 4px 14px;
-  background: #333;
-  color: #ccc;
-  border: 1px solid #555;
-  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+@media (hover: hover) {
+  .editSaveBtn:not(:disabled):hover {
+    opacity: 0.85;
+  }
+  .editCancelBtn:hover {
+    background: var(--bg-surface);
+    color: var(--text-main);
+    border-color: var(--border);
+  }
 }
 
 .scrollableBack {
@@ -188,7 +245,7 @@
 .divider {
   width: 100%;
   border: none;
-  border-top: 1px solid #2a5a7a;
+  border-top: 1px solid var(--border);
   margin: 8px 0;
 }
 
@@ -197,36 +254,38 @@
   margin: 8px auto 0;
   padding: 4px 12px;
   font-size: 0.75rem;
-  background: #1a3a5c;
-  color: #8ab4d6;
-  border: 1px solid #2a5a7a;
-  border-radius: 4px;
+  background: var(--bg-sheikah);
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
 }
 
 @media (hover: hover) {
   .enhanceBtn:hover {
-    background: #2a4a6c;
+    box-shadow: var(--glow-blue);
+    border-color: var(--accent);
   }
 }
 
 .movieQuoteTitle {
   font-size: 0.8rem;
-  color: #8ab4d6;
+  color: var(--accent-dim);
   margin-bottom: 4px;
 }
 
 .movieQuoteText {
   font-style: italic;
   font-size: 0.85rem;
-  color: #ccc;
+  color: var(--text-muted);
   margin-bottom: 4px;
   text-transform: lowercase;
 }
 
 .sceneSummary {
   font-size: 0.8rem;
-  color: #a0c0a0;
+  color: var(--text-success);
 }
 
 .loadingOverlay {
@@ -235,20 +294,20 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(10, 20, 40, 0.85);
+  background: var(--bg-overlay);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   z-index: 10;
 }
 
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #2a5a7a;
-  border-top-color: #8ab4d6;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent-dim);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -259,7 +318,7 @@
 
 .enhanceError {
   margin-top: 12px;
-  color: #e94560;
+  color: var(--danger);
   font-size: 0.8rem;
   text-align: center;
 }

@@ -1,3 +1,7 @@
+/* ============================================
+   Tag Table — Zelda Theme
+   ============================================ */
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -7,19 +11,21 @@
 .td {
   padding: 8px 10px;
   text-align: left;
-  border-bottom: 1px solid #0f3460;
+  border-bottom: 1px solid var(--border);
   font-size: 0.85em;
 }
 
 .th {
-  color: #888;
-  font-weight: 500;
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
   font-size: 0.75em;
 }
 
 .td input[type="text"] {
   width: 100%;
 }
+
+/* ── Actions ── */
 
 .actions {
   display: flex;
@@ -28,32 +34,50 @@
 
 .actions button {
   background: transparent;
-  border: 1px solid #333;
-  color: #888;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 0.75em;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
 }
 
-.actions button:hover {
-  color: #e94560;
-  border-color: #e94560;
+@media (hover: hover) {
+  .actions button:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
 }
 
 .saveBtn {
-  color: #27ae60 !important;
-  border-color: #27ae60 !important;
+  color: var(--success) !important;
+  border-color: var(--success) !important;
 }
 
-.saveBtn:hover {
-  background: #27ae60;
-  color: #fff !important;
+@media (hover: hover) {
+  .saveBtn:hover {
+    background: var(--success);
+    color: var(--text-inverse) !important;
+  }
 }
 
 .empty {
   text-align: center;
-  color: #555;
+  color: var(--text-muted);
   padding: 40px 16px;
   font-size: 0.9em;
+}
+
+.empty::before {
+  content: '';
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 12px;
+  border: 2px solid var(--accent-dim);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(60, 211, 252, 0.2);
+  opacity: 0.5;
 }

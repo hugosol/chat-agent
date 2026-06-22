@@ -1,3 +1,4 @@
+import "../tokens.css";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { ReviewApp } from "../components/review/ReviewApp";

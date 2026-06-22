@@ -141,6 +141,19 @@ Chat Agent 是一个基于 AI 的语言口语练习 Web 应用。使用者（Lea
 | **CSV Movie Import** | Batch import of movies from a CSV file with three fixed columns (imdbId, title, year). The first row is skipped if the imdbId value is non-numeric (header detection). Each row creates a WatchedMovie with PENDING status. | Batch movie import, CSV upload |
 | **Subtitle Download** | Downloads SRT subtitles for a movie via Subdl API, parses them with SrtParser, and persists as SubtitleLine rows. Clears old subtitle data before re-downloading. Triggered manually via the Movies page retry button. | SRT download, subtitle fetch |
 
+## Visual Theme
+
+| Term | Definition | Aliases to avoid |
+|------|------------|-----------------|
+| **Zelda Theme** | The dark warm-toned visual theme inspired by The Legend of Zelda: Breath of the Wild UI, applied via CSS custom properties. Uses tan/earth colors, Sheikah blue glow effects, and double-layer pseudo-element borders. Named after the reference project `zelda-hyrule-ui` v0.4.0. | Zelda skin, BOTW theme, Hyrule style |
+| **Design Token** | A named CSS custom property (`--zelda-tan`, `--sheikah-blue`, `--glow-sheikah`) defined in `tokens.css` and consumed via `var()` in CSS Modules. Tokens cover colors, shadows, border radii, spacing, and animation durations. | CSS variable, theme variable, token |
+| **Theme Layer** | The subset of CSS rules in a component that express visual identity — color, border, shadow, font, border-radius. These reference Design Tokens via `var()` and are the only rules touched during theming. Contrasts with Functional Layer. | Visual layer, skin layer |
+| **Functional Layer** | The subset of CSS rules in a component that express behavior and layout — `display`, `position`, `padding`, `margin`, `flex`, `aria-expanded`-driven visibility, `@media (hover: hover)` iOS fixes, `env(safe-area-inset-*)` adaptations. NEVER modified during theming. | Layout layer, behavior CSS |
+| **Token file** | The single source of truth for all Design Tokens: `src/main/frontend/src/tokens.css`. All CSS Modules reference tokens from this file. No other file defines visual values independently. | `tokens.css`, theme variables |
+| **Double-layer border** | A Zelda UI visual pattern: a dark `rgba(0,0,0,0.6)` outer background with an inner `::after` pseudo-element carrying a translucent colored border (`inset: 3px; border: 1px solid`). Used on buttons, cards, and panels. | Inner border, pseudo-border, Sheikah border |
+| **Sheikah glow** | A blue box-shadow effect mimicking the Sheikah Slate's luminescence: `0 0 10px #4FC0FF, 0 1px 11px #0A8DD7`. Applied to interactive elements on hover/focus. | Blue glow, tech glow |
+| **Hylia Serif** | A custom serif typeface from the Zelda universe, used for titles and headings. Declared via `@font-face` and referenced as `font-family: 'Hylia Serif'`. Body text uses system sans-serif. | Title font, Zelda font |
+
 ## Relationships
 
 - A **Learner** has exactly one **Login session** at a time (per browser).
