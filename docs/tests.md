@@ -40,12 +40,13 @@ cd src/main/frontend && npm test
 |------|------|
 | `service/SessionServiceTest.java` | 会话生命周期、状态管理、userId 隔离 |
 | `service/TurnProcessorTest.java` | 并行回合处理、流式推送、null guard · 含日语模式跳过纠错测试 |
-| `service/SessionCompleteTest.java` | 会话结束流水线（Report + MemoryCue + Profile）· 含日语模式跳过记忆生成测试 |
+| `service/SessionCompleteTest.java` | 会话结束流水线（Report + Assertion + Profile）· 含日语模式跳过断言生成测试 |
 | `service/SessionDbStoreTest.java` | H2 持久化、EntityMapper 转换 |
 | `service/TokenTrackerTest.java` | LLM token 计数、80% 警告阈值 |
 | `service/EmbeddingServiceTest.java` | ONNX 向量化、语义搜索、EmbeddingStore 持久化 |
 | `service/LearningProfileServiceTest.java` | Profile 合并、版本递增 |
-| `service/MemoryCueServiceTest.java` | MemoryCue 异步生成、状态跟踪 |
+| `service/MemoryCueServiceTest.java` | MemoryCue 异步生成、状态跟踪（并存期保留） |
+| `service/AssertionServiceTest.java` | Assertion 提取管线：Extractor → Manager 完整流程、空对话、LLM 失败抛错、lineage 生成 |
 | `service/LlmCallLogServiceTest.java` | LLM 调用日志写入、启动清理 |
 | `service/EntityMapperTest.java` | DTO ↔ Entity 映射 |
 | `service/FlashcardServiceTest.java` | 闪卡创建、FSRS 初始化、Tag upsert |
@@ -79,6 +80,7 @@ cd src/main/frontend && npm test
 | `repository/CardRepositoryIsolationTest.java` | 卡片数据隔离（userId 过滤） |
 | `repository/LlmCallLogRepositoryTest.java` | LLM 日志查询、清理 |
 | `repository/MemoryCueRepositoryTest.java` | MemoryCue 按 mode 查询 |
+| `repository/MemoryAssertionRepositoryTest.java` | MemoryAssertion CRUD、enabled 过滤、递归 CTE 演化链查询 |
 | `repository/UserLearningProfileRepositoryTest.java` | Profile 按类型查询 |
 | `model/ErrorTypeTest.java` | ErrorType 枚举 JSON 反序列化 |
 | `model/TimeLabelTest.java` | 时间标签格式化 |
@@ -107,7 +109,8 @@ cd src/main/frontend && npm test
 | `e2e/ChatAgentResumeIT.java` | 页面刷新 → localStorage sessionId 存活 → 消息/纠错恢复 |
 | `e2e/ChatAgentMemoryIT.java` | 两次会话前后 → Learning Profile v1→v2 合并 → RAG MemoryCue 检索 |
 | `e2e/DailyTalkIT.java` | DAILY_TALK 模式 → 3 轮闲聊 → 教学式纠错 |
-| `e2e/ChatAgentMemoryCueIT.java` | 会话结束 → MemoryCue 两步 LLM → memory_cues COMPLETED 记录 |
+| `e2e/ChatAgentMemoryCueIT.java` | 并存期保留：会话结束 → MemoryCue 两步 LLM → memory_cues COMPLETED 记录 |
+| `e2e/ChatAgentAssertionIT.java` | 会话结束 → Assertion Extractor + Manager → memory_assertions enabled 记录 + assertion_lineage 边 + embedding 持久化 |
 | `e2e/ManagePageIT.java` | 管理页完整流程：Tag CRUD → Card CRUD → 搜索 → 排序 → 牌组过滤 → 分页 → 详情弹窗 |
 | `e2e/FlashcardIT.java` | 闪卡录入：两阶段面板 → 标签创建 → 保存 → H2 数据验证 |
 | `e2e/FlashcardBatchIT.java` | 批量导入导出：导出 CSV → 删卡 → 导入 CSV → FSRS 状态还原 |
@@ -116,7 +119,7 @@ cd src/main/frontend && npm test
 | `e2e/AuthIT.java` | 登录/登出/会话验证 |
 | `e2e/MoviesPageIT.java` | 电影管理完整流程：列表分页/搜索/排序 → TMDB 搜索添加 → CSV 批量导入 → 删除确认 → 字幕下载重试 |
 
-> **计划**：`e2e/JapaneseBusinessIT.java`（JAPANESE_BUSINESS 模式完整会话）推迟到后续迭代，届时需验证：无纠错气泡、无 MemoryCue 生成、日语报告内容。
+> **计划**：`e2e/JapaneseBusinessIT.java`（JAPANESE_BUSINESS 模式完整会话）推迟到后续迭代，届时需验证：无纠错气泡、无 MemoryCue/Assertion 生成、日语报告内容。
 
 > E2E 测试基类: `e2e/helper/E2ETestBase.java`、`e2e/helper/WireMockStubs.java`
 

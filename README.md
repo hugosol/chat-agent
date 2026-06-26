@@ -85,7 +85,7 @@ docker push ghcr.io/你的用户名/chat-agent:latest
 | 模块 | 解决什么问题 | Reference |
 |------|-------------|-----------|
 | 聊天页面 | 实时 WebSocket 流式对话、异步语法纠错、多轮 RAG 记忆注入 | [architecture.md](docs/architecture.md) |
-| MemoryCue | 跨会话语义记忆，RAG 检索 + 向量化存储，跨回合上下文注入 | [architecture.md](docs/architecture.md) / [CONTEXT.md](CONTEXT.md) |
+| MemoryCue / MemoryAssertion | 跨会话语义记忆，RAG 检索 + 向量化存储。V2 写入端升级为结构化断言（MemoryAssertion），检索端保持 MemoryCue | [architecture.md](docs/architecture.md) / [CONTEXT.md](CONTEXT.md) |
 | FSRS 调度器 | 间隔重复算法，决定每张闪卡的下次复习时间 | [fsrs.md](docs/fsrs.md) |
 | FSRS 优化器 | 基于复习历史自动调参，Adam 梯度下降优化 W[21] | [fsrs.md](docs/fsrs.md) |
 | 多 Tab 会话管理 | 页面切换自动恢复，防旧数据干扰，一 Session 一 Tab 绑定 | [frontend-notes.md](docs/frontend-notes.md) |
@@ -137,6 +137,7 @@ cd src/main/frontend && npm test
 - [x] 语法纠错与学习报告
 - [x] 闪卡系统（FSRS-6 调度 + 复习面板 + CSV 导入导出）
 - [x] MemoryCue 跨会话语义记忆（RAG 检索 + 向量化）
+- [ ] 结构化断言存储（MemoryAssertion Extractor + Manager 管线）替代 MemoryCue 写入端
 - [x] 多用户与数据隔离
 - [x] DAILY_TALK 闲聊模式 + WORKPLACE_STANDUP 站会模式 + JAPANESE_BUSINESS ビジネス日本語
 - [x] FSRS 参数优化器（Adam 梯度下降自动调参）

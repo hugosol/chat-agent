@@ -44,8 +44,8 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 com.hugosol.chatagent/
 ├── graph/           # LangGraph: ChatState (6 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
-├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent
-│   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName, TaskContext, ErrorStrategy
+├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent (detectSwitches reused by AssertionService)
+│   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName (9 tasks), TaskContext, ErrorStrategy
 ├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
 ├── controller/      # FlashcardController — REST API (Cards CRUD + Tags CRUD + Import/Export + Back patch, 11 endpoints)
@@ -55,7 +55,7 @@ com.hugosol.chatagent/
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 │                   # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
 │                   # FlashcardService (createCard with FSRS init + Tag upsert),
-│                   # LearningProfileService, MemoryCueService,
+│                   # LearningProfileService, MemoryCueService, AssertionService,
 │                   # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
 │   └── card/          # CardCsvParser, CardBatchService
 ├── model/           # JPA entities + enums

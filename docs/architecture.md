@@ -47,10 +47,10 @@
 | 33 | 模式合并 | `ScenarioType` + `PersonaType` 合并为单一 `AgentMode` 枚举，前端仅一个下拉框；提示词拆分为 per-Mode 的 `description.txt` + `rules.txt` 文件，由 `conversation-system.txt` 骨架模板组装 |
 | 34 | DAILY_TALK 模式 | 新增 `AgentMode.DAILY_TALK`，以 Chris 为 persona（朋友 + 外教混搭角色）。提示词模板通用化：从 `conversation-system.txt` 移除身份硬编码，下沉到各 mode 的 `description.txt`。correction.txt / report.txt 中 "Chinese Java developer" 改为 "Chinese adult" |
 | 35 | ~~Topic Memory 模式隔离~~（已过时） | Topic Memory 已被 MemoryCue 替代。MemoryCue 生成时就携带 `mode` 字段实现模式隔离，RAG 检索时通过 `userId × AgentMode` 双重过滤。详见 ADR `mode-scoped-topic-memory.md`（弃用标记） |
-| 36 | 双轨记忆系统（已统一） | 原始设计为 User Memory（摘要注入）+ MemoryCue（RAG 检索）双轨并存。实施中 Topic Memory 的 Summary 直写被移除，整个记忆系统统一在 MemoryCue 管道：MemoryCue 通过两步 LLM（话题切换检测 + 分段摘要）在会话结束时异步生成，向量化存入 InMemoryEmbeddingStore（JSON 磁盘持久化）。RAG 语义检索通过 MemoryCueQueue（LRU 队列，capacity topK+1，跨 Turn 存活于 ChatState，去重刷新驱逐）管理，每轮注入 System Prompt。LearningProfile 在首轮独立注入。不再有独立的 Topic Memory 管道 |
+| 36 | 双轨记忆系统（已统一） | 原始设计为 User Memory（摘要注入）+ MemoryCue（RAG 检索）双轨并存。实施中 Topic Memory 的 Summary 直写被移除，整个记忆系统统一在 MemoryCue 管道。**V2：写入端升级为 Assertion Extractor + Manager 管线**（结构化断言替代 blob 摘要，per-segment × per-group 两步 LLM + Search→Judge→Merge 串行合并），检索端保持 MemoryCue。MemoryCue 代码在并存期保留。 |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `TaskRunner` 统一管理 LLM 调用生命周期与日志，ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
-| 40 | TaskRunner 同步 Agent 模式 | 抽取 `TaskRunner` 深模块统一管理同步 Agent 的 LLM 调用生命周期。Agent 构造时通过 `runner.register(name, task)` 注册 `TaskDefinition`（模板 + paramBuilder + parser + errorStrategy），运行时通过 `runner.requestModel(name, params, ctx)` 触发 LLM 调用。`TaskName` 枚举管理 5 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE）。删除 `LoggableChatModel` 包装层，日志能力由 TaskRunner 内生提供，含完整 sessionId/userId/agentType/mode 上下文字段。`MemoryAgent` 重命名为 `LearningAgent`（职责退化，仅保留 learningProfile 合并）。
-| 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `ChatMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/LearningProfileService/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
+| 40 | TaskRunner 同步 Agent 模式 | 抽取 `TaskRunner` 深模块统一管理同步 Agent 的 LLM 调用生命周期。Agent 构造时通过 `runner.register(name, task)` 注册 `TaskDefinition`（模板 + paramBuilder + parser + errorStrategy），运行时通过 `runner.requestModel(name, params, ctx)` 触发 LLM 调用。`TaskName` 枚举管理 9 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE / EXTRACT_TOPICS / EXTRACT_STATE / JUDGE_SAME / MERGE_ASSERTION）。删除 `LoggableChatModel` 包装层，日志能力由 TaskRunner 内生提供，含完整 sessionId/userId/agentType/mode 上下文字段。`MemoryAgent` 重命名为 `LearningAgent`（职责退化，仅保留 learningProfile 合并）。 |
+| 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `ChatMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的 3 步管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/LearningProfileService/MemoryCueService，新增 SessionComplete + AssertionService），`onEndSession()` 从 45 行缩至 20 行。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
 | 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载（队列为空）search topK+1 条，后续 search topK 条，去重时同 cueId 刷新到队头，满容时驱逐队尾（最久未访问）。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
 | 42 | TimeLabel 时间感知增强 | `TimeLabel` 计算逻辑从 Duration 桶遍历改为日期+时段判断。≤5分钟 "just now"，≤1小时 "a few minutes ago"，其余按日期分段：今天按时段（last night / this morning / this afternoon / this evening / tonight），昨天同样按时段（last night / yesterday morning / yesterday afternoon / yesterday evening / last night），2天以上保持 "a few days ago" 等模糊标签。`computeLabel(Instant, Instant, ZoneId)` API 签名——时区作为显式参数传入，内部转为用户墙面时间计算标签。 |
@@ -343,6 +343,34 @@ Errors: {allCorrections}
                                       └──────────────┘  │ status (MemoryCueStatus) │
                                                         └─────────────────────────┘
                                                          ┌─────────────────────────┐
+                                                         │    MemoryAssertion      │
+                                                         │─────────────────────────│
+                                                         │ id (PK)                 │
+                                                         │ group_id (FK→Group)     │
+                                                         │ session_id              │
+                                                         │ user_id                 │
+                                                         │ mode                    │
+                                                         │ topic                   │
+                                                         │ state (CLOB)            │
+                                                         │ enabled (default true)  │
+                                                         └─────────────────────────┘
+                                                         ┌─────────────────────────┐
+                                                         │    AssertionGroup       │
+                                                         │─────────────────────────│
+                                                         │ id (PK)                 │
+                                                         │ name                    │
+                                                         │ description             │
+                                                         └─────────────────────────┘
+                                                         ┌─────────────────────────┐
+                                                         │   AssertionLineage      │
+                                                         │─────────────────────────│
+                                                         │ parent_id (PK, FK)      │
+                                                         │ child_id (PK, FK)       │
+                                                         │ operation (MERGE)       │
+                                                         └─────────────────────────┘
+
+                                                        └─────────────────────────┘
+                                                         ┌─────────────────────────┐
                                                          │      LlmCallLog         │
                                                          │─────────────────────────│
                                                          │ id (PK)                 │
@@ -368,6 +396,7 @@ Enum: SessionStatus { ACTIVE, COMPLETED, FAILED }
 Enum: AgentMode { WORKPLACE_STANDUP("Standup Meeting", "workplace_standup"), DAILY_TALK("Daily Talk", "daily_talk"), JAPANESE_BUSINESS("ビジネス日本語", "japanese_business") }
 Enum: LearningType { LEARNING_PROFILE }
 Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED, FIRST_CALL_FAILED }
+Enum: AssertionOperation { MERGE }
 Enum: TimeLabel { JUST_NOW, A_FEW_MINUTES_AGO, LAST_NIGHT, THIS_MORNING, THIS_AFTERNOON, THIS_EVENING, TONIGHT, YESTERDAY_MORNING, YESTERDAY_AFTERNOON, YESTERDAY_EVENING, A_FEW_DAYS_AGO, ABOUT_A_WEEK_AGO, A_FEW_WEEKS_AGO, ABOUT_A_MONTH_AGO, A_WHILE_AGO }（计算方式为日期+时段判断，非 Duration 桶遍历）
 ```
 
@@ -445,10 +474,10 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
 | **持久化存储** | H2 逐条存 Message + ErrorRecord | `saveSession` 节点在会话结束时批量写入 JPA。跨会话通过 Session 关联 |
 | **Checkpoint / 恢复** | MemorySaver | `CompileConfig.builder().checkpointSaver(new MemorySaver())`，每个会话 `threadId`，刷新页面恢复 |
 | **前端展示** | 全部消息 + 折叠旧消息 | 可滚动聊天区，顶部 token 进度条，旧消息折叠到 "Show earlier" 后 |
-| **写入时机** | 会话结束时统一持久化 | `SessionComplete.complete()` 内部串联 `reportAgent.generate()` → `sessionStore.completeSession()` → `learningProfileService.generateMemoryAsync()` + `memoryCueService.generateCuesAsync()` |
+| **写入时机** | 会话结束时统一持久化 | `SessionComplete.complete()` 内部串联 `reportAgent.generate()` → `sessionStore.completeSession()` → `learningProfileService.generateMemoryAsync()` + `assertionService.generateAssertionsAsync()`（V2 替代 MemoryCue） |
 | **日志写入** | LLM 调用时即时异步写入 | `TaskRunner.requestModel()`（同步 Agent）在调用点内生写入完整上下文字段；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
 | **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中通过 `CompletableFuture.runAsync` 删除 3 天前记录 |
-| **记忆写入** | LearningProfileService + MemoryCueService 异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Learning Profile Merge + MemoryCue Split + 多段 MemoryCue Entry。每条 COMPLETED 后触发 `EmbeddingService.indexAsync` 向量化 |
+| **记忆写入** | LearningProfileService + AssertionService 异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Learning Profile Merge + Assertion Extractor（detectSwitches → Step1 → Step2 → embedding 索引）+ Assertion Manager（Search→Judge→Merge 串行）。V1: 仅 error-pattern group。每条断言 COMPLETED 后触发独立 `assertion_embedding_store` 向量化 |
 | **RAG 检索** | TurnProcessor Round 2+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，userId×AgentMode 隔离。结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载 search topK+1 条，后续 search topK 条，去重刷新驱逐，按 tail→head 编号列表注入 System Prompt `{memoryCues}` |
 
 ### 会话生命周期
@@ -467,7 +496,7 @@ Card 和 Tag 均继承 `BaseEntity`（UUID id + createTime + updateTime）。Car
     ├── reportAgent.generate() → ReportResult（失败则降级）
     ├── sessionStore.completeSession() → H2（null report → FAILED）
     ├── learningProfileService.generateMemoryAsync() → Profile Merge
-    └── memoryCueService.generateCuesAsync() → MemoryCue 生成
+    └── assertionService.generateAssertionsAsync() → Assertion Extractor + Manager（V2 替代 MemoryCue）
   ↓
   SessionService.remove() → 释放 state
   SESSION_REPORT → 前端弹窗
@@ -635,11 +664,15 @@ chat-agent/
 │   │   ├── UserProgress.java               // 学习进度（含 userId unique，每用户一行）
 │   │   ├── UserLearningProfile.java                 // Learning Profile 合并记录（含 version + sessionId 追溯）
 │   │   ├── MemoryCue.java                  // 结构化话题记忆（topic/summary，含状态追踪）
+│   │   ├── MemoryAssertion.java            // 结构化断言（topic/state/enabled，含 AssertionGroup 关联）
+│   │   ├── AssertionGroup.java             // 断言分类维度（name/description）
+│   │   ├── AssertionLineage.java           // 断言演化边（parent_id/child_id/operation，支持递归 CTE）
 │   │   ├── LlmCallLog.java                 // LLM API 调用日志（prompt/response/tokens/duration/status）
 │   │   ├── BatchOperationLog.java          // 批量操作日志（导入/导出审计）
 │   │   ├── BatchOperationType.java         // 枚举: IMPORT / EXPORT
 │   │   ├── BatchOperationStatus.java       // 枚举: SUCCESS / PARTIAL / FAILED
 │   │   ├── MemoryCueStatus.java            // 枚举: COMPLETED / SEGMENT_FAILED / FIRST_CALL_FAILED
+│   │   ├── AssertionOperation.java         // 枚举: MERGE（预留扩展）
 │   │   ├── MessageRole.java                // 枚举: USER / AGENT / CORRECTION
 │   │   ├── ErrorType.java                  // 枚举: GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY
 │   │   ├── SessionStatus.java              // 枚举: ACTIVE / COMPLETED / FAILED
@@ -666,6 +699,8 @@ chat-agent/
 │   │   ├── UserProgressRepository.java     // findByUserId
 │   │   ├── UserLearningProfileRepository.java // findByUserIdAndTypeAndModeOrderByVersionDesc
 │   │   ├── MemoryCueRepository.java        // findBySessionId, findAllByStatus
+│   │   ├── MemoryAssertionRepository.java   // findByUserIdAndModeAndEnabled + 递归 CTE 演化链查询
+│   │   ├── AssertionGroupRepository.java    // findAll 分组查询
 │   │   ├── LlmCallLogRepository.java       // deleteByCreateTimeBefore
 │   │   ├── WatchedMovieRepository.java      // findByUserId + findByUserIdAndImdbId
 │   │   ├── SubtitleLineRepository.java      // findByImdbIdInAndWordsLowerLike + deleteByImdbId
@@ -689,7 +724,8 @@ chat-agent/
 │   │   ├── SessionComplete.java            // 会话结束管线 (report+persist+async memory)
 │   │   ├── SessionDbStore.java               // 会话 CRUD + 归档（createSession/getHistory 含 userId）
 │   │   ├── LearningProfileService.java              // 异步 Learning Profile 合并（含 sessionId 追溯）
-│   │   ├── MemoryCueService.java           // 异步 MemoryCue 生成（话题分割 + 分段摘要 → EmbeddingService.indexAsync）
+│   │   ├── MemoryCueService.java           // 异步 MemoryCue 生成（并存期保留）
+│   │   ├── AssertionService.java           // 异步 Assertion Extractor + Manager 管线（替代 MemoryCue 写入端）
 │   │   ├── EmbeddingService.java            // ONNX 向量化 + InMemoryEmbeddingStore 管理（init/search/indexAsync/saveToDisk）
 │   │   ├── LlmCallLogService.java          // 异步 LLM 调用日志写入 + 启动时清理 3 天前记录
 │   │   ├── SessionCleanupLogoutHandler.java // 登出时清理 activeStates
@@ -731,6 +767,10 @@ chat-agent/
 │       ├── memory-profile.txt
 │       ├── memory-cue-split.txt
 │       └── memory-cue-entry.txt
+│       ├── assertion-extract-topics.txt     // Step1: topic 抽取 prompt（{groupName}/{groupDescription} 参数化）
+│       ├── assertion-extract-state.txt      // Step2: state 生成 prompt（{groupName}/{topic} 参数化）
+│       ├── assertion-judge-same.txt         // Judge: 是/否 binary 判断
+│       └── assertion-merge.txt              // Merge: 合并两条断言
 │
 └── src/main/resources/static/
     ├── login/                              // 登录页（公开目录）
@@ -863,7 +903,7 @@ src/main/frontend/
 |---|-------------|----|
 | **场景** | 职场英语 (Standup) + 日常闲聊 (Daily Talk) | 技术演讲练习 + 更多 AgentMode |
 | **Agent** | 五 Agent 全协作（Conversation + Correction + Report + Memory + MemoryCue） | 场景自动切换 |
-| **记忆** | MemoryCue (RAG 向量检索, Round 2+) + LearningProfile (首轮注入) | 长期记忆增强 |
+| **记忆** | MemoryCue (RAG 向量检索, Round 2+) + LearningProfile (首轮注入) | MemoryAssertion 结构化断言写入（替代 MemoryCue 写入端）+ 检索端升级 |
 | **报告** | 错误汇总 + 评分 | 进度趋势图表 |
 | **输入** | 文本输入框 + iOS 键盘听写 | 前端录音 + 后端 OpenAI Whisper API |
 | **TTS** | 浏览器 SpeechSynthesis（🔊 按钮手动触发） | OpenAI TTS（自然度更高） |

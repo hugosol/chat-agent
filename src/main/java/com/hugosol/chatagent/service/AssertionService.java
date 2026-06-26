@@ -166,7 +166,7 @@ public class AssertionService {
             if (segment.isEmpty()) continue;
 
             long t1 = System.currentTimeMillis();
-            List<String> topics = runner.requestModel(TaskName.EXTRACT_TOPICS,
+            List<String> topics = extractTopicsWithRetry(
                     new ExtractTopicsParams(group.getName(), group.getDescription(), labeledMessages), ctx);
             log.info("AssertionService: Step1 (topics) segment {} done in {}ms, {} topics",
                     segIdx, System.currentTimeMillis() - t1, topics.size());
@@ -301,6 +301,46 @@ public class AssertionService {
             segments.add(new ArrayList<>(messages.subList(startIdx, messages.size())));
         }
         return segments;
+    }
+
+    private static final int MAX_TOPIC_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 500;
+
+    private List<String> extractTopicsWithRetry(ExtractTopicsParams params, TaskContext ctx) {
+        Exception lastException = null;
+        for (int attempt = 0; attempt <= MAX_TOPIC_RETRIES; attempt++) {
+            if (attempt > 0) {
+                try {
+                    Thread.sleep(RETRY_DELAY_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            try {
+                String rawResponse = runner.requestRaw(TaskName.EXTRACT_TOPICS, params, ctx);
+                if (rawResponse == null || rawResponse.isBlank()) {
+                    lastException = new RuntimeException("Empty response from LLM");
+                    log.warn("AssertionService: extractTopics attempt {} returned empty, retrying", attempt + 1);
+                    continue;
+                }
+                List<String> topics = parseTopicList(rawResponse);
+                // parseTopicList returns emptyList on parse failure —
+                // distinguish genuine [] from parse failure by checking the raw response
+                if (topics.isEmpty() && !rawResponse.trim().equals("[]")) {
+                    lastException = new RuntimeException("Failed to parse topic list");
+                    log.warn("AssertionService: extractTopics attempt {} parse failed, raw={}", attempt + 1, rawResponse);
+                    continue;
+                }
+                return topics;
+            } catch (RuntimeException e) {
+                lastException = e;
+                log.warn("AssertionService: extractTopics attempt {} threw: {}", attempt + 1, e.getMessage());
+                // Continue to retry on runtime exceptions too
+            }
+        }
+        log.warn("AssertionService: extractTopics all {} attempts exhausted, returning empty", MAX_TOPIC_RETRIES + 1);
+        return Collections.emptyList();
     }
 
     private static List<String> parseTopicList(String response) {

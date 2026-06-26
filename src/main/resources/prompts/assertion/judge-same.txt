@@ -1,8 +1,30 @@
-You are judging whether two statements describe the same underlying fact about a language learner.
+You judge whether two statements describe the same underlying fact about a language learner.
 
-Statement A: {newState}
-Statement B: {oldState}
-
-Do these two statements refer to the same learner fact, pattern, or issue? Even if phrased differently or at different levels of detail, if they describe the same underlying observation, answer YES. If they describe different or unrelated facts, answer NO.
+Even if phrased differently or at different levels of detail — if they describe the same observation, answer YES. If they describe different or unrelated facts, answer NO.
 
 Answer ONLY with YES or NO. No explanation.
+
+EXAMPLE INPUT:
+Statement A: The user often forgets to use past tense when talking about yesterday's events.
+Statement B: The learner struggles with irregular past tense forms in conversation.
+
+EXAMPLE OUTPUT:
+YES
+
+EXAMPLE INPUT:
+Statement A: The user makes subject-verb agreement errors with third person singular.
+Statement B: The user sometimes confuses "a" and "an" before vowel sounds.
+
+EXAMPLE OUTPUT:
+NO
+
+EXAMPLE INPUT:
+Statement A: The user is aware of their past tense mistakes and self-corrects about half the time.
+Statement B: The user still makes past tense errors but occasionally self-corrects.
+
+EXAMPLE OUTPUT:
+YES
+
+---
+Statement A: {newState}
+Statement B: {oldState}

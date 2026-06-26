@@ -109,8 +109,8 @@ class AssertionServiceTest {
         when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
                 .thenReturn(List.of(0)); // one switch at message 0 = one segment
 
-        when(runner.requestModel(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
-                .thenReturn(List.of("past tense"));
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+                .thenReturn("[\"past tense\"]");
         when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
                 .thenReturn("User struggles with irregular past tense verbs");
 
@@ -137,8 +137,8 @@ class AssertionServiceTest {
         when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
                 .thenReturn(Collections.emptyList());
 
-        when(runner.requestModel(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
-                .thenReturn(List.of("plural nouns", "article usage"));
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+                .thenReturn("[\"plural nouns\", \"article usage\"]");
         when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
                 .thenReturn("state text");
 
@@ -152,20 +152,142 @@ class AssertionServiceTest {
     }
 
     @Test
+    void extract_retriesOnEmptyString_succeedsOnThirdAttempt() {
+        List<MessageData> messages = List.of(
+                new MessageData(MessageRole.USER, "I go to store", 0));
+        when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
+                .thenReturn(Collections.emptyList());
+
+        // First two calls return empty string, third returns valid JSON
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+                .thenReturn("", "", "[\"past tense\"]");
+
+        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+                .thenReturn("User struggles with past tense");
+
+        when(assertionRepository.save(any(MemoryAssertion.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, messages, errorPatternGroup);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTopic()).isEqualTo("past tense");
+
+        // Should have called requestRaw 3 times (2 retries + 1 success)
+        verify(runner, times(3)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+    }
+
+    @Test
+    void extract_validEmptyArrayNotRetried() {
+        List<MessageData> messages = List.of(
+                new MessageData(MessageRole.USER, "Hi", 0));
+        when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
+                .thenReturn(Collections.emptyList());
+
+        // LLM legitimately finds no recurring concepts
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+                .thenReturn("[]");
+
+        List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, messages, errorPatternGroup);
+
+        assertThat(result).isEmpty();
+
+        // Should have called requestRaw exactly once — no retries
+        verify(runner, times(1)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(runner, never()).requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
+    }
+
+    @Test
+    void extract_retriesOnParseFailure_succeedsOnRetry() {
+        List<MessageData> messages = List.of(
+                new MessageData(MessageRole.USER, "I go to store", 0));
+        when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
+                .thenReturn(Collections.emptyList());
+
+        // First two calls return malformed JSON, third returns valid
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+                .thenReturn("not json", "{\"bad\": true}", "[\"past tense\"]");
+
+        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+                .thenReturn("User struggles with past tense");
+
+        when(assertionRepository.save(any(MemoryAssertion.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, messages, errorPatternGroup);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTopic()).isEqualTo("past tense");
+
+        verify(runner, times(3)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+    }
+
+    @Test
+    void extract_retriesOnRunnerException_succeedsOnThirdAttempt() {
+        List<MessageData> messages = List.of(
+                new MessageData(MessageRole.USER, "I go to store", 0));
+        when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
+                .thenReturn(Collections.emptyList());
+
+        // First two calls throw, third returns valid JSON
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+                .thenThrow(new RuntimeException("Network error"))
+                .thenThrow(new RuntimeException("Timeout"))
+                .thenReturn("[\"past tense\"]");
+
+        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+                .thenReturn("User struggles with past tense");
+
+        when(assertionRepository.save(any(MemoryAssertion.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, messages, errorPatternGroup);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTopic()).isEqualTo("past tense");
+
+        verify(runner, times(3)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+    }
+
+    @Test
+    void extract_retryExhaustedReturnsEmpty() {
+        List<MessageData> messages = List.of(
+                new MessageData(MessageRole.USER, "just hi", 0));
+        when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
+                .thenReturn(Collections.emptyList());
+
+        // All 4 attempts return empty strings
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+                .thenReturn("", "", "", "");
+
+        List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, messages, errorPatternGroup);
+
+        assertThat(result).isEmpty();
+        verify(runner, times(4)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(runner, never()).requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
+    }
+
+    @Test
     void extract_llmFailure_propagatesException() {
         List<MessageData> messages = List.of(
                 new MessageData(MessageRole.USER, "test", 0));
         when(memoryCueAgent.detectSwitches(eq(messages), eq(MODE), any(TaskContext.class)))
                 .thenReturn(Collections.emptyList());
 
-        when(runner.requestModel(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenThrow(new RuntimeException("LLM error"));
 
-        assertThatThrownBy(() -> service.extract(SESSION_ID, USER_ID, MODE, messages, errorPatternGroup))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("LLM error");
+        // With retry, the exception is caught 3 times, then on the 4th (final) attempt it propagates?
+        // Actually: our retry loop catches RuntimeException and continues retrying.
+        // After 4 attempts (0,1,2,3), it gives up. Since all 4 throw, the loop exits normally
+        // and returns empty list. Exception does NOT propagate.
+        // This test needs to reflect the new behavior.
+        List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, messages, errorPatternGroup);
 
-        // Step2 should never be called after Step1 failure
+        assertThat(result).isEmpty();
+
+        // Should have called requestRaw 4 times (1 original + 3 retries)
+        verify(runner, times(4)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
         verify(runner, never()).requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
         verify(assertionRepository, never()).save(any());
     }

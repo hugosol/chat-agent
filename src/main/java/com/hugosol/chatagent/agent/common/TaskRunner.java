@@ -66,7 +66,7 @@ public class TaskRunner {
             throw e;
         }
 
-        long duration = System.currentTimeMillis() - startTime;
+            long duration = System.currentTimeMillis() - startTime;
         logService.saveAsync(
                 ctx.sessionId(), ctx.userId(), name.name(), ctx.mode(),
                 prompt, null, null,
@@ -133,6 +133,44 @@ public class TaskRunner {
             }
             throw e instanceof RuntimeException re ? re : new RuntimeException(e);
         }
+    }
+
+    /** Returns the raw LLM response string, without applying the parser. */
+    @SuppressWarnings("unchecked")
+    public <P> String requestRaw(TaskName name, P params, TaskContext ctx) {
+        TaskDefinition<P, ?> def = (TaskDefinition<P, ?>) registry.get(name);
+        if (def == null) {
+            throw new IllegalStateException("No task registered for: " + name);
+        }
+
+        Map<String, String> placeholders = def.paramBuilder().apply(params);
+        String prompt = fillTemplate(def.template(), placeholders);
+
+        ChatLanguageModel model = (name == TaskName.REPORT) ? reportChatModel : defaultChatModel;
+
+        long startTime = System.currentTimeMillis();
+        String response;
+        try {
+            response = model.chat(prompt);
+        } catch (RuntimeException e) {
+            long duration = System.currentTimeMillis() - startTime;
+            logService.saveAsync(
+                    ctx.sessionId(), ctx.userId(), name.name(), ctx.mode(),
+                    prompt, null, null,
+                    null,
+                    null, null, duration, "ERROR", e.getMessage());
+            log.warn("TaskRunner: task {} LLM call failed", name, e);
+            throw e;
+        }
+
+        long duration = System.currentTimeMillis() - startTime;
+        logService.saveAsync(
+                ctx.sessionId(), ctx.userId(), name.name(), ctx.mode(),
+                prompt, null, null,
+                response,
+                null, null, duration, "SUCCESS", null);
+
+        return response;
     }
 
     private String fillTemplate(String template, Map<String, String> placeholders) {

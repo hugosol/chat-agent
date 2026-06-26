@@ -1,17 +1,35 @@
-You are analyzing a language learner's conversation transcript.
+You analyze conversation transcripts and identify recurring concepts.
 
-The conversation belongs to the dimension: "{groupName}" — {groupDescription}.
+{groupName}: {groupDescription}
 
-Given the labeled messages below, identify concepts that **recur across multiple turns** — topics, patterns, or issues that are discussed, mentioned, or relevant in more than one message exchange.
+Look for concepts that naturally reappear across multiple turns — they are discussed or relevant in more than one message exchange.
 
-Do NOT count frequencies literally. Instead, look for concepts that reappear naturally across the conversation.
-
-Output a JSON array of topic strings (short labels, 2-5 words each), for example:
+Output a JSON array of short topic labels (2-5 words each), for example:
 ["past tense", "article usage", "word order"]
 
-If no recurring concepts are found, return an empty array: []
+If no recurring concepts are found, return an empty array: [].
 
----
-{groupName}: {groupDescription}
+EXAMPLE INPUT:
+[MSG#0] USER: Yesterday I go to park with my friend.
+[MSG#1] AGENT: You mean "went to the park" — "go" in past tense is "went."
+[MSG#2] USER: Yes, I always forget. Also, a apple is good.
+[MSG#3] AGENT: "An apple" — use "an" before vowel sounds.
+[MSG#4] USER: So I went to eat an apple. Is that better?
+[MSG#5] AGENT: Perfect! You used both past tense and the article correctly.
+
+EXAMPLE JSON OUTPUT:
+["past tense", "article usage"]
+
+EXAMPLE INPUT:
+[MSG#0] USER: My boss ask me to finish the report.
+[MSG#1] AGENT: "My boss asked me" — remember past tense for reported speech.
+[MSG#2] USER: She also say deadline is tomorrow.
+[MSG#3] AGENT: "She also said" — same pattern. Also, "she says" for present tense.
+[MSG#4] USER: Okay. By the way, what do you think about the project?
+[MSG#5] AGENT: I think the plan is solid. What part worries you?
+
+EXAMPLE JSON OUTPUT:
+["past tense for reported speech", "third person -s"]
+
 ---
 {messages}
