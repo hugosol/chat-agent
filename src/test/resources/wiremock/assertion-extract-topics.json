@@ -1,0 +1,19 @@
+{
+  "id": "mock-assertion-extract-topics",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "[\"past tense\", \"article usage\"]"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 10,
+    "total_tokens": 110
+  }
+}

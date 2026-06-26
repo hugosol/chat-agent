@@ -1,0 +1,8 @@
+You are judging whether two statements describe the same underlying fact about a language learner.
+
+Statement A: {newState}
+Statement B: {oldState}
+
+Do these two statements refer to the same learner fact, pattern, or issue? Even if phrased differently or at different levels of detail, if they describe the same underlying observation, answer YES. If they describe different or unrelated facts, answer NO.
+
+Answer ONLY with YES or NO. No explanation.

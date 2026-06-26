@@ -15,12 +15,18 @@ public class WireMockStubs {
     private static final String SCENARIO_CORR = "correction-rounds";
     private static final String SCENARIO_MEM_PROFILE = "memory-profile-rounds";
     private static final String SCENARIO_CUE_ENTRY = "memory-cue-entry-rounds";
+    private static final String SCENARIO_JA_CONV = "japanese-conversation-rounds";
 
     private static final String KEYWORD_CORRECTION = "Correction prompt:";
     private static final String KEYWORD_REPORT = "Report prompt.";
     private static final String KEYWORD_MEM_PROFILE = "E2E_MARKER_MEMORY_PROFILE";
     private static final String KEYWORD_MEM_CUE_SPLIT = "E2E_MARKER_MEMORY_CUE_SPLIT";
     private static final String KEYWORD_MEM_CUE_ENTRY = "E2E_MARKER_MEMORY_CUE_ENTRY";
+    private static final String KEYWORD_ASSERTION_TOPICS = "E2E_MARKER_ASSERTION_EXTRACT_TOPICS";
+    private static final String KEYWORD_ASSERTION_STATE = "E2E_MARKER_ASSERTION_EXTRACT_STATE";
+    private static final String KEYWORD_ASSERTION_JUDGE = "E2E_MARKER_ASSERTION_JUDGE_SAME";
+    private static final String KEYWORD_ASSERTION_MERGE = "E2E_MARKER_ASSERTION_MERGE";
+    private static final String KEYWORD_JAPANESE_CONV = "E2E_MARKER_JAPANESE_BUSINESS";
 
 
     public static void registerAllStubs(WireMockServer wireMock) {
@@ -32,6 +38,8 @@ public class WireMockStubs {
         registerReportStub();
         registerMemoryProfileStubs();
         registerMemoryCueStubs();
+        registerAssertionStubs();
+        registerJapaneseConversationStubs();
     }
 
     public static void registerDailyTalkStubs(WireMockServer wireMock) {
@@ -43,6 +51,8 @@ public class WireMockStubs {
         registerDailyReportStub();
         registerMemoryProfileStubs();
         registerMemoryCueStubs();
+        registerAssertionStubs();
+        registerJapaneseConversationStubs();
     }
 
     private static void registerConversationStubs() {
@@ -295,6 +305,105 @@ public class WireMockStubs {
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(loadResource("wiremock/memory-cue-entry-seg2.json"))));
+    }
+
+    private static void registerAssertionStubs() {
+        String topicsKeyword = KEYWORD_ASSERTION_TOPICS;
+        String stateKeyword = KEYWORD_ASSERTION_STATE;
+        String judgeKeyword = KEYWORD_ASSERTION_JUDGE;
+        String mergeKeyword = KEYWORD_ASSERTION_MERGE;
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(topicsKeyword)))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/assertion-extract-topics.json"))));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(stateKeyword)))
+                .inScenario("assertion-state-rounds")
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/assertion-extract-state-1.json")))
+                .willSetStateTo("topic-2"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(stateKeyword)))
+                .inScenario("assertion-state-rounds")
+                .whenScenarioStateIs("topic-2")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/assertion-extract-state-2.json"))));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(judgeKeyword)))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/assertion-judge-same.json"))));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(mergeKeyword)))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(loadResource("wiremock/assertion-merge.json"))));
+    }
+
+    private static void registerJapaneseConversationStubs() {
+        String convKeyword = KEYWORD_JAPANESE_CONV;
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_JA_CONV)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody(loadResource("wiremock/japanese-conv-round-1.txt")))
+                .willSetStateTo("round-2"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_JA_CONV)
+                .whenScenarioStateIs("round-2")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody(loadResource("wiremock/japanese-conv-round-2.txt")))
+                .willSetStateTo("round-3"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_JA_CONV)
+                .whenScenarioStateIs("round-3")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody(loadResource("wiremock/japanese-conv-round-3.txt")))
+                .willSetStateTo("round-4"));
+
+        stubFor(post(urlEqualTo("/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].content",
+                        containing(convKeyword)))
+                .inScenario(SCENARIO_JA_CONV)
+                .whenScenarioStateIs("round-4")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/event-stream")
+                        .withBody("data: [DONE]\n\n")));
     }
 
     private static String loadResource(String path) {

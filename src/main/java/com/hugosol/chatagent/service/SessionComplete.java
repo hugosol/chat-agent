@@ -24,14 +24,14 @@ public class SessionComplete {
     private final SessionDbStore sessionStore;
     private final ReportAgent reportAgent;
     private final LearningProfileService learningProfileService;
-    private final MemoryCueService memoryCueService;
+    private final AssertionService assertionService;
 
     public SessionComplete(SessionDbStore sessionStore, ReportAgent reportAgent,
-                           LearningProfileService learningProfileService, MemoryCueService memoryCueService) {
+                           LearningProfileService learningProfileService, AssertionService assertionService) {
         this.sessionStore = sessionStore;
         this.reportAgent = reportAgent;
         this.learningProfileService = learningProfileService;
-        this.memoryCueService = memoryCueService;
+        this.assertionService = assertionService;
     }
 
     public ReportResult complete(String sessionId, List<MessageData> messages,
@@ -47,7 +47,7 @@ public class SessionComplete {
 
         if (userId != null && mode != AgentMode.JAPANESE_BUSINESS) {
             learningProfileService.generateLearningProfileAsync(userId, report, mode, sessionId);
-            memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
+            assertionService.generateAssertionsAsync(sessionId, userId, mode, List.copyOf(messages));
         }
 
         return report;

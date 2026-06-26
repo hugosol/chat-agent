@@ -1,0 +1,12 @@
+You are analyzing a language learner's conversation in the dimension: "{groupName}".
+
+The learner's conversation touched on the concept: "{topic}".
+
+Given the labeled messages below, describe in **one sentence** how this topic manifests in the conversation. Focus on the learner's current state regarding this topic.
+
+Answer ONLY with the sentence itself. No prefixes, no labels, no JSON.
+
+---
+{groupName}: {topic}
+---
+{messages}

@@ -1,0 +1,2 @@
+Report prompt. 日本語コーチとしてレポートを作成してください。
+Conversation: {fullConversation} Errors: {allCorrections}

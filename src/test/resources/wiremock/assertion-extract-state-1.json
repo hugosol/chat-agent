@@ -1,0 +1,19 @@
+{
+  "id": "mock-assertion-extract-state-1",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "User struggles with irregular past tense verbs in workplace conversations."
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 15,
+    "total_tokens": 115
+  }
+}

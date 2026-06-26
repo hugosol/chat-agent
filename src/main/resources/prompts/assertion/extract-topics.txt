@@ -1,0 +1,17 @@
+You are analyzing a language learner's conversation transcript.
+
+The conversation belongs to the dimension: "{groupName}" — {groupDescription}.
+
+Given the labeled messages below, identify concepts that **recur across multiple turns** — topics, patterns, or issues that are discussed, mentioned, or relevant in more than one message exchange.
+
+Do NOT count frequencies literally. Instead, look for concepts that reappear naturally across the conversation.
+
+Output a JSON array of topic strings (short labels, 2-5 words each), for example:
+["past tense", "article usage", "word order"]
+
+If no recurring concepts are found, return an empty array: []
+
+---
+{groupName}: {groupDescription}
+---
+{messages}

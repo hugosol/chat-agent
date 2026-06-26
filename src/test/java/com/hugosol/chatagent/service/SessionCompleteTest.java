@@ -35,13 +35,13 @@ class SessionCompleteTest {
     private LearningProfileService learningProfileService;
 
     @Mock
-    private MemoryCueService memoryCueService;
+    private AssertionService assertionService;
 
     private SessionComplete sessionComplete;
 
     @BeforeEach
     void setUp() {
-        sessionComplete = new SessionComplete(sessionStore, reportAgent, learningProfileService, memoryCueService);
+        sessionComplete = new SessionComplete(sessionStore, reportAgent, learningProfileService, assertionService);
     }
 
     @Test
@@ -56,7 +56,7 @@ class SessionCompleteTest {
         assertThat(result).isEqualTo(expectedReport);
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
         verify(learningProfileService).generateLearningProfileAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
-        verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
     @Test
@@ -71,7 +71,7 @@ class SessionCompleteTest {
         assertThat(result.overallAssessment()).contains("failed");
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), isNull());
         verify(learningProfileService).generateLearningProfileAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
-        verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
     @Test
@@ -86,7 +86,7 @@ class SessionCompleteTest {
 
         assertThat(result).isEqualTo(expectedReport);
         verify(learningProfileService).generateLearningProfileAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
-        verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
     @Test
@@ -100,7 +100,7 @@ class SessionCompleteTest {
 
         assertThat(result.fluencyScore()).isEqualTo(-1);
         verify(learningProfileService).generateLearningProfileAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
-        verify(memoryCueService).generateCuesAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
     }
 
     @Test
@@ -115,7 +115,7 @@ class SessionCompleteTest {
         assertThat(result).isEqualTo(expectedReport);
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
         verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
-        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+        verify(assertionService, never()).generateAssertionsAsync(any(), any(), any(), any());
     }
 
     @Test
@@ -130,7 +130,7 @@ class SessionCompleteTest {
         assertThat(result).isEqualTo(expectedReport);
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
         verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
-        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+        verify(assertionService, never()).generateAssertionsAsync(any(), any(), any(), any());
     }
 
     @Test
@@ -146,6 +146,6 @@ class SessionCompleteTest {
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
         verify(reportAgent).generate(eq(messages), eq(corrections), any());
         verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
-        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+        verify(assertionService, never()).generateAssertionsAsync(any(), any(), any(), any());
     }
 }

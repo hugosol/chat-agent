@@ -1,0 +1,19 @@
+{
+  "id": "mock-ja-report",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "{\"overallAssessment\": \"Good performance. --- 良好なパフォーマンス。\", \"errorSummary\": \"Minor issues with keigo.\", \"fluencyScore\": 7, \"keyTakeaway\": \"Practice more keigo. --- 敬語をもっと練習。\"}"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 200,
+    "completion_tokens": 60,
+    "total_tokens": 260
+  }
+}

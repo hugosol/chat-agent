@@ -1,7 +1,9 @@
 package com.hugosol.chatagent.config;
 
+import com.hugosol.chatagent.model.AssertionGroup;
 import com.hugosol.chatagent.model.FsrsParameters;
 import com.hugosol.chatagent.model.User;
+import com.hugosol.chatagent.repository.AssertionGroupRepository;
 import com.hugosol.chatagent.repository.UserRepository;
 import com.hugosol.chatagent.service.FsrsParametersService;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,9 @@ class DataInitializerTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AssertionGroupRepository assertionGroupRepository;
 
     @InjectMocks
     private DataInitializer dataInitializer;
@@ -102,5 +107,32 @@ class DataInitializerTest {
         dataInitializer.run();
 
         verify(fsrsParametersService, never()).save(any(FsrsParameters.class));
+    }
+
+    @Test
+    void shouldCreateAssertionGroupWhenNotExists() throws Exception {
+        when(appProperties.getInitialUsers()).thenReturn(List.of());
+        when(userRepository.findAll()).thenReturn(List.of());
+        when(assertionGroupRepository.findByName("error-pattern")).thenReturn(Optional.empty());
+
+        dataInitializer.run();
+
+        ArgumentCaptor<AssertionGroup> captor = ArgumentCaptor.forClass(AssertionGroup.class);
+        verify(assertionGroupRepository).save(captor.capture());
+        AssertionGroup saved = captor.getValue();
+        assertThat(saved.getName()).isEqualTo("error-pattern");
+        assertThat(saved.getDescription()).contains("Grammar");
+    }
+
+    @Test
+    void shouldNotDuplicateAssertionGroup() throws Exception {
+        when(appProperties.getInitialUsers()).thenReturn(List.of());
+        when(userRepository.findAll()).thenReturn(List.of());
+        when(assertionGroupRepository.findByName("error-pattern"))
+                .thenReturn(Optional.of(new AssertionGroup("error-pattern", "desc")));
+
+        dataInitializer.run();
+
+        verify(assertionGroupRepository, never()).save(any(AssertionGroup.class));
     }
 }

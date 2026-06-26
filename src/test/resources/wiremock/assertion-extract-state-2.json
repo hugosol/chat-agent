@@ -1,0 +1,19 @@
+{
+  "id": "mock-assertion-extract-state-2",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "User frequently omits articles before nouns."
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 12,
+    "total_tokens": 112
+  }
+}

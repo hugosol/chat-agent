@@ -62,6 +62,12 @@ public abstract class E2ETestBase {
     protected MemoryCueRepository memoryCueRepository;
 
     @Autowired
+    protected MemoryAssertionRepository assertionRepository;
+
+    @Autowired
+    protected AssertionLineageRepository lineageRepository;
+
+    @Autowired
     protected CardRepository cardRepository;
 
     @Autowired
@@ -177,6 +183,12 @@ public abstract class E2ETestBase {
         page.waitForFunction(
                 "expected => document.querySelectorAll('[data-testid=\"correction-bubble\"]').length >= expected",
                 turnNumber);
+    }
+
+    /** For modes that skip correction (e.g., JAPANESE_BUSINESS). */
+    protected void waitForAgentResponseNoCorrection() {
+        page.waitForFunction(
+                "() => document.querySelector('[data-testid=\"text-input\"]') && !document.querySelector('[data-testid=\"text-input\"]').disabled");
     }
 
     protected void endSession() {

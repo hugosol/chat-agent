@@ -1,0 +1,19 @@
+{
+  "id": "mock-assertion-judge-same",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "YES"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 30,
+    "completion_tokens": 1,
+    "total_tokens": 31
+  }
+}

@@ -1,7 +1,9 @@
 package com.hugosol.chatagent.config;
 
+import com.hugosol.chatagent.model.AssertionGroup;
 import com.hugosol.chatagent.model.FsrsParameters;
 import com.hugosol.chatagent.model.User;
+import com.hugosol.chatagent.repository.AssertionGroupRepository;
 import com.hugosol.chatagent.repository.UserRepository;
 import com.hugosol.chatagent.service.FsrsParametersService;
 import org.slf4j.Logger;
@@ -21,17 +23,20 @@ public class DataInitializer implements CommandLineRunner {
     private final AppProperties appProperties;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final AssertionGroupRepository assertionGroupRepository;
 
     public DataInitializer(UserRepository userRepository,
                             FsrsParametersService fsrsParametersService,
                             AppProperties appProperties,
                             PasswordEncoder passwordEncoder,
-                            JdbcTemplate jdbcTemplate) {
+                            JdbcTemplate jdbcTemplate,
+                            AssertionGroupRepository assertionGroupRepository) {
         this.userRepository = userRepository;
         this.fsrsParametersService = fsrsParametersService;
         this.appProperties = appProperties;
         this.passwordEncoder = passwordEncoder;
         this.jdbcTemplate = jdbcTemplate;
+        this.assertionGroupRepository = assertionGroupRepository;
     }
 
     @Override
@@ -47,6 +52,7 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         initFsrsParameters();
+        initAssertionGroups();
 
         migrateDropSessionsModeCheckConstraint();
         migrateDropOtherModeCheckConstraints();
@@ -112,6 +118,16 @@ public class DataInitializer implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.debug("wordsLower spaces migration skipped: {}", e.getMessage());
+        }
+    }
+
+    private void initAssertionGroups() {
+        if (assertionGroupRepository.findByName("error-pattern").isEmpty()) {
+            assertionGroupRepository.save(
+                    new AssertionGroup("error-pattern", "Grammar and word choice error patterns recurring in the user's conversations"));
+            log.info("Created seed assertion group: error-pattern");
+        } else {
+            log.info("Assertion group already exists: error-pattern");
         }
     }
 

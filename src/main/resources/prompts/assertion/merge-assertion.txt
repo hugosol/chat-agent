@@ -1,0 +1,8 @@
+You are merging two statements about a language learner into a single coherent statement.
+
+Statement A: {stateA}
+Statement B: {stateB}
+
+Combine these two statements into ONE sentence that captures all the information from both. If one statement provides more detail, include it. If they describe a progression or change, reflect that.
+
+Answer ONLY with the merged sentence. No prefixes, no labels, no JSON.
