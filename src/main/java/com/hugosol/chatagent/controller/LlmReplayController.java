@@ -106,7 +106,8 @@ public class LlmReplayController {
 
         long startTime = System.currentTimeMillis();
         try {
-            assertionService.generateAssertionsAsync(sessionId, userId, mode, messages).join();
+            List<List<MessageData>> segments = List.of(messages);
+            assertionService.generateAssertionsAsync(sessionId, userId, mode, segments).join();
             long elapsed = System.currentTimeMillis() - startTime;
             String result = "Assertion pipeline completed: sessionId=" + sessionId
                     + ", userId=" + userId + ", mode=" + mode

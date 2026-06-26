@@ -3,6 +3,7 @@ package com.hugosol.chatagent.e2e;
 import com.hugosol.chatagent.e2e.helper.E2ETestBase;
 import com.hugosol.chatagent.model.AgentMode;
 import com.hugosol.chatagent.model.MemoryAssertion;
+import com.hugosol.chatagent.model.MemoryCue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +17,7 @@ class ChatAgentAssertionIT extends E2ETestBase {
     void cleanAssertionTables() {
         lineageRepository.deleteAll();
         assertionRepository.deleteAll();
+        memoryCueRepository.deleteAll();
     }
 
     @Test
@@ -56,6 +58,14 @@ class ChatAgentAssertionIT extends E2ETestBase {
             assertEquals(DEFAULT_USER_ID, a.getUserId());
             assertEquals(sid, a.getSessionId());
         }
+
+        // Verify MemoryCue records are also created
+        List<MemoryCue> cues = memoryCueRepository.findBySessionId(sid);
+        assertFalse(cues.isEmpty(), "should have at least one memory cue record");
+        for (MemoryCue cue : cues) {
+            assertEquals(AgentMode.WORKPLACE_STANDUP, cue.getMode());
+            assertEquals(DEFAULT_USER_ID, cue.getUserId());
+        }
     }
 
     @Test
@@ -83,5 +93,8 @@ class ChatAgentAssertionIT extends E2ETestBase {
 
         List<MemoryAssertion> assertions = assertionRepository.findBySessionId(sid);
         assertTrue(assertions.isEmpty(), "Japanese mode should not generate assertions");
+
+        List<MemoryCue> cues = memoryCueRepository.findBySessionId(sid);
+        assertTrue(cues.isEmpty(), "Japanese mode should not generate memory cues");
     }
 }

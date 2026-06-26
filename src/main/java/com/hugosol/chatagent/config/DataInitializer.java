@@ -74,6 +74,7 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         migrateWordsLowerSpaces();
+        migrateMemoryCueFirstCallFailed();
     }
 
     private void migrateEnabledColumn() {
@@ -139,6 +140,18 @@ public class DataInitializer implements CommandLineRunner {
                 fsrsParametersService.save(defaults);
                 log.info("Created default FsrsParameters for user: {}", user.getUsername());
             }
+        }
+    }
+
+    private void migrateMemoryCueFirstCallFailed() {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE memory_cues SET status = 'SEGMENT_FAILED' WHERE status = 'FIRST_CALL_FAILED'");
+            if (updated > 0) {
+                log.info("Migrated: updated {} memory_cues from FIRST_CALL_FAILED to SEGMENT_FAILED", updated);
+            }
+        } catch (Exception e) {
+            log.debug("MemoryCue FIRST_CALL_FAILED migration skipped or already applied: {}", e.getMessage());
         }
     }
 }

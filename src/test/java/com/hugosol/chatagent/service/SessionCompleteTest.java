@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.service;
 
+import com.hugosol.chatagent.agent.MemoryCueAgent;
 import com.hugosol.chatagent.agent.ReportAgent;
 import com.hugosol.chatagent.agent.ReportAgent.ReportResult;
 import com.hugosol.chatagent.dto.CorrectionData;
@@ -12,12 +13,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,11 +41,20 @@ class SessionCompleteTest {
     @Mock
     private AssertionService assertionService;
 
+    @Mock
+    private MemoryCueAgent memoryCueAgent;
+
+    @Mock
+    private MemoryCueService memoryCueService;
+
     private SessionComplete sessionComplete;
 
     @BeforeEach
     void setUp() {
-        sessionComplete = new SessionComplete(sessionStore, reportAgent, learningProfileService, assertionService);
+        sessionComplete = new SessionComplete(sessionStore, reportAgent, learningProfileService,
+                assertionService, memoryCueAgent, memoryCueService);
+        lenient().when(memoryCueAgent.detectSwitches(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
     }
 
     @Test
@@ -56,7 +69,10 @@ class SessionCompleteTest {
         assertThat(result).isEqualTo(expectedReport);
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
         verify(learningProfileService).generateLearningProfileAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
-        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
+        verify(memoryCueService).generateCuesAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
     }
 
     @Test
@@ -71,7 +87,10 @@ class SessionCompleteTest {
         assertThat(result.overallAssessment()).contains("failed");
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), isNull());
         verify(learningProfileService).generateLearningProfileAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
-        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
+        verify(memoryCueService).generateCuesAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
     }
 
     @Test
@@ -86,7 +105,10 @@ class SessionCompleteTest {
 
         assertThat(result).isEqualTo(expectedReport);
         verify(learningProfileService).generateLearningProfileAsync("user1", expectedReport, AgentMode.WORKPLACE_STANDUP, "s1");
-        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
+        verify(memoryCueService).generateCuesAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
     }
 
     @Test
@@ -100,7 +122,10 @@ class SessionCompleteTest {
 
         assertThat(result.fluencyScore()).isEqualTo(-1);
         verify(learningProfileService).generateLearningProfileAsync(eq("user1"), any(), eq(AgentMode.WORKPLACE_STANDUP), eq("s1"));
-        verify(assertionService).generateAssertionsAsync("s1", "user1", AgentMode.WORKPLACE_STANDUP, messages);
+        verify(assertionService).generateAssertionsAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
+        verify(memoryCueService).generateCuesAsync(eq("s1"), eq("user1"), eq(AgentMode.WORKPLACE_STANDUP),
+                argThat(segs -> segs.size() == 1 && segs.get(0).equals(messages)));
     }
 
     @Test
@@ -116,6 +141,8 @@ class SessionCompleteTest {
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
         verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
         verify(assertionService, never()).generateAssertionsAsync(any(), any(), any(), any());
+        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+        verify(memoryCueAgent, never()).detectSwitches(any(), any(), any());
     }
 
     @Test
@@ -131,6 +158,8 @@ class SessionCompleteTest {
         verify(sessionStore).completeSession(eq("s1"), eq(messages), eq(corrections), eq(expectedReport));
         verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
         verify(assertionService, never()).generateAssertionsAsync(any(), any(), any(), any());
+        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+        verify(memoryCueAgent, never()).detectSwitches(any(), any(), any());
     }
 
     @Test
@@ -147,5 +176,7 @@ class SessionCompleteTest {
         verify(reportAgent).generate(eq(messages), eq(corrections), any());
         verify(learningProfileService, never()).generateLearningProfileAsync(any(), any(), any(), any());
         verify(assertionService, never()).generateAssertionsAsync(any(), any(), any(), any());
+        verify(memoryCueService, never()).generateCuesAsync(any(), any(), any(), any());
+        verify(memoryCueAgent, never()).detectSwitches(any(), any(), any());
     }
 }

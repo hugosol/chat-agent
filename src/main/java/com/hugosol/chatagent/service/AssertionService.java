@@ -2,7 +2,6 @@ package com.hugosol.chatagent.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hugosol.chatagent.agent.MemoryCueAgent;
 import com.hugosol.chatagent.agent.common.*;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.MessageData;
@@ -33,7 +32,6 @@ public class AssertionService {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final TaskRunner runner;
-    private final MemoryCueAgent memoryCueAgent;
     private final MemoryAssertionRepository assertionRepository;
     private final AssertionGroupRepository groupRepository;
     private final AssertionLineageRepository lineageRepository;
@@ -42,7 +40,6 @@ public class AssertionService {
     private final ExecutorService executor;
 
     public AssertionService(TaskRunner runner,
-                            MemoryCueAgent memoryCueAgent,
                             MemoryAssertionRepository assertionRepository,
                             AssertionGroupRepository groupRepository,
                             AssertionLineageRepository lineageRepository,
@@ -51,7 +48,6 @@ public class AssertionService {
                             @Qualifier("embeddingExecutor") ExecutorService executor,
                             PromptLoader promptLoader) {
         this.runner = runner;
-        this.memoryCueAgent = memoryCueAgent;
         this.assertionRepository = assertionRepository;
         this.groupRepository = groupRepository;
         this.lineageRepository = lineageRepository;
@@ -115,14 +111,14 @@ public class AssertionService {
     // ── Public API ──────────────────────────────────────────────
 
     public CompletableFuture<Void> generateAssertionsAsync(String sessionId, String userId,
-                                                            AgentMode mode, List<MessageData> messages) {
+                                                            AgentMode mode, List<List<MessageData>> segments) {
         long startTime = System.currentTimeMillis();
         TaskContext ctx = new TaskContext(sessionId, userId, mode.name());
 
         return CompletableFuture.supplyAsync(() -> {
             AssertionGroup group = groupRepository.findByName("error-pattern")
                     .orElseThrow(() -> new IllegalStateException("AssertionGroup 'error-pattern' not found"));
-            return extract(sessionId, userId, mode, messages, group, ctx);
+            return extract(sessionId, userId, mode, segments, group, ctx);
         }, executor).thenAccept(newAssertions -> {
             long extractElapsed = System.currentTimeMillis() - startTime;
             log.info("AssertionService: extract done in {}ms, {} assertions", extractElapsed, newAssertions.size());
@@ -136,34 +132,29 @@ public class AssertionService {
     }
 
     List<MemoryAssertion> extract(String sessionId, String userId, AgentMode mode,
-                                   List<MessageData> messages, AssertionGroup group) {
-        return extract(sessionId, userId, mode, messages, group, null);
+                                   List<List<MessageData>> segments, AssertionGroup group) {
+        return extract(sessionId, userId, mode, segments, group, null);
     }
 
     // ── Package-private for testing ─────────────────────────────
 
     List<MemoryAssertion> extract(String sessionId, String userId, AgentMode mode,
-                                   List<MessageData> messages, AssertionGroup group, TaskContext ctx) {
+                                   List<List<MessageData>> segments, AssertionGroup group, TaskContext ctx) {
         if (ctx == null) {
             ctx = new TaskContext(sessionId, userId, mode.name());
         }
 
-        long t0 = System.currentTimeMillis();
-        List<Integer> switchPoints = memoryCueAgent.detectSwitches(messages, mode, ctx);
-        log.info("AssertionService: detectSwitches done in {}ms, {} switches",
-                System.currentTimeMillis() - t0, switchPoints.size());
-
-        List<List<MessageData>> segments = splitBySwitches(messages, switchPoints);
         if (segments.isEmpty() || (segments.size() == 1 && segments.get(0).isEmpty())) {
             return Collections.emptyList();
         }
 
         List<MemoryAssertion> allAssertions = new ArrayList<>();
-        String labeledMessages = buildLabeledMessages(messages);
 
         for (int segIdx = 0; segIdx < segments.size(); segIdx++) {
             List<MessageData> segment = segments.get(segIdx);
             if (segment.isEmpty()) continue;
+
+            String labeledMessages = SessionComplete.buildLabeledMessages(segment);
 
             long t1 = System.currentTimeMillis();
             List<String> topics = extractTopicsWithRetry(
@@ -185,8 +176,7 @@ public class AssertionService {
             }
         }
 
-        log.info("AssertionService: extract total {} assertions in {}ms",
-                allAssertions.size(), System.currentTimeMillis() - t0);
+        log.info("AssertionService: extract total {} assertions", allAssertions.size());
         return allAssertions;
     }
 
@@ -272,35 +262,6 @@ public class AssertionService {
         // are filtered during search by checking isEnabled() in manage().
         // Full store removal requires InMemoryEmbeddingStore.removeAll(Filter)
         // which may not be available in langchain4j 1.0.0-beta1.
-    }
-
-    private static String buildLabeledMessages(List<MessageData> messages) {
-        StringBuilder labeled = new StringBuilder();
-        for (MessageData msg : messages) {
-            labeled.append("[MSG#").append(msg.getMessageId()).append("] ")
-                    .append(msg.getRole().name()).append(": ")
-                    .append(msg.getContent()).append("\n");
-        }
-        return labeled.toString();
-    }
-
-    static List<List<MessageData>> splitBySwitches(List<MessageData> messages, List<Integer> switchPoints) {
-        if (switchPoints.isEmpty()) {
-            return messages.isEmpty() ? Collections.emptyList() : List.of(messages);
-        }
-        List<List<MessageData>> segments = new ArrayList<>();
-        int startIdx = 0;
-        for (int switchIdx : switchPoints) {
-            int endIdx = Math.min(switchIdx + 1, messages.size());
-            if (startIdx < messages.size()) {
-                segments.add(new ArrayList<>(messages.subList(startIdx, endIdx)));
-            }
-            startIdx = endIdx;
-        }
-        if (startIdx < messages.size()) {
-            segments.add(new ArrayList<>(messages.subList(startIdx, messages.size())));
-        }
-        return segments;
     }
 
     private static final int MAX_TOPIC_RETRIES = 3;
