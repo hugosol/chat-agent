@@ -95,4 +95,21 @@ class LlmCallLogServiceTest {
         assertThat(cutoff).isAfter(threeDaysAgo.minusSeconds(60));
         assertThat(cutoff).isBefore(threeDaysAgo.plusSeconds(60));
     }
+
+    @Test
+    void saveAsync_withSystemPromptAndChatHistory_populatesFields() throws Exception {
+        service.saveAsync("session-2", "user-2", "CORRECTION", "WORKPLACE_STANDUP",
+                null, "You are a coach", "[{\"role\":\"user\",\"content\":\"Hello\"}]",
+                "corrected text", 100, 50, 1500L, "SUCCESS", null);
+        Thread.sleep(200);
+
+        ArgumentCaptor<LlmCallLog> captor = ArgumentCaptor.forClass(LlmCallLog.class);
+        verify(repository, atLeastOnce()).save(captor.capture());
+        LlmCallLog saved = captor.getValue();
+        assertThat(saved.getSystemPrompt()).isEqualTo("You are a coach");
+        assertThat(saved.getChatHistory()).isEqualTo("[{\"role\":\"user\",\"content\":\"Hello\"}]");
+        assertThat(saved.getInputTokens()).isEqualTo(100);
+        assertThat(saved.getOutputTokens()).isEqualTo(50);
+        assertThat(saved.getRequestPrompt()).isNull();
+    }
 }

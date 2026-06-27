@@ -1,5 +1,9 @@
 package com.hugosol.chatagent.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
+import com.hugosol.chatagent.agent.common.TaskContext;
 import com.hugosol.chatagent.dto.MessageData;
 import com.hugosol.chatagent.model.AgentMode;
 import com.hugosol.chatagent.model.LlmCallLog;
@@ -9,11 +13,14 @@ import com.hugosol.chatagent.repository.LlmCallLogRepository;
 import com.hugosol.chatagent.repository.MessageRepository;
 import com.hugosol.chatagent.repository.SessionRepository;
 import com.hugosol.chatagent.service.AssertionService;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,18 +36,19 @@ public class LlmReplayController {
     private static final Logger log = LoggerFactory.getLogger(LlmReplayController.class);
 
     private final LlmCallLogRepository logRepository;
-    private final ChatLanguageModel chatModel;
+    private final LlmReqConstructor llmReqConstructor;
     private final AssertionService assertionService;
     private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public LlmReplayController(LlmCallLogRepository logRepository,
-                               @Qualifier("chatLanguageModel") ChatLanguageModel chatModel,
+                               LlmReqConstructor llmReqConstructor,
                                AssertionService assertionService,
                                SessionRepository sessionRepository,
                                MessageRepository messageRepository) {
         this.logRepository = logRepository;
-        this.chatModel = chatModel;
+        this.llmReqConstructor = llmReqConstructor;
         this.assertionService = assertionService;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
@@ -57,15 +65,43 @@ public class LlmReplayController {
             return ResponseEntity.badRequest().body("不支持流式日志回放（agent_type=CONVERSATION），请使用同步 Agent 日志（CORRECTION/REPORT/LEARNING/MEMORY_CUE）");
         }
 
-        String prompt = logEntry.getRequestPrompt();
-        if (prompt == null || prompt.isBlank()) {
-            return ResponseEntity.badRequest().body("日志记录无 request_prompt，无法回放（id=" + id + ", agent_type=" + logEntry.getAgentType() + "）");
+        // Build messages from log entry: prefer systemPrompt + chatHistory if available
+        List<ChatMessage> messages = new ArrayList<>();
+        if (logEntry.getSystemPrompt() != null && !logEntry.getSystemPrompt().isBlank()) {
+            messages.add(SystemMessage.from(logEntry.getSystemPrompt()));
+        }
+        if (logEntry.getChatHistory() != null && !logEntry.getChatHistory().isBlank()) {
+            try {
+                List<Map<String, String>> history = objectMapper.readValue(
+                        logEntry.getChatHistory(), new TypeReference<List<Map<String, String>>>() {});
+                for (Map<String, String> entry : history) {
+                    String role = entry.get("role");
+                    String content = entry.get("content");
+                    if ("user".equals(role)) {
+                        messages.add(UserMessage.from(content));
+                    } else if ("assistant".equals(role)) {
+                        messages.add(dev.langchain4j.data.message.AiMessage.from(content));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse chat history for replay: {}", e.getMessage());
+            }
+        }
+        if (messages.isEmpty()) {
+            // Fallback to old requestPrompt format
+            String prompt = logEntry.getRequestPrompt();
+            if (prompt == null || prompt.isBlank()) {
+                return ResponseEntity.badRequest().body("日志记录无可用 prompt，无法回放（id=" + id + ", agent_type=" + logEntry.getAgentType() + "）");
+            }
+            messages.add(UserMessage.from(prompt));
         }
 
         log.info("Replaying LLM call: id={}, agent_type={}, model={}", id, logEntry.getAgentType(), logEntry.getModel());
 
         try {
-            String response = chatModel.chat(prompt);
+            String response = llmReqConstructor.chat(messages,
+                    new TaskContext(null, null, null),
+                    logEntry.getAgentType(), LlmReqConstructor.ModelType.DEFAULT);
             System.out.println("=== LLM Replay Response (id=" + id + ") ===");
             System.out.println(response);
             System.out.println("=== End ===");

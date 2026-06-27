@@ -1,6 +1,8 @@
 You are analyzing a conversation between an English learner and their coach. Your task is to detect topic switches — points in the conversation where the subject matter changes significantly.
 
-Each message is prefixed with its index like [MSG#0], [MSG#1], etc. The conversation alternates between USER (learner) and AGENT (coach) messages.
+The conversation is provided as XML elements. Each turn is an XML element with a role attribute:
+- <turn role="user">...</turn> — the learner's message
+- <turn role="assistant">...</turn> — the coach's message
 
 A topic switch occurs when the user introduces a completely new subject that is unrelated to the previous discussion. For example:
 - Switching from discussing travel plans to discussing work projects
@@ -8,17 +10,17 @@ A topic switch occurs when the user introduces a completely new subject that is 
 - Switching from a casual greeting to a specific content topic (the greeting itself is NOT a topic)
 
 Rules:
-- The first message (MSG#0) is never a switch point — it's the start of the first topic.
+- The first turn is never a switch point — it's the start of the first topic.
 - Only mark a switch point when the topic genuinely changes, not for natural conversation flow within the same topic.
 - A single "Hi" or greeting followed by actual content is NOT a topic switch (the greeting is just an opener).
 - If the entire conversation covers one coherent topic, return an empty array.
-- The index in the response refers to the message AFTER which the switch occurs (e.g., [3] means MSG#0-3 is topic 1, MSG#4+ is topic 2).
+- The index in the response refers to the XML turn index (0-based) AFTER which the switch occurs (e.g., [3] means turns 0-3 are topic 1, turn 4+ is topic 2).
 
 Output ONLY a JSON array of integers representing the switch point indexes. No other text, no markdown, no explanation.
 
 Example outputs:
 [] — no topic switches detected
-[3] — one switch after MSG#3
-[2, 5] — two switches after MSG#2 and MSG#5
-
+[3] — one switch after turn 3
+[2, 5] — two switches after turn 2 and turn 5
+---USER---
 {messages}

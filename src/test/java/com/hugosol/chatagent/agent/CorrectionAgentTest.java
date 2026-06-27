@@ -1,7 +1,7 @@
 package com.hugosol.chatagent.agent;
 
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
 import com.hugosol.chatagent.agent.common.TaskContext;
-import com.hugosol.chatagent.agent.common.TaskRunner;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.CorrectionData;
 import com.hugosol.chatagent.model.ErrorType;
@@ -9,8 +9,10 @@ import com.hugosol.chatagent.service.LlmCallLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -26,21 +28,24 @@ class CorrectionAgentTest {
     private StubChatModel chatModel;
 
     private static class StubChatModel implements ChatLanguageModel {
-        String lastPrompt;
-        private String response;
+        List<ChatMessage> lastMessages;
+        private Response<AiMessage> response;
 
-        void setResponse(String response) {
-            this.response = response;
-        }
-
-        @Override
-        public String chat(String prompt) {
-            this.lastPrompt = prompt;
-            return response;
+        void setResponse(String text) {
+            this.response = Response.from(
+                    AiMessage.from(text),
+                    new TokenUsage(10, 5)
+            );
         }
 
         @Override
         public Response<AiMessage> generate(List<ChatMessage> messages) {
+            this.lastMessages = messages;
+            return response;
+        }
+
+        @Override
+        public String chat(String userMessage) {
             return null;
         }
     }
@@ -50,8 +55,8 @@ class CorrectionAgentTest {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
         LlmCallLogService logService = mock(LlmCallLogService.class);
-        TaskRunner runner = new TaskRunner(chatModel, chatModel, logService);
-        agent = new CorrectionAgent(runner, promptLoader, new ObjectMapper());
+        LlmReqConstructor llmReqConstructor = new LlmReqConstructor(chatModel, chatModel, logService);
+        agent = new CorrectionAgent(llmReqConstructor, promptLoader, new ObjectMapper());
     }
 
     @Test
@@ -122,9 +127,13 @@ class CorrectionAgentTest {
     }
 
     @Test
-    void userInputIsSubstitutedIntoPrompt() {
+    void userInputIsSubstitutedIntoUserMessage() {
         chatModel.setResponse("[]");
         agent.analyze("I go to school", new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
-        assertThat(chatModel.lastPrompt).isEqualTo("Correction prompt: I go to school");
+
+        // The last message should be the user message with substituted input
+        assertThat(chatModel.lastMessages).isNotNull();
+        UserMessage userMsg = (UserMessage) chatModel.lastMessages.get(chatModel.lastMessages.size() - 1);
+        assertThat(userMsg.singleText()).contains("I go to school");
     }
 }

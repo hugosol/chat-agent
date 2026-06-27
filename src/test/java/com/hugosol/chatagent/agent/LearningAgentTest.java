@@ -1,14 +1,16 @@
 package com.hugosol.chatagent.agent;
 
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
 import com.hugosol.chatagent.agent.common.TaskContext;
-import com.hugosol.chatagent.agent.common.TaskRunner;
 import com.hugosol.chatagent.config.AppProperties;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.service.LlmCallLogService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -24,21 +26,24 @@ class LearningAgentTest {
     private StubChatModel chatModel;
 
     private static class StubChatModel implements ChatLanguageModel {
-        String lastPrompt;
-        private String response;
+        List<ChatMessage> lastMessages;
+        private Response<AiMessage> response;
 
-        void setResponse(String response) {
-            this.response = response;
-        }
-
-        @Override
-        public String chat(String prompt) {
-            this.lastPrompt = prompt;
-            return response;
+        void setResponse(String text) {
+            this.response = Response.from(
+                    AiMessage.from(text),
+                    new TokenUsage(10, 5)
+            );
         }
 
         @Override
         public Response<AiMessage> generate(List<ChatMessage> messages) {
+            this.lastMessages = messages;
+            return response;
+        }
+
+        @Override
+        public String chat(String userMessage) {
             return null;
         }
     }
@@ -48,8 +53,13 @@ class LearningAgentTest {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
         LlmCallLogService logService = mock(LlmCallLogService.class);
-        TaskRunner runner = new TaskRunner(chatModel, chatModel, logService);
-        agent = new LearningAgent(runner, promptLoader, new AppProperties());
+        LlmReqConstructor llmReqConstructor = new LlmReqConstructor(chatModel, chatModel, logService);
+        agent = new LearningAgent(llmReqConstructor, promptLoader, new AppProperties());
+    }
+
+    private String lastUserContent() {
+        assertThat(chatModel.lastMessages).isNotNull();
+        return ((UserMessage) chatModel.lastMessages.get(chatModel.lastMessages.size() - 1)).singleText();
     }
 
     @Test
@@ -69,8 +79,9 @@ class LearningAgentTest {
         agent.mergeProfile("Old: past tense weak", "New: 3 grammar errors",
                 new TaskContext("s1", "u1", null));
 
-        assertThat(chatModel.lastPrompt).contains("Old: past tense weak");
-        assertThat(chatModel.lastPrompt).contains("New: 3 grammar errors");
+        String userContent = lastUserContent();
+        assertThat(userContent).contains("Old: past tense weak");
+        assertThat(userContent).contains("New: 3 grammar errors");
     }
 
     @Test
@@ -80,7 +91,10 @@ class LearningAgentTest {
         agent.mergeProfile("", "error data",
                 new TaskContext(null, "u1", null));
 
-        assertThat(chatModel.lastPrompt).doesNotContain("null");
-        assertThat(chatModel.lastPrompt).contains("error data");
+        String userContent = lastUserContent();
+        assertThat(userContent).doesNotContain("null");
+        assertThat(userContent).contains("error data");
+        // Empty oldProfile should be replaced with placeholder
+        assertThat(userContent).contains("(No previous sessions)");
     }
 }

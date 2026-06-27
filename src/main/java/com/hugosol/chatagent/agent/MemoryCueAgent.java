@@ -3,14 +3,15 @@ package com.hugosol.chatagent.agent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hugosol.chatagent.agent.common.ErrorStrategy;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
+import com.hugosol.chatagent.agent.common.LlmTaskDefinition;
 import com.hugosol.chatagent.agent.common.TaskContext;
-import com.hugosol.chatagent.agent.common.TaskDefinition;
 import com.hugosol.chatagent.agent.common.TaskName;
-import com.hugosol.chatagent.agent.common.TaskRunner;
 import com.hugosol.chatagent.config.AppProperties;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.MessageData;
 import com.hugosol.chatagent.model.AgentMode;
+import com.hugosol.chatagent.model.MessageRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -28,28 +29,34 @@ public class MemoryCueAgent {
     private static final Logger log = LoggerFactory.getLogger(MemoryCueAgent.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final Pattern JSON_ARRAY_PATTERN = Pattern.compile("\\[\\s*\\d+(?:\\s*,\\s*\\d+)*\\s*]");
+    private static final String USER_DELIMITER = "---USER---";
 
-    private final TaskRunner runner;
+    private final LlmReqConstructor llmReqConstructor;
 
-    public MemoryCueAgent(TaskRunner runner, PromptLoader promptLoader, AppProperties appProperties) {
-        this.runner = runner;
+    public MemoryCueAgent(LlmReqConstructor llmReqConstructor, PromptLoader promptLoader, AppProperties appProperties) {
+        this.llmReqConstructor = llmReqConstructor;
 
-        String splitTemplate = promptLoader.load("memory-cue-split.txt");
-        runner.register(TaskName.CHAT_SWITCHES, TaskDefinition
+        String[] splitParts = promptLoader.load("memory-cue-split.txt").split(USER_DELIMITER, 2);
+        String splitSystemTemplate = splitParts[0].stripTrailing();
+        String splitUserTemplate = splitParts.length > 1 ? splitParts[1].strip() : "{messages}";
+        llmReqConstructor.register(TaskName.CHAT_SWITCHES, LlmTaskDefinition
                 .<SwitchParams, List<Integer>>builder()
-                .template(splitTemplate)
+                .systemTemplate(splitSystemTemplate)
+                .userTemplate(splitUserTemplate)
                 .paramBuilder(p -> Map.of("messages", buildLabeledMessages(p.messages())))
                 .parser(this::parseSwitches)
                 .errorStrategy(ErrorStrategy.SWALLOW)
                 .build());
 
-        String raw = promptLoader.load("memory-cue-entry.txt");
-        String entryTemplate = raw
+        String[] entryParts = promptLoader.load("memory-cue-entry.txt").split(USER_DELIMITER, 2);
+        String entrySystemTemplate = entryParts[0].stripTrailing()
                 .replace("{cueTopicMaxWords}", String.valueOf(appProperties.getMemory().getCueTopicMaxWords()))
                 .replace("{cueSummaryMaxSentences}", String.valueOf(appProperties.getMemory().getCueSummaryMaxSentences()));
-        runner.register(TaskName.GENERATE_MEMORY_CUE, TaskDefinition
+        String entryUserTemplate = entryParts.length > 1 ? entryParts[1].strip() : "{segment}";
+        llmReqConstructor.register(TaskName.GENERATE_MEMORY_CUE, LlmTaskDefinition
                 .<CueParams, CueResult>builder()
-                .template(entryTemplate)
+                .systemTemplate(entrySystemTemplate)
+                .userTemplate(entryUserTemplate)
                 .paramBuilder(p -> Map.of("segment", buildSegmentText(p.messages())))
                 .parser(this::parseCue)
                 .errorStrategy(ErrorStrategy.SWALLOW)
@@ -60,14 +67,14 @@ public class MemoryCueAgent {
 
     public List<Integer> detectSwitches(List<MessageData> messages, AgentMode mode, TaskContext ctx) {
         log.debug("MemoryCueAgent detectSwitches...");
-        List<Integer> result = runner.requestModel(TaskName.CHAT_SWITCHES,
+        List<Integer> result = llmReqConstructor.execute(TaskName.CHAT_SWITCHES,
                 new SwitchParams(messages), ctx);
         return result != null ? result : Collections.emptyList();
     }
 
     public CueResult generateCue(List<MessageData> messages, AgentMode mode, int segmentIndex, TaskContext ctx) {
         log.debug("MemoryCueAgent generateCue segment {}...", segmentIndex);
-        CueResult result = runner.requestModel(TaskName.GENERATE_MEMORY_CUE,
+        CueResult result = llmReqConstructor.execute(TaskName.GENERATE_MEMORY_CUE,
                 new CueParams(messages, segmentIndex), ctx);
         if (result == null) {
             throw new RuntimeException("Failed to parse cue JSON: SWALLOW returned null");
@@ -75,23 +82,34 @@ public class MemoryCueAgent {
         return result;
     }
 
-    private String buildLabeledMessages(List<MessageData> messages) {
-        StringBuilder labeled = new StringBuilder();
+    static String buildLabeledMessages(List<MessageData> messages) {
+        StringBuilder xml = new StringBuilder();
         for (MessageData msg : messages) {
-            labeled.append("[MSG#").append(msg.getMessageId()).append("] ")
-                    .append(msg.getRole().name()).append(": ")
-                    .append(msg.getContent()).append("\n");
+            String role = msg.getRole() == MessageRole.USER ? "user" : "assistant";
+            xml.append("<turn role=\"").append(role).append("\">")
+                    .append(escapeXml(msg.getContent()))
+                    .append("</turn>\n");
         }
-        return labeled.toString();
+        return xml.toString();
     }
 
-    private String buildSegmentText(List<MessageData> messages) {
-        StringBuilder segment = new StringBuilder();
+    static String buildSegmentText(List<MessageData> messages) {
+        // Same XML format, used for segment (no message index needed)
+        StringBuilder xml = new StringBuilder();
         for (MessageData msg : messages) {
-            segment.append(msg.getRole().name()).append(": ")
-                    .append(msg.getContent()).append("\n");
+            String role = msg.getRole() == MessageRole.USER ? "user" : "assistant";
+            xml.append("<turn role=\"").append(role).append("\">")
+                    .append(escapeXml(msg.getContent()))
+                    .append("</turn>\n");
         }
-        return segment.toString();
+        return xml.toString();
+    }
+
+    private static String escapeXml(String text) {
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     private List<Integer> parseSwitches(String response) {

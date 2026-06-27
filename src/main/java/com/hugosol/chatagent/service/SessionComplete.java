@@ -86,13 +86,21 @@ public class SessionComplete {
     }
 
     static String buildLabeledMessages(List<MessageData> messages) {
-        StringBuilder labeled = new StringBuilder();
+        StringBuilder xml = new StringBuilder();
         for (MessageData msg : messages) {
-            labeled.append("[MSG#").append(msg.getMessageId()).append("] ")
-                    .append(msg.getRole().name()).append(": ")
-                    .append(msg.getContent()).append("\n");
+            String role = msg.getRole().name().equals("USER") ? "user" : "assistant";
+            xml.append("<turn role=\"").append(role).append("\">")
+                    .append(escapeXml(msg.getContent()))
+                    .append("</turn>\n");
         }
-        return labeled.toString();
+        return xml.toString();
+    }
+
+    private static String escapeXml(String text) {
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     private ReportResult generateReport(String sessionId, String userId, AgentMode mode,

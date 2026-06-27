@@ -2,7 +2,7 @@ package com.hugosol.chatagent.service;
 
 import com.hugosol.chatagent.agent.common.TaskContext;
 import com.hugosol.chatagent.agent.common.TaskName;
-import com.hugosol.chatagent.agent.common.TaskRunner;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
 import com.hugosol.chatagent.dto.MessageData;
 import com.hugosol.chatagent.model.*;
 import com.hugosol.chatagent.repository.AssertionGroupRepository;
@@ -38,7 +38,7 @@ import static org.mockito.Mockito.*;
 class AssertionServiceTest {
 
     @Mock
-    private TaskRunner runner;
+    private LlmReqConstructor llmReqConstructor;
 
     @Mock
     private MemoryAssertionRepository assertionRepository;
@@ -76,7 +76,7 @@ class AssertionServiceTest {
             return null;
         }).when(executor).execute(any(Runnable.class));
 
-        service = new AssertionService(runner, assertionRepository,
+        service = new AssertionService(llmReqConstructor, assertionRepository,
                 groupRepository, lineageRepository, assertionEmbeddingStore, embeddingModel,
                 executor, null);
     }
@@ -90,7 +90,7 @@ class AssertionServiceTest {
         List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, segments, errorPatternGroup);
 
         assertThat(result).isEmpty();
-        verify(runner, never()).requestModel(any(TaskName.class), any(), any(TaskContext.class));
+        verify(llmReqConstructor, never()).execute(any(TaskName.class), any(), any(TaskContext.class));
         verify(assertionRepository, never()).save(any());
     }
 
@@ -100,9 +100,9 @@ class AssertionServiceTest {
                 new MessageData(MessageRole.USER, "I go to store yesterday", 0));
         List<List<MessageData>> segments = List.of(messages);
 
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenReturn("[\"past tense\"]");
-        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
                 .thenReturn("User struggles with irregular past tense verbs");
 
         MemoryAssertion savedAssertion = new MemoryAssertion(errorPatternGroup, SESSION_ID, USER_ID, MODE,
@@ -127,9 +127,9 @@ class AssertionServiceTest {
                 new MessageData(MessageRole.USER, "I have many sheeps", 0));
         List<List<MessageData>> segments = List.of(messages);
 
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenReturn("[\"plural nouns\", \"article usage\"]");
-        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
                 .thenReturn("state text");
 
         when(assertionRepository.save(any(MemoryAssertion.class)))
@@ -148,10 +148,10 @@ class AssertionServiceTest {
         List<List<MessageData>> segments = List.of(messages);
 
         // First two calls return empty string, third returns valid JSON
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenReturn("", "", "[\"past tense\"]");
 
-        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
                 .thenReturn("User struggles with past tense");
 
         when(assertionRepository.save(any(MemoryAssertion.class)))
@@ -163,7 +163,7 @@ class AssertionServiceTest {
         assertThat(result.get(0).getTopic()).isEqualTo("past tense");
 
         // Should have called requestRaw 3 times (2 retries + 1 success)
-        verify(runner, times(3)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(llmReqConstructor, times(3)).executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
     }
 
     @Test
@@ -173,7 +173,7 @@ class AssertionServiceTest {
         List<List<MessageData>> segments = List.of(messages);
 
         // LLM legitimately finds no recurring concepts
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenReturn("[]");
 
         List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, segments, errorPatternGroup);
@@ -181,8 +181,8 @@ class AssertionServiceTest {
         assertThat(result).isEmpty();
 
         // Should have called requestRaw exactly once — no retries
-        verify(runner, times(1)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
-        verify(runner, never()).requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
+        verify(llmReqConstructor, times(1)).executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(llmReqConstructor, never()).execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
     }
 
     @Test
@@ -192,10 +192,10 @@ class AssertionServiceTest {
         List<List<MessageData>> segments = List.of(messages);
 
         // First two calls return malformed JSON, third returns valid
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenReturn("not json", "{\"bad\": true}", "[\"past tense\"]");
 
-        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
                 .thenReturn("User struggles with past tense");
 
         when(assertionRepository.save(any(MemoryAssertion.class)))
@@ -206,7 +206,7 @@ class AssertionServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getTopic()).isEqualTo("past tense");
 
-        verify(runner, times(3)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(llmReqConstructor, times(3)).executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
     }
 
     @Test
@@ -216,12 +216,12 @@ class AssertionServiceTest {
         List<List<MessageData>> segments = List.of(messages);
 
         // First two calls throw, third returns valid JSON
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenThrow(new RuntimeException("Network error"))
                 .thenThrow(new RuntimeException("Timeout"))
                 .thenReturn("[\"past tense\"]");
 
-        when(runner.requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class)))
                 .thenReturn("User struggles with past tense");
 
         when(assertionRepository.save(any(MemoryAssertion.class)))
@@ -232,7 +232,7 @@ class AssertionServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getTopic()).isEqualTo("past tense");
 
-        verify(runner, times(3)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(llmReqConstructor, times(3)).executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
     }
 
     @Test
@@ -242,14 +242,14 @@ class AssertionServiceTest {
         List<List<MessageData>> segments = List.of(messages);
 
         // All 4 attempts return empty strings
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenReturn("", "", "", "");
 
         List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, segments, errorPatternGroup);
 
         assertThat(result).isEmpty();
-        verify(runner, times(4)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
-        verify(runner, never()).requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
+        verify(llmReqConstructor, times(4)).executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(llmReqConstructor, never()).execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
     }
 
     @Test
@@ -258,7 +258,7 @@ class AssertionServiceTest {
                 new MessageData(MessageRole.USER, "test", 0));
         List<List<MessageData>> segments = List.of(messages);
 
-        when(runner.requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
+        when(llmReqConstructor.executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class)))
                 .thenThrow(new RuntimeException("LLM error"));
 
         List<MemoryAssertion> result = service.extract(SESSION_ID, USER_ID, MODE, segments, errorPatternGroup);
@@ -266,8 +266,8 @@ class AssertionServiceTest {
         assertThat(result).isEmpty();
 
         // Should have called requestRaw 4 times (1 original + 3 retries)
-        verify(runner, times(4)).requestRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
-        verify(runner, never()).requestModel(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
+        verify(llmReqConstructor, times(4)).executeRaw(eq(TaskName.EXTRACT_TOPICS), any(), any(TaskContext.class));
+        verify(llmReqConstructor, never()).execute(eq(TaskName.EXTRACT_STATE), any(), any(TaskContext.class));
         verify(assertionRepository, never()).save(any());
     }
 
@@ -284,8 +284,8 @@ class AssertionServiceTest {
         service.manage(SESSION_ID, USER_ID, MODE, List.of(newAssertion),
                 new TaskContext(SESSION_ID, USER_ID, MODE.name()));
 
-        verify(runner, never()).requestModel(eq(TaskName.JUDGE_SAME), any(), any());
-        verify(runner, never()).requestModel(eq(TaskName.MERGE_ASSERTION), any(), any());
+        verify(llmReqConstructor, never()).execute(eq(TaskName.JUDGE_SAME), any(), any(TaskContext.class));
+        verify(llmReqConstructor, never()).execute(eq(TaskName.MERGE_ASSERTION), any(), any(TaskContext.class));
         verify(lineageRepository, never()).save(any());
     }
 
@@ -305,9 +305,9 @@ class AssertionServiceTest {
 
         when(assertionRepository.findById(oldAssertion.getId())).thenReturn(Optional.of(oldAssertion));
 
-        when(runner.requestModel(eq(TaskName.JUDGE_SAME), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.JUDGE_SAME), any(), any(TaskContext.class)))
                 .thenReturn(true);
-        when(runner.requestModel(eq(TaskName.MERGE_ASSERTION), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.MERGE_ASSERTION), any(), any(TaskContext.class)))
                 .thenReturn("User struggled with past tense but has shown improvement");
 
         when(assertionRepository.save(any(MemoryAssertion.class)))
@@ -340,13 +340,13 @@ class AssertionServiceTest {
         when(assertionEmbeddingStore.search(any(EmbeddingSearchRequest.class))).thenReturn(searchResult);
         when(assertionRepository.findById(oldAssertion.getId())).thenReturn(Optional.of(oldAssertion));
 
-        when(runner.requestModel(eq(TaskName.JUDGE_SAME), any(), any(TaskContext.class)))
+        when(llmReqConstructor.execute(eq(TaskName.JUDGE_SAME), any(), any(TaskContext.class)))
                 .thenReturn(false);
 
         service.manage(SESSION_ID, USER_ID, MODE, List.of(newAssertion),
                 new TaskContext(SESSION_ID, USER_ID, MODE.name()));
 
-        verify(runner, never()).requestModel(eq(TaskName.MERGE_ASSERTION), any(), any());
+        verify(llmReqConstructor, never()).execute(eq(TaskName.MERGE_ASSERTION), any(), any(TaskContext.class));
         verify(lineageRepository, never()).save(any());
         verify(assertionRepository, never()).save(argThat(a -> !a.isEnabled()));
     }
@@ -368,8 +368,8 @@ class AssertionServiceTest {
         service.manage(SESSION_ID, USER_ID, MODE, List.of(newAssertion),
                 new TaskContext(SESSION_ID, USER_ID, MODE.name()));
 
-        verify(runner, never()).requestModel(eq(TaskName.JUDGE_SAME), any(), any());
-        verify(runner, never()).requestModel(eq(TaskName.MERGE_ASSERTION), any(), any());
+        verify(llmReqConstructor, never()).execute(eq(TaskName.JUDGE_SAME), any(), any(TaskContext.class));
+        verify(llmReqConstructor, never()).execute(eq(TaskName.MERGE_ASSERTION), any(), any(TaskContext.class));
         verify(lineageRepository, never()).save(any());
     }
 

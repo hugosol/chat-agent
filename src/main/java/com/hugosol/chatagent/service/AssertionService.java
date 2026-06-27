@@ -10,6 +10,9 @@ import com.hugosol.chatagent.repository.AssertionGroupRepository;
 import com.hugosol.chatagent.repository.AssertionLineageRepository;
 import com.hugosol.chatagent.repository.MemoryAssertionRepository;
 import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
@@ -31,7 +34,7 @@ public class AssertionService {
     private static final Logger log = LoggerFactory.getLogger(AssertionService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private final TaskRunner runner;
+    private final LlmReqConstructor llmReqConstructor;
     private final MemoryAssertionRepository assertionRepository;
     private final AssertionGroupRepository groupRepository;
     private final AssertionLineageRepository lineageRepository;
@@ -39,7 +42,7 @@ public class AssertionService {
     private final EmbeddingModel embeddingModel;
     private final ExecutorService executor;
 
-    public AssertionService(TaskRunner runner,
+    public AssertionService(LlmReqConstructor llmReqConstructor,
                             MemoryAssertionRepository assertionRepository,
                             AssertionGroupRepository groupRepository,
                             AssertionLineageRepository lineageRepository,
@@ -47,7 +50,7 @@ public class AssertionService {
                             EmbeddingModel embeddingModel,
                             @Qualifier("embeddingExecutor") ExecutorService executor,
                             PromptLoader promptLoader) {
-        this.runner = runner;
+        this.llmReqConstructor = llmReqConstructor;
         this.assertionRepository = assertionRepository;
         this.groupRepository = groupRepository;
         this.lineageRepository = lineageRepository;
@@ -60,11 +63,34 @@ public class AssertionService {
         }
     }
 
+    private static final String USER_DELIMITER = "---USER---";
+
     private void registerTasks(PromptLoader promptLoader) {
-        String topicsTemplate = promptLoader.load("assertion/extract-topics.txt");
-        runner.register(TaskName.EXTRACT_TOPICS, TaskDefinition
+        // EXTRACT_TOPICS — with 2 few-shot example pairs (XML transcript → JSON array)
+        String[] topicsParts = promptLoader.load("assertion/extract-topics.txt").split(USER_DELIMITER, 2);
+        String topicsSystem = topicsParts[0].stripTrailing();
+        String topicsUser = topicsParts.length > 1 ? topicsParts[1].strip() : "{messages}";
+        List<ChatMessage> topicsExamples = List.of(
+                UserMessage.from("<turn role=\"user\">Yesterday I go to park with my friend.</turn>\n" +
+                        "<turn role=\"assistant\">You mean \"went to the park\" — \"go\" in past tense is \"went.\"</turn>\n" +
+                        "<turn role=\"user\">Yes, I always forget. Also, a apple is good.</turn>\n" +
+                        "<turn role=\"assistant\">\"An apple\" — use \"an\" before vowel sounds.</turn>\n" +
+                        "<turn role=\"user\">So I went to eat an apple. Is that better?</turn>\n" +
+                        "<turn role=\"assistant\">Perfect! You used both past tense and the article correctly.</turn>"),
+                AiMessage.from("[\"past tense\", \"article usage\"]"),
+                UserMessage.from("<turn role=\"user\">My boss ask me to finish the report.</turn>\n" +
+                        "<turn role=\"assistant\">\"My boss asked me\" — remember past tense for reported speech.</turn>\n" +
+                        "<turn role=\"user\">She also say deadline is tomorrow.</turn>\n" +
+                        "<turn role=\"assistant\">\"She also said\" — same pattern. Also, \"she says\" for present tense.</turn>\n" +
+                        "<turn role=\"user\">Okay. By the way, what do you think about the project?</turn>\n" +
+                        "<turn role=\"assistant\">I think the plan is solid. What part worries you?</turn>"),
+                AiMessage.from("[\"past tense for reported speech\", \"third person -s\"]")
+        );
+        llmReqConstructor.register(TaskName.EXTRACT_TOPICS, LlmTaskDefinition
                 .<ExtractTopicsParams, List<String>>builder()
-                .template(topicsTemplate)
+                .systemTemplate(topicsSystem)
+                .userTemplate(topicsUser)
+                .exampleMessages(topicsExamples)
                 .paramBuilder(p -> Map.of(
                         "groupName", p.groupName(),
                         "groupDescription", p.groupDescription(),
@@ -73,10 +99,14 @@ public class AssertionService {
                 .errorStrategy(ErrorStrategy.THROW)
                 .build());
 
-        String stateTemplate = promptLoader.load("assertion/extract-state.txt");
-        runner.register(TaskName.EXTRACT_STATE, TaskDefinition
+        // EXTRACT_STATE
+        String[] stateParts = promptLoader.load("assertion/extract-state.txt").split(USER_DELIMITER, 2);
+        String stateSystem = stateParts[0].stripTrailing();
+        String stateUser = stateParts.length > 1 ? stateParts[1].strip() : "{groupName}: {topic}\n{messages}";
+        llmReqConstructor.register(TaskName.EXTRACT_STATE, LlmTaskDefinition
                 .<ExtractStateParams, String>builder()
-                .template(stateTemplate)
+                .systemTemplate(stateSystem)
+                .userTemplate(stateUser)
                 .paramBuilder(p -> Map.of(
                         "groupName", p.groupName(),
                         "topic", p.topic(),
@@ -85,10 +115,26 @@ public class AssertionService {
                 .errorStrategy(ErrorStrategy.THROW)
                 .build());
 
-        String judgeTemplate = promptLoader.load("assertion/judge-same.txt");
-        runner.register(TaskName.JUDGE_SAME, TaskDefinition
+        // JUDGE_SAME — with 3 few-shot example pairs
+        String[] judgeParts = promptLoader.load("assertion/judge-same.txt").split(USER_DELIMITER, 2);
+        String judgeSystem = judgeParts[0].stripTrailing();
+        String judgeUser = judgeParts.length > 1 ? judgeParts[1].strip() : "Statement A: {newState}\nStatement B: {oldState}";
+        List<ChatMessage> judgeExamples = List.of(
+                UserMessage.from("Statement A: The user often forgets to use past tense when talking about yesterday's events.\n" +
+                        "Statement B: The learner struggles with irregular past tense forms in conversation."),
+                AiMessage.from("YES"),
+                UserMessage.from("Statement A: The user makes subject-verb agreement errors with third person singular.\n" +
+                        "Statement B: The user sometimes confuses \"a\" and \"an\" before vowel sounds."),
+                AiMessage.from("NO"),
+                UserMessage.from("Statement A: The user is aware of their past tense mistakes and self-corrects about half the time.\n" +
+                        "Statement B: The user still makes past tense errors but occasionally self-corrects."),
+                AiMessage.from("YES")
+        );
+        llmReqConstructor.register(TaskName.JUDGE_SAME, LlmTaskDefinition
                 .<JudgeParams, Boolean>builder()
-                .template(judgeTemplate)
+                .systemTemplate(judgeSystem)
+                .userTemplate(judgeUser)
+                .exampleMessages(judgeExamples)
                 .paramBuilder(p -> Map.of(
                         "newState", p.newState(),
                         "oldState", p.oldState()))
@@ -96,10 +142,14 @@ public class AssertionService {
                 .errorStrategy(ErrorStrategy.THROW)
                 .build());
 
-        String mergeTemplate = promptLoader.load("assertion/merge-assertion.txt");
-        runner.register(TaskName.MERGE_ASSERTION, TaskDefinition
+        // MERGE_ASSERTION
+        String[] mergeParts = promptLoader.load("assertion/merge-assertion.txt").split(USER_DELIMITER, 2);
+        String mergeSystem = mergeParts[0].stripTrailing();
+        String mergeUser = mergeParts.length > 1 ? mergeParts[1].strip() : "Statement A: {stateA}\nStatement B: {stateB}";
+        llmReqConstructor.register(TaskName.MERGE_ASSERTION, LlmTaskDefinition
                 .<MergeParams, String>builder()
-                .template(mergeTemplate)
+                .systemTemplate(mergeSystem)
+                .userTemplate(mergeUser)
                 .paramBuilder(p -> Map.of(
                         "stateA", p.stateA(),
                         "stateB", p.stateB()))
@@ -164,7 +214,7 @@ public class AssertionService {
 
             for (String topic : topics) {
                 long t2 = System.currentTimeMillis();
-                String state = runner.requestModel(TaskName.EXTRACT_STATE,
+                String state = llmReqConstructor.execute(TaskName.EXTRACT_STATE,
                         new ExtractStateParams(group.getName(), topic, labeledMessages), ctx);
                 log.info("AssertionService: Step2 (state) topic='{}' done in {}ms",
                         topic, System.currentTimeMillis() - t2);
@@ -207,12 +257,12 @@ public class AssertionService {
                 if (oldAssertion.getSessionId().equals(sessionId)) continue;
 
                 // Judge
-                boolean isSame = runner.requestModel(TaskName.JUDGE_SAME,
+                boolean isSame = llmReqConstructor.execute(TaskName.JUDGE_SAME,
                         new JudgeParams(newAssertion.getState(), oldAssertion.getState()), ctx);
 
                 if (isSame) {
                     // Merge
-                    String mergedState = runner.requestModel(TaskName.MERGE_ASSERTION,
+                    String mergedState = llmReqConstructor.execute(TaskName.MERGE_ASSERTION,
                             new MergeParams(newAssertion.getState(), oldAssertion.getState()), ctx);
 
                     // Soft-delete old
@@ -279,7 +329,7 @@ public class AssertionService {
                 }
             }
             try {
-                String rawResponse = runner.requestRaw(TaskName.EXTRACT_TOPICS, params, ctx);
+                String rawResponse = llmReqConstructor.executeRaw(TaskName.EXTRACT_TOPICS, params, ctx);
                 if (rawResponse == null || rawResponse.isBlank()) {
                     lastException = new RuntimeException("Empty response from LLM");
                     log.warn("AssertionService: extractTopics attempt {} returned empty, retrying", attempt + 1);

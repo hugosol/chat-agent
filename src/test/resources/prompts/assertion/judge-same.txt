@@ -1,2 +1,4 @@
 E2E_MARKER_ASSERTION_JUDGE_SAME
 Judge if same: {newState} vs {oldState}
+---USER---
+{newState} {oldState}

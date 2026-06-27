@@ -1,1 +1,3 @@
-Correction prompt: {userInput}
+Correction prompt:
+---USER---
+{userInput}

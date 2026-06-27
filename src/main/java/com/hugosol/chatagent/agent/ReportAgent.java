@@ -1,10 +1,10 @@
 package com.hugosol.chatagent.agent;
 
 import com.hugosol.chatagent.agent.common.ErrorStrategy;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
+import com.hugosol.chatagent.agent.common.LlmTaskDefinition;
 import com.hugosol.chatagent.agent.common.TaskContext;
-import com.hugosol.chatagent.agent.common.TaskDefinition;
 import com.hugosol.chatagent.agent.common.TaskName;
-import com.hugosol.chatagent.agent.common.TaskRunner;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.CorrectionData;
 import com.hugosol.chatagent.dto.MessageData;
@@ -23,23 +23,25 @@ import java.util.Map;
 public class ReportAgent {
 
     private static final Logger log = LoggerFactory.getLogger(ReportAgent.class);
-    private final TaskRunner runner;
+    private static final String USER_DELIMITER = "---USER---";
+
+    private final LlmReqConstructor llmReqConstructor;
     private final ObjectMapper objectMapper;
 
-    private final String rootReportTemplate;
-    private final Map<AgentMode, String> reportTemplates = new EnumMap<>(AgentMode.class);
+    private final Map<AgentMode, String> reportSystemTemplates = new EnumMap<>(AgentMode.class);
 
-    public ReportAgent(TaskRunner runner, PromptLoader promptLoader, ObjectMapper objectMapper) {
-        this.runner = runner;
+    public ReportAgent(LlmReqConstructor llmReqConstructor, PromptLoader promptLoader, ObjectMapper objectMapper) {
+        this.llmReqConstructor = llmReqConstructor;
         this.objectMapper = objectMapper;
-        this.rootReportTemplate = promptLoader.load("report.txt");
-        for (AgentMode mode : AgentMode.values()) {
-            String path = mode.getTemplatePath();
-            reportTemplates.put(mode, promptLoader.loadIfExists(path + "/report.txt", rootReportTemplate));
-        }
-        runner.register(TaskName.REPORT, TaskDefinition
+
+        String[] rootParts = promptLoader.load("report.txt").split(USER_DELIMITER, 2);
+        String rootSystemTemplate = rootParts[0].stripTrailing();
+        String rootUserTemplate = rootParts.length > 1 ? rootParts[1].strip() : "{fullConversation}\n{allCorrections}";
+
+        llmReqConstructor.register(TaskName.REPORT, LlmTaskDefinition
                 .<ReportParams, ReportResult>builder()
-                .template(rootReportTemplate)  // placeholder; overridden at request time
+                .systemTemplate(rootSystemTemplate)
+                .userTemplate(rootUserTemplate)
                 .paramBuilder(p -> Map.of(
                         "fullConversation", buildConversationText(p.messages()),
                         "allCorrections", buildErrorsText(p.corrections())
@@ -47,6 +49,16 @@ public class ReportAgent {
                 .parser(this::parseReport)
                 .errorStrategy(ErrorStrategy.SWALLOW)
                 .build());
+
+        // Load per-mode system template overrides
+        for (AgentMode mode : AgentMode.values()) {
+            String path = mode.getTemplatePath();
+            String perModeFull = promptLoader.loadIfExists(path + "/report.txt", null);
+            if (perModeFull != null) {
+                String[] modeParts = perModeFull.split(USER_DELIMITER, 2);
+                reportSystemTemplates.put(mode, modeParts[0].stripTrailing());
+            }
+        }
     }
 
     public ReportResult generate(List<MessageData> messages, List<CorrectionData> allCorrections, TaskContext ctx) {
@@ -57,9 +69,15 @@ public class ReportAgent {
         } catch (IllegalArgumentException e) {
             mode = AgentMode.WORKPLACE_STANDUP;
         }
-        String template = reportTemplates.getOrDefault(mode, rootReportTemplate);
-        ReportResult result = runner.requestModel(TaskName.REPORT,
-                new ReportParams(messages, allCorrections), ctx, template);
+        String systemOverride = reportSystemTemplates.get(mode);
+        ReportResult result;
+        if (systemOverride != null) {
+            result = llmReqConstructor.execute(TaskName.REPORT,
+                    new ReportParams(messages, allCorrections), ctx, systemOverride);
+        } else {
+            result = llmReqConstructor.execute(TaskName.REPORT,
+                    new ReportParams(messages, allCorrections), ctx);
+        }
         return result != null ? result : new ReportResult("", "", 0, "");
     }
 

@@ -13,10 +13,10 @@ IMPORTANT: When writing JSON string values, use single quotes for quoting words 
 
 Use the actual conversation and errors below to generate an honest, helpful report.
 
+Output ONLY the JSON object. No markdown, no extra text.
+---USER---
 Full conversation:
 {fullConversation}
 
 All errors recorded this session:
 {allCorrections}
-
-Output ONLY the JSON object. No markdown, no extra text.

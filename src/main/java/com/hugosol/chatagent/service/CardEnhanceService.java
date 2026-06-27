@@ -2,12 +2,16 @@ package com.hugosol.chatagent.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
+import com.hugosol.chatagent.agent.common.TaskContext;
 import com.hugosol.chatagent.model.*;
 import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.SubtitleLineRepository;
 import com.hugosol.chatagent.repository.WatchedMovieRepository;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -30,7 +34,7 @@ public class CardEnhanceService {
     private final CardEnhancementRepository cardEnhancementRepository;
     private final SubtitleLineRepository subtitleLineRepository;
     private final WatchedMovieRepository watchedMovieRepository;
-    private final ChatLanguageModel chatLanguageModel;
+    private final LlmReqConstructor llmReqConstructor;
     private final WiktionaryClient wiktionaryClient;
     private final ObjectMapper objectMapper;
 
@@ -38,13 +42,13 @@ public class CardEnhanceService {
                               CardEnhancementRepository cardEnhancementRepository,
                               SubtitleLineRepository subtitleLineRepository,
                               WatchedMovieRepository watchedMovieRepository,
-                              ChatLanguageModel chatLanguageModel,
+                              LlmReqConstructor llmReqConstructor,
                               WiktionaryClient wiktionaryClient) {
         this.cardRepository = cardRepository;
         this.cardEnhancementRepository = cardEnhancementRepository;
         this.subtitleLineRepository = subtitleLineRepository;
         this.watchedMovieRepository = watchedMovieRepository;
-        this.chatLanguageModel = chatLanguageModel;
+        this.llmReqConstructor = llmReqConstructor;
         this.wiktionaryClient = wiktionaryClient;
         this.objectMapper = new ObjectMapper();
     }
@@ -314,16 +318,25 @@ public class CardEnhanceService {
             contextText.append("- ").append(line.getText()).append(marker).append("\n");
         }
 
-        String prompt = """
-                你是电影台词分析助手。以下是电影《%s》中一段包含单词"%s"的台词及前后文。请用一两句中文描述这段台词发生的情境（谁在什么情况下对谁说了什么）。
+        String systemPrompt = """
+                你是电影台词分析助手。请用一两句中文描述一段台词发生的情境（谁在什么情况下对谁说了什么）。
+                请直接给出场景摘要，不要解释，不要引述原文。""";
 
-                台词上下文：
+        String userPrompt = """
+                以下是电影《%s》中一段包含单词"%s"的台词及前后文：
+
 %s
+                请描述这段台词的情境：""".formatted(movieTitle, targetWord, contextText.toString());
 
-                请直接给出场景摘要，不要解释，不要引述原文：""".formatted(movieTitle, targetWord, contextText.toString());
+        List<ChatMessage> messages = List.of(
+                SystemMessage.from(systemPrompt),
+                UserMessage.from(userPrompt)
+        );
 
         try {
-            String result = chatLanguageModel.chat(prompt).trim();
+            String result = llmReqConstructor.chat(messages,
+                    new TaskContext(null, null, null),
+                    "CARD_ENHANCE", LlmReqConstructor.ModelType.DEFAULT).trim();
             log.info("generateSceneSummary for '{}': LLM returned {} chars: {}",
                     targetWord, result.length(),
                     result.length() > 100 ? result.substring(0, 100) + "..." : result);

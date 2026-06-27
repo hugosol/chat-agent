@@ -1,1 +1,3 @@
-Report prompt. Conversation: {fullConversation} Errors: {allCorrections}
+Report prompt.
+---USER---
+Conversation: {fullConversation} Errors: {allCorrections}

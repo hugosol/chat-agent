@@ -27,5 +27,5 @@ Output ONLY a JSON array with this exact structure (no markdown, no explanation 
 ]
 
 If no errors found, return exactly: []
-
-User's utterance: "{userInput}"
+---USER---
+User's utterance: {userInput}

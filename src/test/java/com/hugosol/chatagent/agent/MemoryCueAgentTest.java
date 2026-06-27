@@ -1,7 +1,7 @@
 package com.hugosol.chatagent.agent;
 
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
 import com.hugosol.chatagent.agent.common.TaskContext;
-import com.hugosol.chatagent.agent.common.TaskRunner;
 import com.hugosol.chatagent.config.AppProperties;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.MessageData;
@@ -10,8 +10,10 @@ import com.hugosol.chatagent.model.MessageRole;
 import com.hugosol.chatagent.service.LlmCallLogService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -28,21 +30,24 @@ class MemoryCueAgentTest {
     private StubChatModel chatModel;
 
     private static class StubChatModel implements ChatLanguageModel {
-        String lastPrompt;
-        String response;
+        List<ChatMessage> lastMessages;
+        private Response<AiMessage> response;
 
-        void setResponse(String response) {
-            this.response = response;
-        }
-
-        @Override
-        public String chat(String prompt) {
-            this.lastPrompt = prompt;
-            return response;
+        void setResponse(String text) {
+            this.response = Response.from(
+                    AiMessage.from(text),
+                    new TokenUsage(10, 5)
+            );
         }
 
         @Override
         public Response<AiMessage> generate(List<ChatMessage> messages) {
+            this.lastMessages = messages;
+            return response;
+        }
+
+        @Override
+        public String chat(String userMessage) {
             return null;
         }
     }
@@ -52,8 +57,13 @@ class MemoryCueAgentTest {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
         LlmCallLogService logService = mock(LlmCallLogService.class);
-        TaskRunner runner = new TaskRunner(chatModel, chatModel, logService);
-        agent = new MemoryCueAgent(runner, promptLoader, new AppProperties());
+        LlmReqConstructor llmReqConstructor = new LlmReqConstructor(chatModel, chatModel, logService);
+        agent = new MemoryCueAgent(llmReqConstructor, promptLoader, new AppProperties());
+    }
+
+    private String lastUserContent() {
+        assertThat(chatModel.lastMessages).isNotNull();
+        return ((UserMessage) chatModel.lastMessages.get(chatModel.lastMessages.size() - 1)).singleText();
     }
 
     @Test
@@ -122,16 +132,16 @@ class MemoryCueAgentTest {
     }
 
     @Test
-    void detectSwitches_injectsMessageIndexesInPrompt() {
+    void detectSwitches_injectsXmlFormatInPrompt() {
         chatModel.setResponse("[]");
 
         agent.detectSwitches(buildMessages(4), AgentMode.WORKPLACE_STANDUP,
                 new TaskContext("s1", "u1", "WORKPLACE_STANDUP"));
 
-        assertThat(chatModel.lastPrompt).contains("[MSG#0]");
-        assertThat(chatModel.lastPrompt).contains("[MSG#1]");
-        assertThat(chatModel.lastPrompt).contains("[MSG#2]");
-        assertThat(chatModel.lastPrompt).contains("[MSG#3]");
+        String userContent = lastUserContent();
+        assertThat(userContent).contains("<turn role=\"user\">");
+        assertThat(userContent).contains("<turn role=\"assistant\">");
+        assertThat(userContent).doesNotContain("[MSG#");
     }
 
     private static MessageData msg(int id, String text) {

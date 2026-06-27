@@ -1,3 +1,4 @@
 E2E_MARKER_MEMORY_CUE_SPLIT
 You are analyzing a conversation. Detect topic switches.
+---USER---
 {messages}
