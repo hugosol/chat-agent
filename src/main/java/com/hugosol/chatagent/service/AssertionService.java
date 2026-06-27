@@ -66,25 +66,28 @@ public class AssertionService {
     private static final String USER_DELIMITER = "---USER---";
 
     private void registerTasks(PromptLoader promptLoader) {
-        // EXTRACT_TOPICS — with 2 few-shot example pairs (XML transcript → JSON array)
+        // EXTRACT_TOPICS — with 3 few-shot example pairs: grouping, separation, empty
         String[] topicsParts = promptLoader.load("assertion/extract-topics.txt").split(USER_DELIMITER, 2);
         String topicsSystem = topicsParts[0].stripTrailing();
         String topicsUser = topicsParts.length > 1 ? topicsParts[1].strip() : "{messages}";
         List<ChatMessage> topicsExamples = List.of(
-                UserMessage.from("<turn role=\"user\">Yesterday I go to park with my friend.</turn>\n" +
-                        "<turn role=\"assistant\">You mean \"went to the park\" — \"go\" in past tense is \"went.\"</turn>\n" +
-                        "<turn role=\"user\">Yes, I always forget. Also, a apple is good.</turn>\n" +
-                        "<turn role=\"assistant\">\"An apple\" — use \"an\" before vowel sounds.</turn>\n" +
-                        "<turn role=\"user\">So I went to eat an apple. Is that better?</turn>\n" +
-                        "<turn role=\"assistant\">Perfect! You used both past tense and the article correctly.</turn>"),
-                AiMessage.from("[\"past tense\", \"article usage\"]"),
-                UserMessage.from("<turn role=\"user\">My boss ask me to finish the report.</turn>\n" +
-                        "<turn role=\"assistant\">\"My boss asked me\" — remember past tense for reported speech.</turn>\n" +
-                        "<turn role=\"user\">She also say deadline is tomorrow.</turn>\n" +
-                        "<turn role=\"assistant\">\"She also said\" — same pattern. Also, \"she says\" for present tense.</turn>\n" +
-                        "<turn role=\"user\">Okay. By the way, what do you think about the project?</turn>\n" +
-                        "<turn role=\"assistant\">I think the plan is solid. What part worries you?</turn>"),
-                AiMessage.from("[\"past tense for reported speech\", \"third person -s\"]")
+                // Example 1: same error type across turns → merged into ONE topic
+                UserMessage.from("<turn role=\"user\">Yesterday I go to the park.</turn>\n" +
+                        "<turn role=\"assistant\">Ah, you went to the park? Was it crowded?</turn>\n" +
+                        "<turn role=\"user\">No, but I forget my key there.</turn>\n" +
+                        "<turn role=\"assistant\">Oh no, you forgot your key? Hope you got it back.</turn>"),
+                AiMessage.from("[\"past tense\"]"),
+                // Example 2: different error types → SEPARATE topics
+                UserMessage.from("<turn role=\"user\">I have a idea for the meeting.</turn>\n" +
+                        "<turn role=\"assistant\">An idea? What is it?</turn>\n" +
+                        "<turn role=\"user\">She always come late on Monday.</turn>\n" +
+                        "<turn role=\"assistant\">She comes late? That's annoying.</turn>"),
+                AiMessage.from("[\"articles\", \"third person -s\"]"),
+                // Example 3: no grammar errors → EMPTY array
+                UserMessage.from("<turn role=\"user\">I had a great weekend. Watched a movie and relaxed.</turn>\n" +
+                        "<turn role=\"assistant\">Sounds lovely! What did you watch?</turn>\n" +
+                        "<turn role=\"user\">An old comedy. Nothing special but fun.</turn>"),
+                AiMessage.from("[]")
         );
         llmReqConstructor.register(TaskName.EXTRACT_TOPICS, LlmTaskDefinition
                 .<ExtractTopicsParams, List<String>>builder()
