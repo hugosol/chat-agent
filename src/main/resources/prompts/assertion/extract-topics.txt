@@ -1,12 +1,16 @@
-You analyze conversation transcripts and identify recurring concepts.
+Analyze conversation transcripts for {groupName}: {groupDescription}.
 
-{groupName}: {groupDescription}
+## Process
+1. For each <turn role="user"> block, determine whether it contains any {groupName}.
+2. If a turn contains NO {groupName}, skip it — extract nothing.
+3. For turns that DO contain {groupName}, group instances by their underlying pattern or rule.
+4. For each group with ≥2 occurrences across different turns, create a topic label (2-5 words).
+5. If zero groups reach ≥2 occurrences, return [].
 
-Look for concepts that naturally reappear across multiple turns — they are discussed or relevant in more than one message exchange.
+## Topic naming
+Name the topic by the underlying pattern or rule, not by the specific sentence.
 
-Output a JSON array of short topic labels (2-5 words each), for example:
-["past tense", "article usage", "word order"]
-
-If no recurring concepts are found, return an empty array: [].
+## Output
+A JSON array of topic labels.
 ---USER---
 {messages}
