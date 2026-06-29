@@ -69,8 +69,12 @@ com.hugosol.chatagent/
 
 ## Conventions & Gotchas
 
+> **编码规范已独立为 [docs/conventions.md](docs/conventions.md)**——设计理念、分层规则、数据层约定、错误处理、线程模型、命名规范。以下仅保留 AI 代理操作层面的要点。
+>
 > 做前端改动前必读 [docs/frontend-notes.md](docs/frontend-notes.md)（iOS 兼容、CSS 规范、测试 mock 模式）
 > 做闪卡改动前必读 [docs/fsrs.md](docs/fsrs.md)（FSRS 算法、调度器设计、优化器）
+> 编码规范与设计理念见 [docs/conventions.md](docs/conventions.md)（分层、数据、错误处理、线程、命名）
+> 深层设计机制见 [docs/design-rationale.md](docs/design-rationale.md)（记忆注入、管线共享、架构取舍）
 > 测试清单与规范见 [docs/tests.md](docs/tests.md)
 
 - **ADR 优先级**: `docs/adr/` 为历史决策记录，以代码和 README.md、docs/architecture.md 等持续更新文档为准。仅当 ADR 明确过期时追加过期标识。

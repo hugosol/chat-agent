@@ -125,6 +125,8 @@ cd src/main/frontend && npm test
 | [README.md](README.md) | 项目概览、快速上手、Roadmap |
 | [CONTEXT.md](CONTEXT.md) | 领域术语表 |
 | [docs/architecture.md](docs/architecture.md) | 架构蓝图与设计决策 |
+| [docs/design-rationale.md](docs/design-rationale.md) | 设计理念与深层机制 |
+| [docs/conventions.md](docs/conventions.md) | 设计理念与编码规则 |
 | [docs/data-model.md](docs/data-model.md) | 数据模型与实体关系 |
 | [docs/frontend-notes.md](docs/frontend-notes.md) | 前端实现规范与浏览器兼容 |
 | [docs/fsrs.md](docs/fsrs.md) | FSRS 算法、调度器、优化器参考 |
