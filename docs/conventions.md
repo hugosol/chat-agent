@@ -305,19 +305,22 @@ public record FsrsSchedulerConfig(double[] w, double desiredRetention, ...) {
 
 ## 九、文档维护
 
-### 9.1 文档职责
+> 完成功能开发后，按 [AGENTS.md](../AGENTS.md) 中的 **Documentation Update Checklist**（逆向查找表）逐行检查每份文档是否需要更新。该表以文档为索引，列出每份文档的触发条件和跳过场景。以下为文档职责概要——详细更新规则以 AGENTS.md 为准。
 
-| 文档 | 面向 | 更新时机 |
+| 文档 | 面向 | 核心职责 |
 |------|------|---------|
-| `README.md` | 新用户 | 功能变更影响启动流程时 |
-| `CONTEXT.md` | 开发者 | 新增领域术语或关系变化时 |
-| `docs/architecture.md` | 架构师 | 新增决策或设计偏离时 |
-| `docs/data-model.md` | 开发者 | 新增实体或字段变更时 |
-| `docs/conventions.md`（本文档） | 开发者 | 新增编码模式或规则变更时 |
-| `docs/tests.md` | QA/开发者 | 新增测试文件时 |
-| `AGENTS.md` | AI Agent | 项目结构变化时 |
+| `README.md` | 新用户 | 项目概览、快速上手 |
+| `CONTEXT.md` | 开发者 | 领域术语表 |
+| `docs/architecture.md` | 架构师 | 架构决策日志 |
+| `docs/design-rationale.md` | 设计者 | 深层设计机制与权衡 |
+| `docs/conventions.md`（本文档） | 开发者 | 编码规则与模式 |
+| `docs/data-model.md` | 开发者 | 实体关系图与枚举 |
+| `docs/fsrs.md` | 算法开发者 | FSRS 算法参考 |
+| `docs/frontend-notes.md` | 前端开发者 | 前端实现规范 |
+| `docs/tests.md` | QA/开发者 | 测试清单 |
+| `AGENTS.md` | AI Agent | 操作手册 + 文档更新规则 |
 
-### 9.2 ADR 与代码的关系
+### ADR 与代码的关系
 
 - `docs/adr/` 为历史决策记录，**以代码和上述持续更新文档为准**
 - 仅当 ADR 明确过期时追加过期标识
