@@ -74,8 +74,8 @@ docker push ghcr.io/你的用户名/chat-agent:latest
 | Spring Boot | 3.4.7 | Web 框架，整合 Spring Security / Data JPA | [architecture.md](docs/architecture.md) |
 | LangChain4j | 1.0.0-beta2 | LLM 调用封装（OpenAI 兼容适配器连接 DeepSeek） | [architecture.md](docs/architecture.md#二完整决策日志) |
 | langgraph4j | 1.8.16 | Agent 状态图编排 | [architecture.md](docs/architecture.md#四langgraph-状态机) |
-| H2 | — | 嵌入式文件数据库 | [architecture.md](docs/architecture.md#六数据模型) |
-| WebSocket | — | 客户端-服务端实时双向通信（JSON 协议） | [architecture.md](docs/architecture.md#七websocket-协议) |
+| H2 | — | 嵌入式文件数据库 | [data-model.md](docs/data-model.md) |
+| WebSocket | — | 客户端-服务端实时双向通信（JSON 协议） | [AGENTS.md](AGENTS.md#websocket-protocol) |
 | React + TypeScript | 18 | 前端 UI（Vite Library Mode，CSS Modules） | [frontend-notes.md](docs/frontend-notes.md) |
 | ONNX Runtime | — | RAG 语义检索（all-MiniLM-L6-v2，384 维向量化） | [architecture.md](docs/architecture.md) |
 | FSRS-6 | — | 间隔重复调度算法，决定卡片何时复习 | [fsrs.md](docs/fsrs.md) |
@@ -85,7 +85,7 @@ docker push ghcr.io/你的用户名/chat-agent:latest
 | 模块 | 解决什么问题 | Reference |
 |------|-------------|-----------|
 | 聊天页面 | 实时 WebSocket 流式对话、异步语法纠错、多轮 RAG 记忆注入 | [architecture.md](docs/architecture.md) |
-| MemoryCue / MemoryAssertion | 跨会话语义记忆，RAG 检索 + 向量化存储。V2 写入端升级为结构化断言（MemoryAssertion），检索端保持 MemoryCue | [architecture.md](docs/architecture.md) / [CONTEXT.md](CONTEXT.md) |
+| MemoryCue / MemoryAssertion | 跨会话语义记忆，RAG 检索 + 向量化存储。V2 写入端 MemoryCue 与 MemoryAssertion 并行运行（共享 detectSwitches），检索端使用 MemoryCue RAG | [architecture.md](docs/architecture.md) / [CONTEXT.md](CONTEXT.md) |
 | FSRS 调度器 | 间隔重复算法，决定每张闪卡的下次复习时间 | [fsrs.md](docs/fsrs.md) |
 | FSRS 优化器 | 基于复习历史自动调参，Adam 梯度下降优化 W[21] | [fsrs.md](docs/fsrs.md) |
 | 多 Tab 会话管理 | 页面切换自动恢复，防旧数据干扰，一 Session 一 Tab 绑定 | [frontend-notes.md](docs/frontend-notes.md) |
@@ -125,6 +125,7 @@ cd src/main/frontend && npm test
 | [README.md](README.md) | 项目概览、快速上手、Roadmap |
 | [CONTEXT.md](CONTEXT.md) | 领域术语表 |
 | [docs/architecture.md](docs/architecture.md) | 架构蓝图与设计决策 |
+| [docs/data-model.md](docs/data-model.md) | 数据模型与实体关系 |
 | [docs/frontend-notes.md](docs/frontend-notes.md) | 前端实现规范与浏览器兼容 |
 | [docs/fsrs.md](docs/fsrs.md) | FSRS 算法、调度器、优化器参考 |
 | [docs/tests.md](docs/tests.md) | 测试清单与规范 |
@@ -137,7 +138,7 @@ cd src/main/frontend && npm test
 - [x] 语法纠错与学习报告
 - [x] 闪卡系统（FSRS-6 调度 + 复习面板 + CSV 导入导出）
 - [x] MemoryCue 跨会话语义记忆（RAG 检索 + 向量化）
-- [ ] 结构化断言存储（MemoryAssertion Extractor + Manager 管线）替代 MemoryCue 写入端
+- [x] 结构化断言存储（MemoryAssertion Extractor + Manager 管线，与 MemoryCue 并行运行）
 - [x] 多用户与数据隔离
 - [x] DAILY_TALK 闲聊模式 + WORKPLACE_STANDUP 站会模式 + JAPANESE_BUSINESS ビジネス日本語
 - [x] FSRS 参数优化器（Adam 梯度下降自动调参）

@@ -45,7 +45,7 @@ com.hugosol.chatagent/
 ├── graph/           # LangGraph: ChatState (6 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
 ├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent (detectSwitches reused by AssertionService)
-│   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName (9 tasks), TaskContext, ErrorStrategy
+│   └── common/       # LlmReqConstructor (sync engine), LlmTaskDefinition, TaskName (9 tasks), TaskContext, ErrorStrategy
 ├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
 ├── controller/      # FlashcardController — REST API (Cards CRUD + Tags CRUD + Import/Export + Back patch, 11 endpoints)
@@ -119,7 +119,7 @@ Server → Client:
   ERROR { message }
 ```
 
-> Full protocol with JSON examples: [docs/architecture.md](docs/architecture.md#websocket-协议)
+> Full protocol with JSON examples: see WebSocket Protocol section above.
 
 ## Flashcard Module
 

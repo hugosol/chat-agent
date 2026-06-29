@@ -32,7 +32,7 @@ cd src/main/frontend && npm test
 | `agent/ReportAgentTest.java` | 报告生成、ReportResult 解析 · 含日语报告模板测试 |
 | `agent/LearningAgentTest.java` | Learning Profile 合并逻辑 |
 | `agent/MemoryCueAgentTest.java` | 话题切换检测、分段摘要生成 |
-| `agent/common/TaskRunnerTest.java` | 同步引擎、LLM 调用日志、ErrorStrategy |
+| `agent/common/LlmReqConstructorTest.java` | 同步引擎、消息组装、模板填充、日志记录、ErrorStrategy |
 
 ### Service（16 个测试类）
 
@@ -45,7 +45,7 @@ cd src/main/frontend && npm test
 | `service/TokenTrackerTest.java` | LLM token 计数、80% 警告阈值 |
 | `service/EmbeddingServiceTest.java` | ONNX 向量化、语义搜索、EmbeddingStore 持久化 |
 | `service/LearningProfileServiceTest.java` | Profile 合并、版本递增 |
-| `service/MemoryCueServiceTest.java` | MemoryCue 异步生成、状态跟踪（并存期保留） |
+| `service/MemoryCueServiceTest.java` | MemoryCue 异步生成、状态跟踪（与 AssertionService 并行运行）|
 | `service/AssertionServiceTest.java` | Assertion 提取管线：Extractor → Manager 完整流程、空对话、LLM 失败抛错、lineage 生成 |
 | `service/LlmCallLogServiceTest.java` | LLM 调用日志写入、启动清理 |
 | `service/EntityMapperTest.java` | DTO ↔ Entity 映射 |
