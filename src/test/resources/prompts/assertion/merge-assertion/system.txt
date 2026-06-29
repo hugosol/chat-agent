@@ -1,4 +1,2 @@
 E2E_MARKER_ASSERTION_MERGE
 Merge: {stateA} + {stateB}
----USER---
-{stateA} {stateB}

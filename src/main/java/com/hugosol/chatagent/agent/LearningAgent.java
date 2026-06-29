@@ -17,21 +17,17 @@ import java.util.Map;
 public class LearningAgent {
 
     private static final Logger log = LoggerFactory.getLogger(LearningAgent.class);
-    private static final String USER_DELIMITER = "---USER---";
 
     private final LlmReqConstructor llmReqConstructor;
 
     public LearningAgent(LlmReqConstructor llmReqConstructor, PromptLoader promptLoader, AppProperties appProperties) {
         this.llmReqConstructor = llmReqConstructor;
-        String fullTemplate = promptLoader.load("memory-profile.txt");
-        String[] parts = fullTemplate.split(USER_DELIMITER, 2);
-        String systemTemplate = parts[0].stripTrailing()
+        String systemTemplate = promptLoader.load("memory-profile/system.txt").stripTrailing()
                 .replace("{profileMaxLength}", String.valueOf(appProperties.getMemory().getProfileMaxLength()));
-        String userTemplate = parts.length > 1 ? parts[1].strip() : "{oldLearningProfile}\n{errorSummary}";
         llmReqConstructor.register(TaskName.MERGE_LEARNING, LlmTaskDefinition
                 .<MergeLearningParams, String>builder()
                 .systemTemplate(systemTemplate)
-                .userTemplate(userTemplate)
+                .userTemplate("Previous learning profile (may be empty if this is the first session):\n---\n{oldLearningProfile}\n---\n\nLatest session data:\n- Error Summary: {errorSummary}")
                 .paramBuilder(p -> Map.of(
                         "oldLearningProfile", p.oldProfile().isEmpty() ? "(No previous sessions)" : p.oldProfile(),
                         "errorSummary", p.errorSummary()

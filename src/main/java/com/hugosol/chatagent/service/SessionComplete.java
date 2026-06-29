@@ -85,24 +85,6 @@ public class SessionComplete {
         return segments;
     }
 
-    static String buildLabeledMessages(List<MessageData> messages) {
-        StringBuilder xml = new StringBuilder();
-        for (MessageData msg : messages) {
-            String role = msg.getRole().name().equals("USER") ? "user" : "assistant";
-            xml.append("<turn role=\"").append(role).append("\">")
-                    .append(escapeXml(msg.getContent()))
-                    .append("</turn>\n");
-        }
-        return xml.toString();
-    }
-
-    private static String escapeXml(String text) {
-        return text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
-    }
-
     private ReportResult generateReport(String sessionId, String userId, AgentMode mode,
                                          List<MessageData> messages, List<CorrectionData> corrections) {
         try {

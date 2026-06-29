@@ -10,9 +10,7 @@ import com.hugosol.chatagent.repository.AssertionGroupRepository;
 import com.hugosol.chatagent.repository.AssertionLineageRepository;
 import com.hugosol.chatagent.repository.MemoryAssertionRepository;
 import dev.langchain4j.data.embedding.Embedding;
-import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
@@ -63,36 +61,17 @@ public class AssertionService {
         }
     }
 
-    private static final String USER_DELIMITER = "---USER---";
-
     private void registerTasks(PromptLoader promptLoader) {
-        // EXTRACT_TOPICS — with 3 few-shot example pairs: grouping, separation, empty
-        String[] topicsParts = promptLoader.load("assertion/extract-topics.txt").split(USER_DELIMITER, 2);
-        String topicsSystem = topicsParts[0].stripTrailing();
-        String topicsUser = topicsParts.length > 1 ? topicsParts[1].strip() : "{messages}";
-        List<ChatMessage> topicsExamples = List.of(
-                // Example 1: same error type across turns → merged into ONE topic
-                UserMessage.from("<turn role=\"user\">Yesterday I go to the park.</turn>\n" +
-                        "<turn role=\"assistant\">Ah, you went to the park? Was it crowded?</turn>\n" +
-                        "<turn role=\"user\">No, but I forget my key there.</turn>\n" +
-                        "<turn role=\"assistant\">Oh no, you forgot your key? Hope you got it back.</turn>"),
-                AiMessage.from("[\"past tense\"]"),
-                // Example 2: different error types → SEPARATE topics
-                UserMessage.from("<turn role=\"user\">I have a idea for the meeting.</turn>\n" +
-                        "<turn role=\"assistant\">An idea? What is it?</turn>\n" +
-                        "<turn role=\"user\">She always come late on Monday.</turn>\n" +
-                        "<turn role=\"assistant\">She comes late? That's annoying.</turn>"),
-                AiMessage.from("[\"articles\", \"third person -s\"]"),
-                // Example 3: no grammar errors → EMPTY array
-                UserMessage.from("<turn role=\"user\">I had a great weekend. Watched a movie and relaxed.</turn>\n" +
-                        "<turn role=\"assistant\">Sounds lovely! What did you watch?</turn>\n" +
-                        "<turn role=\"user\">An old comedy. Nothing special but fun.</turn>"),
-                AiMessage.from("[]")
-        );
+        // EXTRACT_TOPICS — few-shot examples externalized to examples.txt
+        String topicsSystem = promptLoader.load("assertion/extract-topics/system.txt").stripTrailing();
+        String topicsExamplesContent = promptLoader.loadIfExists("assertion/extract-topics/examples.txt", null);
+        List<ChatMessage> topicsExamples = topicsExamplesContent != null
+                ? ExampleMsgFormatter.parseFewShot(topicsExamplesContent, false)
+                : List.of();
         llmReqConstructor.register(TaskName.EXTRACT_TOPICS, LlmTaskDefinition
                 .<ExtractTopicsParams, List<String>>builder()
                 .systemTemplate(topicsSystem)
-                .userTemplate(topicsUser)
+                .userTemplate("{messages}")
                 .exampleMessages(topicsExamples)
                 .paramBuilder(p -> Map.of(
                         "groupName", p.groupName(),
@@ -103,13 +82,11 @@ public class AssertionService {
                 .build());
 
         // EXTRACT_STATE
-        String[] stateParts = promptLoader.load("assertion/extract-state.txt").split(USER_DELIMITER, 2);
-        String stateSystem = stateParts[0].stripTrailing();
-        String stateUser = stateParts.length > 1 ? stateParts[1].strip() : "{groupName}: {topic}\n{messages}";
+        String stateSystem = promptLoader.load("assertion/extract-state/system.txt").stripTrailing();
         llmReqConstructor.register(TaskName.EXTRACT_STATE, LlmTaskDefinition
                 .<ExtractStateParams, String>builder()
                 .systemTemplate(stateSystem)
-                .userTemplate(stateUser)
+                .userTemplate("{groupName}: {topic}\n{messages}")
                 .paramBuilder(p -> Map.of(
                         "groupName", p.groupName(),
                         "topic", p.topic(),
@@ -118,25 +95,16 @@ public class AssertionService {
                 .errorStrategy(ErrorStrategy.THROW)
                 .build());
 
-        // JUDGE_SAME — with 3 few-shot example pairs
-        String[] judgeParts = promptLoader.load("assertion/judge-same.txt").split(USER_DELIMITER, 2);
-        String judgeSystem = judgeParts[0].stripTrailing();
-        String judgeUser = judgeParts.length > 1 ? judgeParts[1].strip() : "Statement A: {newState}\nStatement B: {oldState}";
-        List<ChatMessage> judgeExamples = List.of(
-                UserMessage.from("Statement A: The user often forgets to use past tense when talking about yesterday's events.\n" +
-                        "Statement B: The learner struggles with irregular past tense forms in conversation."),
-                AiMessage.from("YES"),
-                UserMessage.from("Statement A: The user makes subject-verb agreement errors with third person singular.\n" +
-                        "Statement B: The user sometimes confuses \"a\" and \"an\" before vowel sounds."),
-                AiMessage.from("NO"),
-                UserMessage.from("Statement A: The user is aware of their past tense mistakes and self-corrects about half the time.\n" +
-                        "Statement B: The user still makes past tense errors but occasionally self-corrects."),
-                AiMessage.from("YES")
-        );
+        // JUDGE_SAME — few-shot examples externalized to examples.txt
+        String judgeSystem = promptLoader.load("assertion/judge-same/system.txt").stripTrailing();
+        String judgeExamplesContent = promptLoader.loadIfExists("assertion/judge-same/examples.txt", null);
+        List<ChatMessage> judgeExamples = judgeExamplesContent != null
+                ? ExampleMsgFormatter.parseFewShot(judgeExamplesContent, false)
+                : List.of();
         llmReqConstructor.register(TaskName.JUDGE_SAME, LlmTaskDefinition
                 .<JudgeParams, Boolean>builder()
                 .systemTemplate(judgeSystem)
-                .userTemplate(judgeUser)
+                .userTemplate("Statement A: {newState}\nStatement B: {oldState}")
                 .exampleMessages(judgeExamples)
                 .paramBuilder(p -> Map.of(
                         "newState", p.newState(),
@@ -146,13 +114,11 @@ public class AssertionService {
                 .build());
 
         // MERGE_ASSERTION
-        String[] mergeParts = promptLoader.load("assertion/merge-assertion.txt").split(USER_DELIMITER, 2);
-        String mergeSystem = mergeParts[0].stripTrailing();
-        String mergeUser = mergeParts.length > 1 ? mergeParts[1].strip() : "Statement A: {stateA}\nStatement B: {stateB}";
+        String mergeSystem = promptLoader.load("assertion/merge-assertion/system.txt").stripTrailing();
         llmReqConstructor.register(TaskName.MERGE_ASSERTION, LlmTaskDefinition
                 .<MergeParams, String>builder()
                 .systemTemplate(mergeSystem)
-                .userTemplate(mergeUser)
+                .userTemplate("Statement A: {stateA}\nStatement B: {stateB}")
                 .paramBuilder(p -> Map.of(
                         "stateA", p.stateA(),
                         "stateB", p.stateB()))
@@ -169,9 +135,18 @@ public class AssertionService {
         TaskContext ctx = new TaskContext(sessionId, userId, mode.name());
 
         return CompletableFuture.supplyAsync(() -> {
-            AssertionGroup group = groupRepository.findByName("error-pattern")
-                    .orElseThrow(() -> new IllegalStateException("AssertionGroup 'error-pattern' not found"));
-            return extract(sessionId, userId, mode, segments, group, ctx);
+            List<AssertionGroup> groups = groupRepository.findByMode(mode.name());
+            if (groups.isEmpty()) {
+                log.debug("AssertionService: no groups for mode {}, skipping", mode);
+                return Collections.<MemoryAssertion>emptyList();
+            }
+
+            List<MemoryAssertion> allAssertions = new ArrayList<>();
+            for (AssertionGroup group : groups) {
+                List<MemoryAssertion> groupAssertions = extract(sessionId, userId, mode, segments, group, ctx);
+                allAssertions.addAll(groupAssertions);
+            }
+            return allAssertions;
         }, executor).thenAccept(newAssertions -> {
             long extractElapsed = System.currentTimeMillis() - startTime;
             log.info("AssertionService: extract done in {}ms, {} assertions", extractElapsed, newAssertions.size());
@@ -207,7 +182,7 @@ public class AssertionService {
             List<MessageData> segment = segments.get(segIdx);
             if (segment.isEmpty()) continue;
 
-            String labeledMessages = SessionComplete.buildLabeledMessages(segment);
+            String labeledMessages = ExampleMsgFormatter.toXml(segment);
 
             long t1 = System.currentTimeMillis();
             List<String> topics = extractTopicsWithRetry(

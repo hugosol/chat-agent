@@ -3,6 +3,3 @@ You judge whether two statements describe the same underlying fact about a langu
 Even if phrased differently or at different levels of detail — if they describe the same observation, answer YES. If they describe different or unrelated facts, answer NO.
 
 Answer ONLY with YES or NO. No explanation.
----USER---
-Statement A: {newState}
-Statement B: {oldState}

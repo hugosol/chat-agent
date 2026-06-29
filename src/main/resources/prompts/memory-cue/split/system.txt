@@ -22,5 +22,3 @@ Example outputs:
 [] — no topic switches detected
 [3] — one switch after turn 3
 [2, 5] — two switches after turn 2 and turn 5
----USER---
-{messages}

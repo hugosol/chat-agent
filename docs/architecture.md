@@ -51,7 +51,7 @@
 | 35 | ~~Topic Memory 模式隔离~~（已过时） | Topic Memory 已被 MemoryCue 替代。MemoryCue 生成时就携带 `mode` 字段实现模式隔离，RAG 检索时通过 `userId × AgentMode` 双重过滤。详见 ADR `mode-scoped-topic-memory.md`（弃用标记） |
 | 36 | 双轨记忆系统（已统一） | 原始设计为 User Memory（摘要注入）+ MemoryCue（RAG 检索）双轨并存。实施中 Topic Memory 的 Summary 直写被移除，整个记忆系统统一在 MemoryCue 管道。**V2：写入端并行运行 Assertion + MemoryCue 双管线**（共享 detectSwitches 一次调用，各自独立写入）。Assertion 提供结构化断言（Extractor + Manager 管线，per-segment × per-group 两步 LLM + Search→Judge→Merge 串行合并），MemoryCue 维持 RAG 检索端正常运行。检索端保持 MemoryCue。 |
 | 37 | LLM 调用日志 + 文件日志 | 新建 `llm_call_logs` 表持久化每次 LLM 调用的完整上下文（request_prompt / system_prompt / chat_history / response_text / tokens / duration）。同步 Agent 通过 `LlmReqConstructor` 统一管理 LLM 调用生命周期与日志（含完整 sessionId/userId/agentType/mode 上下文字段），ConversationAgent 通过 `TurnProcessor` 手动注入。写入异步执行不阻塞业务。启动时自动清理 3 天前记录。新增 `logback-spring.xml`，仅 local profile 启用文件日志（DEBUG 级别，按天滚动）。 |
-| 40 | LlmReqConstructor 同步 Agent 模式 | 抽取 `LlmReqConstructor` 深模块统一管理同步 Agent 的 LLM 调用生命周期，替换原有的 `TaskRunner`。Agent 构造时通过 `llmReqConstructor.register(name, task)` 注册 `LlmTaskDefinition`（systemTemplate + userTemplate + exampleMessages + paramBuilder + parser + errorStrategy），运行时通过 `llmReqConstructor.execute(name, params, ctx)` 触发 LLM 调用。模板按 `---USER---` 分隔符拆分为 system/user 两部分；对话数据使用 XML 格式（`<turn role="user">...</turn>`）；few-shot 示例从模板迁移到 Java 静态 `List<ChatMessage>`。调用 `ChatLanguageModel.generate(List<ChatMessage>)` 替代旧 `chat(String)`，日志完整记录 `system_prompt`、`chat_history`、`input_tokens`、`output_tokens`。`CardEnhanceService` 通过 `llmReqConstructor.chat()` 直接调用（无 Agent 注册）。`TaskName` 枚举管理 9 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE / EXTRACT_TOPICS / EXTRACT_STATE / JUDGE_SAME / MERGE_ASSERTION）。 |
+| 40 | LlmReqConstructor 同步 Agent 模式 | 抽取 `LlmReqConstructor` 深模块统一管理同步 Agent 的 LLM 调用生命周期，替换原有的 `TaskRunner`。Agent 构造时通过 `llmReqConstructor.register(name, task)` 注册 `LlmTaskDefinition`（systemTemplate + userTemplate + exampleMessages + paramBuilder + parser + errorStrategy），运行时通过 `llmReqConstructor.execute(name, params, ctx)` 触发 LLM 调用。Prompt 模板采用子目录结构（`system.txt` + 可选 `examples.txt`），`userTemplate` 内联为 Java 字面量。`ExampleMsgFormatter` 集中管理 XML 格式转换（`toXml` / `toXmlUserOnly`）和 few-shot 解析（`parseFewShot`），保证 few-shot 示例与真实对话数据使用一致的 `<turn>` XML 格式。调用 `ChatLanguageModel.generate(List<ChatMessage>)` 替代旧 `chat(String)`，日志完整记录 `system_prompt`、`chat_history`、`input_tokens`、`output_tokens`。`CardEnhanceService` 通过 `llmReqConstructor.chat()` 直接调用（无 Agent 注册）。`TaskName` 枚举管理 9 个任务标识（CORRECTION / REPORT / MERGE_LEARNING / CHAT_SWITCHES / GENERATE_MEMORY_CUE / EXTRACT_TOPICS / EXTRACT_STATE / JUDGE_SAME / MERGE_ASSERTION）。 |
 | 41 | 会话结束管线抽取 | 抽取 `SessionComplete` 深模块：将 `ChatMessageHandler.onEndSession()` 中的报告生成、持久化、异步记忆触发的管线集中到一个简单接口后面。Handler 依赖从 7 降至 4（移除 ReportAgent/SessionDbStore/LearningProfileService/MemoryCueAgent/MemoryCueService，新增 SessionComplete），`onEndSession()` 从 45 行缩至 20 行。`SessionComplete` 内部编排：shared `detectSwitches` → `splitBySwitches` → 并行触发 `LearningProfileService` + `AssertionService` + `MemoryCueService`（后恢复并行运行，共享一次 detectSwitches 调用，消除重复 LLM 成本）。`SessionDbStore.completeSession()` 支持 null report → `SessionStatus.FAILED`。报告 LLM 失败时返回降级报告（fluencyScore=-1 哨兵值），前端条件渲染隐藏评分行。 |
 | 38 | ~~Tag Consolidation~~ (废弃) | 已由 RAG 向量检索替代。tags 字段及 `StringListConverter`、`consolidateTags()` 方法、`tag-consolidation.txt` prompt 均已删除。详见 ADR `rag-memory-retrieval.md` |
 | 39 | RAG 向量检索 | 用 ONNX all-MiniLM-L6-v2 (384 维) 对 MemoryCue 的 topic+summary 做向量化，存入 InMemoryEmbeddingStore（JSON 磁盘持久化到 `./data/embedding-store.json`）。每轮用户输入 (messageId ≥ 2) 触发语义检索，结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载（队列为空）search topK+1 条，后续 search topK 条，去重时同 cueId 刷新到队头，满容时驱逐队尾（最久未访问）。注入 System Prompt 时按 tail→head（旧→新）生成编号列表。userId × AgentMode 隔离。专用 `embeddingExecutor` 线程池 (core=2, max=2)。磁盘文件损坏时自动从 H2 重建。 |
@@ -162,15 +162,15 @@ compiled.stream(input, RunnableConfig.builder()
 
 ## 五、Prompt 设计
 
-所有 Prompt 模板位于 `src/main/resources/prompts/`，由 `PromptLoader` 加载。模板通过 `LlmReqConstructor` 统一管理 LLM 调用——模板按 `---USER---` 分隔符拆分为 system/user 两部分，对话数据使用 XML 格式（`<turn role="user">...</turn>`），few-shot 示例定义在 Java 静态 `List<ChatMessage>` 中。
+所有 Prompt 模板位于 `src/main/resources/prompts/`，由 `PromptLoader` 加载。每个 Task 使用独立子目录：`system.txt`（系统提示词）+ 可选的 `examples.txt`（few-shot 示例，通过 `ExampleMsgFormatter.parseFewShot()` 加载）。`userTemplate` 内联为 Java 字面量（在 Agent 构造函数中）。`ExampleMsgFormatter` 集中管理 XML 格式转换（`toXml` / `toXmlUserOnly`），保证 few-shot 示例与真实对话数据使用完全一致的 `<turn>` XML 格式。
 
-| Agent | 模板文件 | 设计要点 |
+| Agent | 模板目录 | 设计要点 |
 |-------|---------|---------|
 | ConversationAgent | `conversation-system.txt`（骨架）+ per-Mode `description.txt` + `rules.txt` | 骨架包含 `{Description}` `{Rules}` `{memoryCues}` `{learningProfile}` 占位符；per-Mode 子目录（如 `japanese_business/`）可覆盖骨架，提供语言特定的标签（`ルール:` 等）。启动时加载到 `EnumMap`，运行时 O(1) 查取 |
-| CorrectionAgent | `correction.txt` | 5 类纠错（GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY），JSON 输出。含语音识别误判过滤规则 |
-| ReportAgent | `report.txt` | Per-Mode 报告模板（日语模式使用日语报告），JSON 格式，fluencyScore=-1 为降级哨兵值 |
-| MemoryCueAgent | `memory-cue-split.txt` + `memory-cue-entry.txt` | 两步 LLM：分割检测 → 每段生成 (topic, summary) |
-| AssertionService | `assertion/extract-topics.txt` `assertion/extract-state.txt` `assertion/judge-same.txt` `assertion/merge-assertion.txt` | 四步 LLM：topic 抽取 → state 生成 → Judge 判断 → Merge 合并。参数化于 `{groupName}` `{groupDescription}` |
+| CorrectionAgent | `correction/system.txt` | 5 类纠错（GRAMMAR / WORD_CHOICE / CHINGLISH / PRONUNCIATION / FLUENCY），JSON 输出。含语音识别误判过滤规则。userTemplate: `"User's utterance: {userInput}"` |
+| ReportAgent | `report/system.txt` | Per-Mode 报告模板（日语模式使用 `japanese_business/report.txt` 覆盖），JSON 格式，fluencyScore=-1 为降级哨兵值 |
+| MemoryCueAgent | `memory-cue/split/system.txt` + `memory-cue/entry/system.txt` | 两步 LLM：分割检测 → 每段生成 (topic, summary)。对话 XML 由 `ExampleMsgFormatter.toXml()` 生成 |
+| AssertionService | `assertion/extract-topics/` `assertion/extract-state/` `assertion/judge-same/` `assertion/merge-assertion/` | 四步 LLM：topic 抽取 → state 生成 → Judge 判断 → Merge 合并。参数化于 `{groupName}` `{groupDescription}`。few-shot 示例外置到 `examples.txt`（extract-topics + judge-same） |
 
 > 完整 Prompt 文本见源文件。TaskName 枚举与 LlmTaskDefinition 映射见 [AGENTS.md](../AGENTS.md#tech-stack-summary)。
 
@@ -192,7 +192,7 @@ compiled.stream(input, RunnableConfig.builder()
 | **写入时机** | 会话结束时统一持久化 | `SessionComplete.complete()` 内部：`reportAgent.generate()` → `sessionStore.completeSession()` → `learningProfileService.generateLearningProfileAsync()` + `assertionService.generateAssertionsAsync()` + `memoryCueService.generateCuesAsync()`（并行运行，共享 detectSwitches 一次调用） |
 | **日志写入** | LLM 调用时即时异步写入 | `LlmReqConstructor.execute()`（同步 Agent）在调用点内生写入完整上下文字段；`TurnProcessor`（ConversationAgent）在 `onCompleteResponse` 时写入。通过 `llmLogExecutor` (core=2, max=4) 异步写 `llm_call_logs` 表 |
 | **日志清理** | 每次启动时自动清理 | `LlmCallLogService.cleanupOnStartup()` 在 `@PostConstruct` 中删除 3 天前记录 |
-| **记忆写入** | `LearningProfileService` + `AssertionService` + `MemoryCueService` 并行异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Learning Profile Merge + Assertion Extractor（detectSwitches → Step1 → Step2 → embedding 索引）+ Assertion Manager（Search→Judge→Merge 串行）+ MemoryCue 两步生成（split → entry 并行）。V1: 仅 error-pattern group |
+| **记忆写入** | `LearningProfileService` + `AssertionService` + `MemoryCueService` 并行异步触发 | `llmRequestExecutor` (core=4, max=8) 上同时运行 Learning Profile Merge + Assertion Extractor（detectSwitches → Step1 → Step2 → embedding 索引）+ Assertion Manager（Search→Judge→Merge 串行）+ MemoryCue 两步生成（split → entry 并行）。V1: error-pattern + dev-progress 两个 group，按 `AssertionGroup.mode` 列匹配 AgentMode |
 | **RAG 检索** | TurnProcessor Round 2+ 每轮触发 | `EmbeddingService.search()` 语义搜索历史 MemoryCue，userId×AgentMode 隔离。结果通过 MemoryCueQueue（LRU 队列，capacity topK+1）管理：首次加载 search topK+1 条，后续 search topK 条，去重刷新驱逐，按 tail→head 编号列表注入 System Prompt `{memoryCues}` |
 
 ### 报告弹层
@@ -217,7 +217,7 @@ compiled.stream(input, RunnableConfig.builder()
 | 模块 | 包路径 | 职责 |
 |------|--------|------|
 | Graph | `graph/` | ChatState 容器 + CorrectionNode |
-| Agents | `agent/` + `agent/common/` | Conversation·Correction·Report·Learning·MemoryCue，通过 LlmReqConstructor 统一调度 |
+| Agents | `agent/` + `agent/common/` | Conversation·Correction·Report·Learning·MemoryCue，通过 LlmReqConstructor 统一调度。`ExampleMsgFormatter` 集中管理 XML 转换和 few-shot 解析 |
 | Flashcard | `flashcard/` | FSRS-6 调度器 + 复习模式 |
 | WebSocket | `websocket/` | 协议处理 + 会话生命周期 |
 | REST API | `controller/` | FlashcardController · ReviewController · TuneController · MovieController · LlmReplayController |

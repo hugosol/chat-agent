@@ -61,8 +61,8 @@ Enum: MemoryCueStatus { COMPLETED, SEGMENT_FAILED }
 │ group_id (FK→Group)     │────→│ id (PK)                 │
 │ session_id              │     │ name                    │
 │ user_id                 │     │ description             │
-│ mode                    │     └─────────────────────────┘
-│ topic                   │
+│ mode                    │     │ mode                    │
+│ topic                   │     └─────────────────────────┘
 │ state                   │     ┌─────────────────────────┐
 │ enabled                 │     │   AssertionLineage      │
 │ create_time             │     │─────────────────────────│

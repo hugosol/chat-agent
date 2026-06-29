@@ -123,12 +123,35 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void initAssertionGroups() {
-        if (assertionGroupRepository.findByName("error-pattern").isEmpty()) {
+        // Seed error-pattern group with WORKPLACE_STANDUP mode
+        var existingErrorPattern = assertionGroupRepository.findByName("error-pattern");
+        if (existingErrorPattern.isEmpty()) {
             assertionGroupRepository.save(
-                    new AssertionGroup("error-pattern", "Grammar and word choice error patterns recurring in the user's conversations"));
-            log.info("Created seed assertion group: error-pattern");
+                    new AssertionGroup("error-pattern",
+                            "Grammar and word choice error patterns recurring in the user's conversations",
+                            "WORKPLACE_STANDUP"));
+            log.info("Created seed assertion group: error-pattern (mode=WORKPLACE_STANDUP)");
         } else {
-            log.info("Assertion group already exists: error-pattern");
+            // Backfill: migrate existing null-mode error-pattern to WORKPLACE_STANDUP
+            AssertionGroup group = existingErrorPattern.get();
+            if (group.getMode() == null) {
+                group.setMode("WORKPLACE_STANDUP");
+                assertionGroupRepository.save(group);
+                log.info("Backfilled mode for existing assertion group: error-pattern -> WORKPLACE_STANDUP");
+            } else {
+                log.info("Assertion group already exists: error-pattern (mode={})", group.getMode());
+            }
+        }
+
+        // Seed dev-progress group for WORKPLACE_STANDUP mode
+        if (assertionGroupRepository.findByName("dev-progress").isEmpty()) {
+            assertionGroupRepository.save(
+                    new AssertionGroup("dev-progress",
+                            "The user's daily development progress, tasks completed, blockers encountered, and technologies or tools mentioned",
+                            "WORKPLACE_STANDUP"));
+            log.info("Created seed assertion group: dev-progress (mode=WORKPLACE_STANDUP)");
+        } else {
+            log.info("Assertion group already exists: dev-progress");
         }
     }
 

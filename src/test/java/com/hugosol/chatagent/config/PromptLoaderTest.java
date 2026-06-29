@@ -12,16 +12,16 @@ class PromptLoaderTest {
 
     @Test
     void loadsExistingFile() {
-        String content = loader.load("correction.txt");
+        String content = loader.load("correction/system.txt");
         assertThat(content).isNotEmpty();
-        assertThat(content).contains("{userInput}");
+        assertThat(content).contains("Correction prompt:");
     }
 
     @Test
     void loadsReportTemplate() {
-        String content = loader.load("report.txt");
+        String content = loader.load("report/system.txt");
         assertThat(content).isNotEmpty();
-        assertThat(content).contains("{fullConversation}");
+        assertThat(content).contains("Report prompt.");
     }
 
     @Test
@@ -33,7 +33,7 @@ class PromptLoaderTest {
 
     @Test
     void loadedContentIsTrimmedCorrectly() {
-        String content = loader.load("correction.txt");
+        String content = loader.load("correction/system.txt");
         assertThat(content).doesNotContain("\r");
     }
 }

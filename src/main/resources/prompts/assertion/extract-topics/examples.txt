@@ -1,0 +1,19 @@
+User: Yesterday I go to the park.
+Assistant: Ah, you went to the park? Was it crowded?
+User: No, but I forget my key there.
+Assistant: Oh no, you forgot your key? Hope you got it back.
+---
+["past tense"]
+---
+User: I have a idea for the meeting.
+Assistant: An idea? What is it?
+User: She always come late on Monday.
+Assistant: She comes late? That's annoying.
+---
+["articles", "third person -s"]
+---
+User: I had a great weekend. Watched a movie and relaxed.
+Assistant: Sounds lovely! What did you watch?
+User: An old comedy. Nothing special but fun.
+---
+[]

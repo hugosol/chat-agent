@@ -12,5 +12,3 @@ Name the topic by the underlying pattern or rule, not by the specific sentence.
 
 ## Output
 A JSON array of topic labels.
----USER---
-{messages}

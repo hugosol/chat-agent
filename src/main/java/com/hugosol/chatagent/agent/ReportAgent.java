@@ -23,7 +23,6 @@ import java.util.Map;
 public class ReportAgent {
 
     private static final Logger log = LoggerFactory.getLogger(ReportAgent.class);
-    private static final String USER_DELIMITER = "---USER---";
 
     private final LlmReqConstructor llmReqConstructor;
     private final ObjectMapper objectMapper;
@@ -34,14 +33,12 @@ public class ReportAgent {
         this.llmReqConstructor = llmReqConstructor;
         this.objectMapper = objectMapper;
 
-        String[] rootParts = promptLoader.load("report.txt").split(USER_DELIMITER, 2);
-        String rootSystemTemplate = rootParts[0].stripTrailing();
-        String rootUserTemplate = rootParts.length > 1 ? rootParts[1].strip() : "{fullConversation}\n{allCorrections}";
+        String rootSystemTemplate = promptLoader.load("report/system.txt").stripTrailing();
 
         llmReqConstructor.register(TaskName.REPORT, LlmTaskDefinition
                 .<ReportParams, ReportResult>builder()
                 .systemTemplate(rootSystemTemplate)
-                .userTemplate(rootUserTemplate)
+                .userTemplate("Full conversation:\n{fullConversation}\n\nAll errors recorded this session:\n{allCorrections}")
                 .paramBuilder(p -> Map.of(
                         "fullConversation", buildConversationText(p.messages()),
                         "allCorrections", buildErrorsText(p.corrections())
@@ -53,10 +50,9 @@ public class ReportAgent {
         // Load per-mode system template overrides
         for (AgentMode mode : AgentMode.values()) {
             String path = mode.getTemplatePath();
-            String perModeFull = promptLoader.loadIfExists(path + "/report.txt", null);
-            if (perModeFull != null) {
-                String[] modeParts = perModeFull.split(USER_DELIMITER, 2);
-                reportSystemTemplates.put(mode, modeParts[0].stripTrailing());
+            String perModeSystem = promptLoader.loadIfExists(path + "/report.txt", null);
+            if (perModeSystem != null) {
+                reportSystemTemplates.put(mode, perModeSystem.stripTrailing());
             }
         }
     }

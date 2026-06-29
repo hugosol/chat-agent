@@ -1,0 +1,4 @@
+Statement A: test state A.
+Statement B: test state B.
+---
+YES

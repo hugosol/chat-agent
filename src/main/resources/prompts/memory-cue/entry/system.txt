@@ -15,5 +15,3 @@ Example:
 {"topic": "Travel Plans to Japan", "summary": "The user is planning a trip to Tokyo and Kyoto in October. They discussed itinerary options including temples, food tours, and transportation. The coach suggested visiting Fushimi Inari early morning to avoid crowds."}
 
 Output ONLY the JSON object. No markdown, no explanations, no surrounding text.
----USER---
-{segment}

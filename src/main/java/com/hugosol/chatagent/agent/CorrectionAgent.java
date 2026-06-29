@@ -21,7 +21,6 @@ import java.util.Map;
 public class CorrectionAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CorrectionAgent.class);
-    private static final String USER_DELIMITER = "---USER---";
 
     private final LlmReqConstructor llmReqConstructor;
     private final ObjectMapper objectMapper;
@@ -29,14 +28,11 @@ public class CorrectionAgent {
     public CorrectionAgent(LlmReqConstructor llmReqConstructor, PromptLoader promptLoader, ObjectMapper objectMapper) {
         this.llmReqConstructor = llmReqConstructor;
         this.objectMapper = objectMapper;
-        String fullTemplate = promptLoader.load("correction.txt");
-        String[] parts = fullTemplate.split(USER_DELIMITER, 2);
-        String systemTemplate = parts[0].stripTrailing();
-        String userTemplate = parts.length > 1 ? parts[1].strip() : "{userInput}";
+        String systemTemplate = promptLoader.load("correction/system.txt").stripTrailing();
         llmReqConstructor.register(TaskName.CORRECTION, LlmTaskDefinition
                 .<CorrectionParams, List<CorrectionData>>builder()
                 .systemTemplate(systemTemplate)
-                .userTemplate(userTemplate)
+                .userTemplate("User's utterance: {userInput}")
                 .paramBuilder(p -> Map.of("userInput", p.userInput()))
                 .parser(this::parseResponse)
                 .errorStrategy(ErrorStrategy.SWALLOW)

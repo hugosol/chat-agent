@@ -16,11 +16,20 @@ public class AssertionGroup extends BaseEntity {
     @Column(columnDefinition = "CLOB")
     private String description;
 
+    @Column
+    private String mode;
+
     public AssertionGroup() {}
 
     public AssertionGroup(String name, String description) {
         this.name = name;
         this.description = description;
+    }
+
+    public AssertionGroup(String name, String description, String mode) {
+        this.name = name;
+        this.description = description;
+        this.mode = mode;
     }
 
     public String getId() { return id; }
@@ -31,4 +40,7 @@ public class AssertionGroup extends BaseEntity {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getMode() { return mode; }
+    public void setMode(String mode) { this.mode = mode; }
 }

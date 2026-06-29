@@ -45,7 +45,7 @@ com.hugosol.chatagent/
 ├── graph/           # LangGraph: ChatState (6 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
 ├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent (detectSwitches reused by AssertionService)
-│   └── common/       # LlmReqConstructor (sync engine), LlmTaskDefinition, TaskName (9 tasks), TaskContext, ErrorStrategy
+│   └── common/       # LlmReqConstructor (sync engine), LlmTaskDefinition, TaskName (9 tasks), TaskContext, ErrorStrategy, ExampleMsgFormatter (XML conversion + few-shot parsing)
 ├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
 ├── controller/      # FlashcardController — REST API (Cards CRUD + Tags CRUD + Import/Export + Back patch, 11 endpoints)

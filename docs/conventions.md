@@ -49,8 +49,8 @@
 所有非流式 LLM 调用**必须**通过 `LlmReqConstructor`，不得直接调用 `ChatLanguageModel`。
 
 **设计原因**：
-- 模板按 `---USER---` 分隔符拆分为 system/user 两部分，使用 `ChatLanguageModel.generate(List<ChatMessage>)` 发送原生 role 标签
-- 对话数据统一使用 XML 格式（`<turn role="user">...</turn>`）
+- Prompt 模板采用子目录结构：每个 Task 目录下 `system.txt`（系统提示词）+ 可选的 `examples.txt`（few-shot 示例），`userTemplate` 内联为 Java 字面量
+- 对话数据统一使用 XML 格式（`<turn role="user">...</turn>`），由 `ExampleMsgFormatter.toXml()` 生成
 - 日志自动记录完整字段（systemPrompt / chatHistory / inputTokens / outputTokens）
 - 统一错误策略和模型路由
 
