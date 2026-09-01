@@ -1,10 +1,10 @@
 package com.hugosol.chatagent.agent;
 
 import com.hugosol.chatagent.agent.common.ErrorStrategy;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
+import com.hugosol.chatagent.agent.common.LlmTaskDefinition;
 import com.hugosol.chatagent.agent.common.TaskContext;
-import com.hugosol.chatagent.agent.common.TaskDefinition;
 import com.hugosol.chatagent.agent.common.TaskName;
-import com.hugosol.chatagent.agent.common.TaskRunner;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.CorrectionData;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -21,16 +21,18 @@ import java.util.Map;
 public class CorrectionAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CorrectionAgent.class);
-    private final TaskRunner runner;
+
+    private final LlmReqConstructor llmReqConstructor;
     private final ObjectMapper objectMapper;
 
-    public CorrectionAgent(TaskRunner runner, PromptLoader promptLoader, ObjectMapper objectMapper) {
-        this.runner = runner;
+    public CorrectionAgent(LlmReqConstructor llmReqConstructor, PromptLoader promptLoader, ObjectMapper objectMapper) {
+        this.llmReqConstructor = llmReqConstructor;
         this.objectMapper = objectMapper;
-        String template = promptLoader.load("correction.txt");
-        runner.register(TaskName.CORRECTION, TaskDefinition
+        String systemTemplate = promptLoader.load("correction/system.txt").stripTrailing();
+        llmReqConstructor.register(TaskName.CORRECTION, LlmTaskDefinition
                 .<CorrectionParams, List<CorrectionData>>builder()
-                .template(template)
+                .systemTemplate(systemTemplate)
+                .userTemplate("User's utterance: {userInput}")
                 .paramBuilder(p -> Map.of("userInput", p.userInput()))
                 .parser(this::parseResponse)
                 .errorStrategy(ErrorStrategy.SWALLOW)
@@ -42,7 +44,7 @@ public class CorrectionAgent {
             return Collections.emptyList();
         }
 
-        List<CorrectionData> result = runner.requestModel(TaskName.CORRECTION,
+        List<CorrectionData> result = llmReqConstructor.execute(TaskName.CORRECTION,
                 new CorrectionParams(userInput), ctx);
         return result != null ? result : Collections.emptyList();
     }

@@ -1,0 +1,14 @@
+Analyze conversation transcripts for {groupName}: {groupDescription}.
+
+## Process
+1. For each <turn role="user"> block, determine whether it contains any {groupName}.
+2. If a turn contains NO {groupName}, skip it — extract nothing.
+3. For turns that DO contain {groupName}, group instances by their underlying pattern or rule.
+4. For each group with ≥2 occurrences across different turns, create a topic label (2-5 words).
+5. If zero groups reach ≥2 occurrences, return [].
+
+## Topic naming
+Name the topic by the underlying pattern or rule, not by the specific sentence.
+
+## Output
+A JSON array of topic labels.

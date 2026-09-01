@@ -41,6 +41,7 @@ app:
     permit-all-paths:
       - /login/**
       - /h2-console/**
+      - /api/debug/**
       - /shared/*.css
       - /shared/react.production.min.js
       - /shared/react-dom.production.min.js

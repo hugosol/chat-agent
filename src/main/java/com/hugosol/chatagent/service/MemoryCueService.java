@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -38,22 +37,11 @@ public class MemoryCueService {
         this.executor = executor;
     }
 
-    public CompletableFuture<Void> generateCuesAsync(String sessionId, String userId, AgentMode mode, List<MessageData> messages) {
+    public CompletableFuture<Void> generateCuesAsync(String sessionId, String userId, AgentMode mode, List<List<MessageData>> segments) {
         long startTime = System.currentTimeMillis();
         TaskContext ctx = new TaskContext(sessionId, userId, mode.name());
 
         return CompletableFuture.supplyAsync(() -> {
-            List<Integer> switchPoints;
-            try {
-                switchPoints = agent.detectSwitches(messages, mode, ctx);
-            } catch (Exception e) {
-                log.warn("MemoryCueService: detectSwitches failed for session {}: {}", sessionId, e.getMessage());
-                repository.save(new MemoryCue(sessionId, userId, mode, -1,
-                        null, null, MemoryCueStatus.FIRST_CALL_FAILED));
-                return Collections.<CompletableFuture<Void>>emptyList();
-            }
-
-            List<List<MessageData>> segments = splitBySwitches(messages, switchPoints);
             List<CompletableFuture<Void>> futures = new ArrayList<>();
 
             for (int i = 0; i < segments.size(); i++) {
@@ -89,25 +77,5 @@ public class MemoryCueService {
                         log.info("Background task duration (MemoryCue): {}s", String.format("%.1f", elapsed / 1000.0));
                     }, executor);
         });
-    }
-
-    private static List<List<MessageData>> splitBySwitches(List<MessageData> messages, List<Integer> switchPoints) {
-        if (switchPoints.isEmpty()) {
-            return List.of(messages);
-        }
-
-        List<List<MessageData>> segments = new ArrayList<>();
-        int startIdx = 0;
-        for (int switchIdx : switchPoints) {
-            int endIdx = Math.min(switchIdx + 1, messages.size());
-            if (startIdx < messages.size()) {
-                segments.add(messages.subList(startIdx, endIdx));
-            }
-            startIdx = endIdx;
-        }
-        if (startIdx < messages.size()) {
-            segments.add(messages.subList(startIdx, messages.size()));
-        }
-        return segments;
     }
 }

@@ -1,0 +1,19 @@
+{
+  "id": "mock-assertion-merge",
+  "object": "chat.completion",
+  "created": 1713139200,
+  "model": "deepseek-v4-flash",
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "User has struggled with past tense but shows gradual improvement across sessions."
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 60,
+    "completion_tokens": 20,
+    "total_tokens": 80
+  }
+}

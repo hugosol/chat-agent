@@ -1,8 +1,8 @@
 package com.hugosol.chatagent.agent;
 
 import com.hugosol.chatagent.agent.ReportAgent.ReportResult;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
 import com.hugosol.chatagent.agent.common.TaskContext;
-import com.hugosol.chatagent.agent.common.TaskRunner;
 import com.hugosol.chatagent.config.PromptLoader;
 import com.hugosol.chatagent.dto.CorrectionData;
 import com.hugosol.chatagent.dto.MessageData;
@@ -12,8 +12,11 @@ import com.hugosol.chatagent.service.LlmCallLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -29,21 +32,24 @@ class ReportAgentTest {
     private StubChatModel chatModel;
 
     private static class StubChatModel implements ChatLanguageModel {
-        String lastPrompt;
-        private String response;
+        List<ChatMessage> lastMessages;
+        private Response<AiMessage> response;
 
-        void setResponse(String response) {
-            this.response = response;
-        }
-
-        @Override
-        public String chat(String prompt) {
-            this.lastPrompt = prompt;
-            return response;
+        void setResponse(String text) {
+            this.response = Response.from(
+                    AiMessage.from(text),
+                    new TokenUsage(10, 5)
+            );
         }
 
         @Override
         public Response<AiMessage> generate(List<ChatMessage> messages) {
+            this.lastMessages = messages;
+            return response;
+        }
+
+        @Override
+        public String chat(String userMessage) {
             return null;
         }
     }
@@ -53,8 +59,18 @@ class ReportAgentTest {
         chatModel = new StubChatModel();
         PromptLoader promptLoader = new PromptLoader(new DefaultResourceLoader());
         LlmCallLogService logService = mock(LlmCallLogService.class);
-        TaskRunner runner = new TaskRunner(chatModel, chatModel, logService);
-        agent = new ReportAgent(runner, promptLoader, new ObjectMapper());
+        LlmReqConstructor llmReqConstructor = new LlmReqConstructor(chatModel, chatModel, logService);
+        agent = new ReportAgent(llmReqConstructor, promptLoader, new ObjectMapper());
+    }
+
+    private String lastUserContent() {
+        assertThat(chatModel.lastMessages).isNotNull();
+        return ((UserMessage) chatModel.lastMessages.get(chatModel.lastMessages.size() - 1)).singleText();
+    }
+
+    private String lastSystemContent() {
+        assertThat(chatModel.lastMessages).isNotNull();
+        return ((SystemMessage) chatModel.lastMessages.get(0)).text();
     }
 
     @Test
@@ -118,10 +134,11 @@ class ReportAgentTest {
                 new TaskContext("s1", "u1", "WORKPLACE_STANDUP")
         );
 
-        assertThat(chatModel.lastPrompt).contains("USER: Hello");
-        assertThat(chatModel.lastPrompt).contains("AGENT: Hi there");
-        assertThat(chatModel.lastPrompt).contains("USER: How are you");
-        assertThat(chatModel.lastPrompt).doesNotContain("CORRECTION");
+        String userContent = lastUserContent();
+        assertThat(userContent).contains("USER: Hello");
+        assertThat(userContent).contains("AGENT: Hi there");
+        assertThat(userContent).contains("USER: How are you");
+        assertThat(userContent).doesNotContain("CORRECTION");
     }
 
     @Test
@@ -134,9 +151,10 @@ class ReportAgentTest {
                 new TaskContext("s1", "u1", "WORKPLACE_STANDUP")
         );
 
-        assertThat(chatModel.lastPrompt).contains("\"type\"");
-        assertThat(chatModel.lastPrompt).contains("\"original\"");
-        assertThat(chatModel.lastPrompt).contains("\"he go\"");
+        String userContent = lastUserContent();
+        assertThat(userContent).contains("\"type\"");
+        assertThat(userContent).contains("\"original\"");
+        assertThat(userContent).contains("\"he go\"");
     }
 
     @Test
@@ -149,7 +167,7 @@ class ReportAgentTest {
                 new TaskContext("s1", "u1", "WORKPLACE_STANDUP")
         );
 
-        assertThat(chatModel.lastPrompt).contains("No errors recorded");
+        assertThat(lastUserContent()).contains("No errors recorded");
     }
 
     @Test
@@ -186,7 +204,8 @@ class ReportAgentTest {
                 new TaskContext("s1", "u1", "JAPANESE_BUSINESS")
         );
 
-        assertThat(chatModel.lastPrompt).contains("日本語コーチ");
-        assertThat(chatModel.lastPrompt).doesNotContain("English coach");
+        // System message should be in Japanese (per-mode override)
+        assertThat(lastSystemContent()).contains("日本語");
+        assertThat(lastSystemContent()).doesNotContain("English coach");
     }
 }

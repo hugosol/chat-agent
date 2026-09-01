@@ -1,5 +1,6 @@
 package com.hugosol.chatagent.service;
 
+import com.hugosol.chatagent.agent.MemoryCueAgent;
 import com.hugosol.chatagent.agent.ReportAgent;
 import com.hugosol.chatagent.agent.ReportAgent.ReportResult;
 import com.hugosol.chatagent.agent.common.TaskContext;
@@ -10,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -24,13 +27,18 @@ public class SessionComplete {
     private final SessionDbStore sessionStore;
     private final ReportAgent reportAgent;
     private final LearningProfileService learningProfileService;
+    private final AssertionService assertionService;
+    private final MemoryCueAgent memoryCueAgent;
     private final MemoryCueService memoryCueService;
 
     public SessionComplete(SessionDbStore sessionStore, ReportAgent reportAgent,
-                           LearningProfileService learningProfileService, MemoryCueService memoryCueService) {
+                           LearningProfileService learningProfileService, AssertionService assertionService,
+                           MemoryCueAgent memoryCueAgent, MemoryCueService memoryCueService) {
         this.sessionStore = sessionStore;
         this.reportAgent = reportAgent;
         this.learningProfileService = learningProfileService;
+        this.assertionService = assertionService;
+        this.memoryCueAgent = memoryCueAgent;
         this.memoryCueService = memoryCueService;
     }
 
@@ -46,11 +54,35 @@ public class SessionComplete {
         }
 
         if (userId != null && mode != AgentMode.JAPANESE_BUSINESS) {
+            TaskContext ctx = new TaskContext(sessionId, userId, mode.name());
+            List<Integer> switchPoints = memoryCueAgent.detectSwitches(messages, mode, ctx);
+            List<List<MessageData>> segments = splitBySwitches(messages, switchPoints);
+
             learningProfileService.generateLearningProfileAsync(userId, report, mode, sessionId);
-            memoryCueService.generateCuesAsync(sessionId, userId, mode, List.copyOf(messages));
+            assertionService.generateAssertionsAsync(sessionId, userId, mode, segments);
+            memoryCueService.generateCuesAsync(sessionId, userId, mode, segments);
         }
 
         return report;
+    }
+
+    static List<List<MessageData>> splitBySwitches(List<MessageData> messages, List<Integer> switchPoints) {
+        if (switchPoints == null || switchPoints.isEmpty()) {
+            return messages.isEmpty() ? Collections.emptyList() : List.of(messages);
+        }
+        List<List<MessageData>> segments = new ArrayList<>();
+        int startIdx = 0;
+        for (int switchIdx : switchPoints) {
+            int endIdx = Math.min(switchIdx + 1, messages.size());
+            if (startIdx < messages.size()) {
+                segments.add(new ArrayList<>(messages.subList(startIdx, endIdx)));
+            }
+            startIdx = endIdx;
+        }
+        if (startIdx < messages.size()) {
+            segments.add(new ArrayList<>(messages.subList(startIdx, messages.size())));
+        }
+        return segments;
     }
 
     private ReportResult generateReport(String sessionId, String userId, AgentMode mode,

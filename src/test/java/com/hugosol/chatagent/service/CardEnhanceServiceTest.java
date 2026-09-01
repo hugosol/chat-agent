@@ -5,7 +5,7 @@ import com.hugosol.chatagent.repository.CardEnhancementRepository;
 import com.hugosol.chatagent.repository.CardRepository;
 import com.hugosol.chatagent.repository.SubtitleLineRepository;
 import com.hugosol.chatagent.repository.WatchedMovieRepository;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import com.hugosol.chatagent.agent.common.LlmReqConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +33,7 @@ class CardEnhanceServiceTest {
     @Mock
     private WatchedMovieRepository watchedMovieRepository;
     @Mock
-    private ChatLanguageModel chatLanguageModel;
+    private LlmReqConstructor llmReqConstructor;
     @Mock
     private WiktionaryClient wiktionaryClient;
 
@@ -42,7 +42,7 @@ class CardEnhanceServiceTest {
     @BeforeEach
     void setUp() {
         service = new CardEnhanceService(cardRepository, cardEnhancementRepository,
-                subtitleLineRepository, watchedMovieRepository, chatLanguageModel, wiktionaryClient);
+                subtitleLineRepository, watchedMovieRepository, llmReqConstructor, wiktionaryClient);
     }
 
     @Test
@@ -63,7 +63,7 @@ class CardEnhanceServiceTest {
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt001"), eq(40), eq(44)))
                 .thenReturn(List.of(match));
 
-        when(chatLanguageModel.chat(anyString())).thenReturn("梦境中对话的场景。");
+        when(llmReqConstructor.chat(anyList(), any(), anyString(), any())).thenReturn("梦境中对话的场景。");
         when(wiktionaryClient.fetchEtymology("dream")).thenReturn("From Old English drēam.");
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         // Re-read includes both newly saved enhancements
@@ -97,7 +97,7 @@ class CardEnhanceServiceTest {
         assertThat(result.movieQuote()).isNotNull();
         assertThat(result.etymology()).isEqualTo("From Old English...");
         verify(subtitleLineRepository, never()).findByImdbIdInAndWordsLowerLike(any(), any());
-        verify(chatLanguageModel, never()).chat(anyString());
+        verify(llmReqConstructor, never()).chat(anyList(), any(), anyString(), any());
         verify(cardEnhancementRepository, never()).save(any());
     }
 
@@ -174,7 +174,7 @@ class CardEnhanceServiceTest {
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(anyString(), anyInt(), anyInt()))
                 .thenReturn(List.of(m1));
 
-        when(chatLanguageModel.chat(anyString())).thenReturn("Scene summary.");
+        when(llmReqConstructor.chat(anyList(), any(), anyString(), any())).thenReturn("Scene summary.");
         when(wiktionaryClient.fetchEtymology("dream")).thenReturn(null);
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
@@ -213,7 +213,7 @@ class CardEnhanceServiceTest {
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(anyString(), anyInt(), anyInt()))
                 .thenReturn(List.of(match));
 
-        when(chatLanguageModel.chat(anyString())).thenReturn("Scene summary.");
+        when(llmReqConstructor.chat(anyList(), any(), anyString(), any())).thenReturn("Scene summary.");
         when(wiktionaryClient.fetchEtymology("dream")).thenReturn(null);
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(cardEnhancementRepository.findByCardId("card-1")).thenReturn(List.of());
@@ -249,7 +249,7 @@ class CardEnhanceServiceTest {
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt002"), anyInt(), anyInt()))
                 .thenReturn(List.of(m2));
 
-        when(chatLanguageModel.chat(anyString())).thenReturn("Matrix scene.");
+        when(llmReqConstructor.chat(anyList(), any(), anyString(), any())).thenReturn("Matrix scene.");
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(subtitleLineRepository.countByImdbId("tt001")).thenReturn(1);
 
@@ -304,7 +304,7 @@ class CardEnhanceServiceTest {
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(anyString(), anyInt(), anyInt()))
                 .thenReturn(List.of(match));
 
-        when(chatLanguageModel.chat(anyString())).thenReturn("Scene.");
+        when(llmReqConstructor.chat(anyList(), any(), anyString(), any())).thenReturn("Scene.");
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", null, null);
@@ -359,7 +359,7 @@ class CardEnhanceServiceTest {
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt002"), anyInt(), anyInt()))
                 .thenReturn(List.of(m2));
 
-        when(chatLanguageModel.chat(anyString())).thenReturn("Matrix scene.");
+        when(llmReqConstructor.chat(anyList(), any(), anyString(), any())).thenReturn("Matrix scene.");
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         CardEnhanceService.EnhanceResult result = service.requote("card-1", "user-1", "tt001", "00:05:00,000");
@@ -428,7 +428,7 @@ class CardEnhanceServiceTest {
         when(subtitleLineRepository.findByImdbIdAndLineIndexBetween(eq("tt001"), anyInt(), anyInt()))
                 .thenReturn(List.of(m2));
 
-        when(chatLanguageModel.chat(anyString())).thenReturn("梦境场景。");
+        when(llmReqConstructor.chat(anyList(), any(), anyString(), any())).thenReturn("梦境场景。");
         when(cardEnhancementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // Run multiple times to verify we never get the excluded occurrence

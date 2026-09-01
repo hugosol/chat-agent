@@ -1,0 +1,14 @@
+Statement A: The user often forgets to use past tense when talking about yesterday's events.
+Statement B: The learner struggles with irregular past tense forms in conversation.
+---
+YES
+---
+Statement A: The user makes subject-verb agreement errors with third person singular.
+Statement B: The user sometimes confuses "a" and "an" before vowel sounds.
+---
+NO
+---
+Statement A: The user is aware of their past tense mistakes and self-corrects about half the time.
+Statement B: The user still makes past tense errors but occasionally self-corrects.
+---
+YES

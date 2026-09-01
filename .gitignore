@@ -30,3 +30,6 @@ src/main/resources/static/shared/*-bundle.*
 application-local.yml
 /.run/
 /logs/
+
+# Codebase memory index artifact (regenerated locally)
+.codebase-memory/

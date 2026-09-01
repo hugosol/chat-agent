@@ -1,0 +1,2 @@
+E2E_MARKER_ASSERTION_EXTRACT_TOPICS
+Extract recurring concepts from: {groupName} - {groupDescription}

@@ -44,8 +44,8 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 com.hugosol.chatagent/
 ├── graph/           # LangGraph: ChatState (6 channels incl. USER_ID + MODE) + 1 node + builder
 │   └── nodes/       # CorrectionNode (only remaining node)
-├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent
-│   └── common/       # TaskRunner (sync engine), TaskDefinition, TaskName, TaskContext, ErrorStrategy
+├── agent/           # ConversationAgent (streaming), CorrectionAgent, ReportAgent, LearningAgent, MemoryCueAgent (detectSwitches reused by AssertionService)
+│   └── common/       # LlmReqConstructor (sync engine), LlmTaskDefinition, TaskName (9 tasks), TaskContext, ErrorStrategy, ExampleMsgFormatter (XML conversion + few-shot parsing)
 ├── flashcard/       # FSRS-6 scheduler (repeat + init) + CardState + Rating enum + AleaPrng (deterministic fuzz)
 ├── websocket/       # ChatWebSocketHandler (WS entry), ChatMessageHandler (protocol logic)
 ├── controller/      # FlashcardController — REST API (Cards CRUD + Tags CRUD + Import/Export + Back patch, 11 endpoints)
@@ -55,7 +55,7 @@ com.hugosol.chatagent/
 ├── service/         # SessionService (state + tokens + sessionToWs), TurnProcessor (parallel turns),
 │                   # SessionComplete (session-ending pipeline), SessionDbStore (entity persistence),
 │                   # FlashcardService (createCard with FSRS init + Tag upsert),
-│                   # LearningProfileService, MemoryCueService,
+│                   # LearningProfileService, MemoryCueService, AssertionService,
 │                   # EmbeddingService (RAG vectorization), SessionCleanupLogoutHandler, TokenTracker, EntityMapper
 │   └── card/          # CardCsvParser, CardBatchService
 ├── model/           # JPA entities + enums
@@ -69,9 +69,34 @@ com.hugosol.chatagent/
 
 ## Conventions & Gotchas
 
+> **编码规范已独立为 [docs/conventions.md](docs/conventions.md)**——设计理念、分层规则、数据层约定、错误处理、线程模型、命名规范。以下仅保留 AI 代理操作层面的要点。
+>
 > 做前端改动前必读 [docs/frontend-notes.md](docs/frontend-notes.md)（iOS 兼容、CSS 规范、测试 mock 模式）
 > 做闪卡改动前必读 [docs/fsrs.md](docs/fsrs.md)（FSRS 算法、调度器设计、优化器）
+> 编码规范与设计理念见 [docs/conventions.md](docs/conventions.md)（分层、数据、错误处理、线程、命名）
+> 深层设计机制见 [docs/design-rationale.md](docs/design-rationale.md)（记忆注入、管线共享、架构取舍）
 > 测试清单与规范见 [docs/tests.md](docs/tests.md)
+>
+> ---
+>
+> ### Documentation Update Checklist
+>
+> 完成功能后，逐行检查以下列表。触发条件为真的文档 **必须更新**；标记为跳过场景的文档可安全标记为 N/A。
+>
+> | 文档 | 触发条件（若以下任一为真则更新） | 可跳过 |
+> |------|-------------------------------|---------|
+> | `README.md` | 新增用户可见功能、新增外部 API 依赖、启动命令/配置变更 | 仅内部重构 |
+> | `CONTEXT.md` | 新增/重命名领域术语、实体关系变更、新概念需示例对话解释 | 纯代码重构 |
+> | `docs/architecture.md` | 新增/修订架构决策、设计偏离、新增决策理由 | Bug 修复 |
+> | `docs/design-rationale.md` | 引入会困惑"为什么这样设计"的机制、需解释权衡 | 常规 CRUD 新增 |
+> | `docs/conventions.md` | 新增/变更分层规则、错误处理模式、线程池配置、命名规范 | Bug 修复 |
+> | `docs/data-model.md` | 新增/删除实体、字段变更、关系变更、枚举值新增/删除 | 仅方法/DTO 变更 |
+> | `docs/fsrs.md` | FSRS 算法变更、新增调度器功能、优化器参数/行为变更 | 仅 UI 变更 |
+> | `docs/frontend-notes.md` | 新增浏览器兼容问题、CSS 约定变更、iOS 适配方案变更 | 后端代码变更 |
+> | `docs/tests.md` | 新增/删除测试文件、测试策略变更 | 测试内容变更（无新增文件） |
+> | `AGENTS.md` | 项目结构变更（新增/删除包）、新增关键约定、环境变量变更 | 仅方法重命名 |
+>
+> **维护方式**：新增文档时追加一行。现有行的触发条件很少需要改动——它们是文档自身定义的固有属性。
 
 - **ADR 优先级**: `docs/adr/` 为历史决策记录，以代码和 README.md、docs/architecture.md 等持续更新文档为准。仅当 ADR 明确过期时追加过期标识。
 - **Maven**: `mvn compile` (build), `mvn test` (unit tests), `mvn verify` (E2E — failsafe, includes IT)
@@ -119,7 +144,7 @@ Server → Client:
   ERROR { message }
 ```
 
-> Full protocol with JSON examples: [docs/architecture.md](docs/architecture.md#websocket-协议)
+> Full protocol with JSON examples: see WebSocket Protocol section above.
 
 ## Flashcard Module
 
@@ -162,3 +187,8 @@ Issues 以本地 markdown 文件形式存放在 `.scratch/<feature>/` 目录下�
 ### Domain Docs
 
 单上下文布局 — `CONTEXT.md` + `docs/adr/` 在仓库根目录。详见 `docs/agents/domain.md`。
+
+### Documentation Maintenance
+
+完成功能后，按上方 **Documentation Update Checklist**（逆向查找表）逐份文档检查更新。
+该表位于本文档 Conventions 章节内，以文档为索引列出触发条件和跳过场景。

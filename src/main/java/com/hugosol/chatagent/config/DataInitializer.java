@@ -1,7 +1,9 @@
 package com.hugosol.chatagent.config;
 
+import com.hugosol.chatagent.model.AssertionGroup;
 import com.hugosol.chatagent.model.FsrsParameters;
 import com.hugosol.chatagent.model.User;
+import com.hugosol.chatagent.repository.AssertionGroupRepository;
 import com.hugosol.chatagent.repository.UserRepository;
 import com.hugosol.chatagent.service.FsrsParametersService;
 import org.slf4j.Logger;
@@ -21,17 +23,20 @@ public class DataInitializer implements CommandLineRunner {
     private final AppProperties appProperties;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final AssertionGroupRepository assertionGroupRepository;
 
     public DataInitializer(UserRepository userRepository,
                             FsrsParametersService fsrsParametersService,
                             AppProperties appProperties,
                             PasswordEncoder passwordEncoder,
-                            JdbcTemplate jdbcTemplate) {
+                            JdbcTemplate jdbcTemplate,
+                            AssertionGroupRepository assertionGroupRepository) {
         this.userRepository = userRepository;
         this.fsrsParametersService = fsrsParametersService;
         this.appProperties = appProperties;
         this.passwordEncoder = passwordEncoder;
         this.jdbcTemplate = jdbcTemplate;
+        this.assertionGroupRepository = assertionGroupRepository;
     }
 
     @Override
@@ -47,6 +52,7 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         initFsrsParameters();
+        initAssertionGroups();
 
         migrateDropSessionsModeCheckConstraint();
         migrateDropOtherModeCheckConstraints();
@@ -68,6 +74,7 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         migrateWordsLowerSpaces();
+        migrateMemoryCueFirstCallFailed();
     }
 
     private void migrateEnabledColumn() {
@@ -115,6 +122,39 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    private void initAssertionGroups() {
+        // Seed error-pattern group with WORKPLACE_STANDUP mode
+        var existingErrorPattern = assertionGroupRepository.findByName("error-pattern");
+        if (existingErrorPattern.isEmpty()) {
+            assertionGroupRepository.save(
+                    new AssertionGroup("error-pattern",
+                            "Grammar and word choice error patterns recurring in the user's conversations",
+                            "WORKPLACE_STANDUP"));
+            log.info("Created seed assertion group: error-pattern (mode=WORKPLACE_STANDUP)");
+        } else {
+            // Backfill: migrate existing null-mode error-pattern to WORKPLACE_STANDUP
+            AssertionGroup group = existingErrorPattern.get();
+            if (group.getMode() == null) {
+                group.setMode("WORKPLACE_STANDUP");
+                assertionGroupRepository.save(group);
+                log.info("Backfilled mode for existing assertion group: error-pattern -> WORKPLACE_STANDUP");
+            } else {
+                log.info("Assertion group already exists: error-pattern (mode={})", group.getMode());
+            }
+        }
+
+        // Seed dev-progress group for WORKPLACE_STANDUP mode
+        if (assertionGroupRepository.findByName("dev-progress").isEmpty()) {
+            assertionGroupRepository.save(
+                    new AssertionGroup("dev-progress",
+                            "The user's daily development progress, tasks completed, blockers encountered, and technologies or tools mentioned",
+                            "WORKPLACE_STANDUP"));
+            log.info("Created seed assertion group: dev-progress (mode=WORKPLACE_STANDUP)");
+        } else {
+            log.info("Assertion group already exists: dev-progress");
+        }
+    }
+
     private void initFsrsParameters() {
         var allUsers = userRepository.findAll();
         for (var user : allUsers) {
@@ -123,6 +163,18 @@ public class DataInitializer implements CommandLineRunner {
                 fsrsParametersService.save(defaults);
                 log.info("Created default FsrsParameters for user: {}", user.getUsername());
             }
+        }
+    }
+
+    private void migrateMemoryCueFirstCallFailed() {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE memory_cues SET status = 'SEGMENT_FAILED' WHERE status = 'FIRST_CALL_FAILED'");
+            if (updated > 0) {
+                log.info("Migrated: updated {} memory_cues from FIRST_CALL_FAILED to SEGMENT_FAILED", updated);
+            }
+        } catch (Exception e) {
+            log.debug("MemoryCue FIRST_CALL_FAILED migration skipped or already applied: {}", e.getMessage());
         }
     }
 }

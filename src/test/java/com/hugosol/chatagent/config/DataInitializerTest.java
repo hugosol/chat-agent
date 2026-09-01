@@ -1,7 +1,9 @@
 package com.hugosol.chatagent.config;
 
+import com.hugosol.chatagent.model.AssertionGroup;
 import com.hugosol.chatagent.model.FsrsParameters;
 import com.hugosol.chatagent.model.User;
+import com.hugosol.chatagent.repository.AssertionGroupRepository;
 import com.hugosol.chatagent.repository.UserRepository;
 import com.hugosol.chatagent.service.FsrsParametersService;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,9 @@ class DataInitializerTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AssertionGroupRepository assertionGroupRepository;
 
     @InjectMocks
     private DataInitializer dataInitializer;
@@ -102,5 +107,60 @@ class DataInitializerTest {
         dataInitializer.run();
 
         verify(fsrsParametersService, never()).save(any(FsrsParameters.class));
+    }
+
+    @Test
+    void shouldCreateAssertionGroupWhenNotExists() throws Exception {
+        when(appProperties.getInitialUsers()).thenReturn(List.of());
+        when(userRepository.findAll()).thenReturn(List.of());
+        when(assertionGroupRepository.findByName("error-pattern")).thenReturn(Optional.empty());
+        when(assertionGroupRepository.findByName("dev-progress")).thenReturn(Optional.empty());
+
+        dataInitializer.run();
+
+        ArgumentCaptor<AssertionGroup> captor = ArgumentCaptor.forClass(AssertionGroup.class);
+        verify(assertionGroupRepository, times(2)).save(captor.capture());
+        List<AssertionGroup> saved = captor.getAllValues();
+
+        AssertionGroup errorPattern = saved.get(0);
+        assertThat(errorPattern.getName()).isEqualTo("error-pattern");
+        assertThat(errorPattern.getDescription()).contains("Grammar");
+        assertThat(errorPattern.getMode()).isEqualTo("WORKPLACE_STANDUP");
+
+        AssertionGroup devProgress = saved.get(1);
+        assertThat(devProgress.getName()).isEqualTo("dev-progress");
+        assertThat(devProgress.getDescription()).contains("development");
+        assertThat(devProgress.getMode()).isEqualTo("WORKPLACE_STANDUP");
+    }
+
+    @Test
+    void shouldNotDuplicateAssertionGroup() throws Exception {
+        when(appProperties.getInitialUsers()).thenReturn(List.of());
+        when(userRepository.findAll()).thenReturn(List.of());
+        AssertionGroup existing = new AssertionGroup("error-pattern", "desc", "WORKPLACE_STANDUP");
+        when(assertionGroupRepository.findByName("error-pattern")).thenReturn(Optional.of(existing));
+        when(assertionGroupRepository.findByName("dev-progress"))
+                .thenReturn(Optional.of(new AssertionGroup("dev-progress", "desc", "WORKPLACE_STANDUP")));
+
+        dataInitializer.run();
+
+        verify(assertionGroupRepository, never()).save(any(AssertionGroup.class));
+    }
+
+    @Test
+    void shouldBackfillNullModeOnExistingErrorPattern() throws Exception {
+        when(appProperties.getInitialUsers()).thenReturn(List.of());
+        when(userRepository.findAll()).thenReturn(List.of());
+        AssertionGroup existing = new AssertionGroup("error-pattern", "desc"); // mode=null
+        when(assertionGroupRepository.findByName("error-pattern")).thenReturn(Optional.of(existing));
+        when(assertionGroupRepository.findByName("dev-progress"))
+                .thenReturn(Optional.of(new AssertionGroup("dev-progress", "desc", "WORKPLACE_STANDUP")));
+
+        dataInitializer.run();
+
+        ArgumentCaptor<AssertionGroup> captor = ArgumentCaptor.forClass(AssertionGroup.class);
+        verify(assertionGroupRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getMode()).isEqualTo("WORKPLACE_STANDUP");
+        assertThat(existing.getMode()).isEqualTo("WORKPLACE_STANDUP");
     }
 }

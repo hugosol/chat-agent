@@ -1,0 +1,7 @@
+data: {"id":"mock-ja-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"プレゼンの資料も確認されたのですね。"},"finish_reason":null}]}
+
+data: {"id":"mock-ja-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"content":"素晴らしい準備ですね。"},"finish_reason":null}]}
+
+data: {"id":"mock-ja-conv-3","object":"chat.completion.chunk","created":1713139200,"model":"deepseek-v4-flash","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":150,"completion_tokens":20,"total_tokens":170}}
+
+data: [DONE]
