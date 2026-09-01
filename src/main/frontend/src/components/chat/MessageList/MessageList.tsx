@@ -9,7 +9,7 @@ const MAX_VISIBLE = 10;
 
 function buildCorrectionSummary(corrections: CorrectionData[]): string {
   return corrections
-    .map((c, i) => `${i + 1}. ${c.original} �?${c.corrected}`)
+    .map((c, i) => `${i + 1}. ${c.original} \u2192${c.corrected}`)
     .join("\n");
 }
 

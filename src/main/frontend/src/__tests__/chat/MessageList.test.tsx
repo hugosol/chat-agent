@@ -159,6 +159,31 @@ describe("MessageList", () => {
     expect(content).toMatch(/2\..*big.*large/);
   });
 
+  it("renders a clean arrow separator in correction bubble (no replacement characters)", () => {
+    const ctxValue = createContextValue({
+      messages: [{ id: 1, role: "user", text: "I have two job", streaming: false }],
+      corrections: [
+        {
+          type: "GRAMMAR" as const,
+          original: "job",
+          corrected: "jobs",
+          explanation: "",
+          messageId: 1,
+        },
+      ],
+    });
+    render(
+      React.createElement(TestWrapper, { ctxValue, children: React.createElement(MessageList) })
+    );
+    const bubbles = screen.getAllByTestId("correction-bubble");
+    expect(bubbles).toHaveLength(1);
+    const content = bubbles[0].textContent || "";
+    expect(content).toContain("job");
+    expect(content).toContain("jobs");
+    expect(content).toContain("\u2192");
+    expect(content).not.toContain("\uFFFD");
+  });
+
   it("shows Show earlier button when messages exceed 10", () => {
     const msgs: Array<{ id: number; role: "user" | "agent"; text: string; streaming: boolean }> = [];
     for (let i = 1; i <= 12; i++) {
