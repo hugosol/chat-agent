@@ -32,7 +32,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 
 - **Java 17** / **Spring Boot 3.4.7** / **Maven**
 - **LangChain4j** (OpenAI-compatible adapter) + **langgraph4j** 1.8.16
-- **DeepSeek** API (default model: `deepseek-v4-flash`)
+- **DeepSeek** API (default model: `deepseek-v4-flash-vision-exp`)
 - **H2** file database + **Spring Data JPA**
 - **WebSocket** JSON protocol
 - **React 18 + TypeScript** (Vite Library Mode, CSS Modules)
@@ -138,7 +138,7 @@ Server → Client:
 |----------|---------|-------|
 | `DEEPSEEK_API_KEY` | *(required by default)* | Bypass with `local` profile: place key in `application-local.yml` |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | |
-| `DEEPSEEK_MODEL` | `deepseek-v4-flash` | Config in `application.yml` |
+| `DEEPSEEK_MODEL` | `deepseek-v4-flash-vision-exp` | Config in `application.yml` |
 | `LOG_DIR` | `./logs/` | File log output directory (local and prd profiles) |
 
 No `.env` file support — use `local` profile (`application-local.yml`, gitignored) or set vars directly in shell.

@@ -115,7 +115,7 @@ Add a `JAPANESE_BUSINESS` (ビジネス日本語) mode. When selected, the AI ac
 
 ## Further Notes
 
-- DeepSeek model (`deepseek-v4-flash`) supports Japanese natively — no model change required.
+- DeepSeek model (`deepseek-v4-flash-vision-exp`) supports Japanese natively — no model change required.
 - Browser SpeechSynthesis requires explicit `lang` attribute — Chrome/Edge include Japanese voices by default on Windows.
 - The `conversation-system-japanese.txt` skeleton should use Japanese section labels rather than English ones. The fallback strategy ensures the root English skeleton is used if a per-mode file is missing — safe for future modes.
 - All mode guards use `if (mode != JAPANESE_BUSINESS)` pattern — additive, zero impact on existing modes. Future Japanese sub-modes can be added to the guard condition.

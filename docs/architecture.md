@@ -16,7 +16,7 @@
 | 2 | 对话场景 | 职场英语 + 日常闲聊 + 商务日语 |
 | 3 | 交互模态 | 文本输入 + TTS 朗读（语音输入通过 OpenAI Whisper API 预留到 V2） |
 | 4 | 交付形态 | Web 应用 (Spring Boot + 浏览器) |
-| 5 | LLM 提供商 | DeepSeek V4 FAST，LangChain4j 抽象层保证可替换 |
+| 5 | LLM 提供商 | DeepSeek V4 Flash Vision Exp（`deepseek-v4-flash-vision-exp`），LangChain4j 抽象层保证可替换 |
 | 6 | 输入方式 | 文本输入框，iOS 用户可借助键盘原生听写。浏览器 SpeechSynthesis 做 TTS 输出（需用户手势触发） |
 | 7 | Agent 核心能力 | 角色扮演 + 自然纠错 + 对话后报告 + 学习进度追踪 + 跨会话记忆（LearningProfile + MemoryCue RAG 检索） |
 | 8 | 纠错机制 | Agent 口头自然纠正（融入对话不打断） |

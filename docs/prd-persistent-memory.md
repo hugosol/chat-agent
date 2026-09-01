@@ -288,7 +288,7 @@ Test flow: Session1 → END → verify 2 UserMemory rows in H2 (version=1) → S
 ## Further Notes
 
 - The User Memory entity uses `@Enumerated(EnumType.STRING)` for the `type` field with a `MemoryType` enum (`TOPIC_SUMMARY`, `LEARNING_PROFILE`). Adding a new memory type requires only: (1) new enum constant, (2) new prompt template file, (3) new generation task in `MemoryService`.
-- Each memory generation produces one DeepSeek API call per type per session. With the default `deepseek-v4-flash` model, cost is negligible given the tiny output sizes (400-500 characters).
+- Each memory generation produces one DeepSeek API call per type per session. With the default `deepseek-v4-flash-vision-exp` model, cost is negligible given the tiny output sizes (400-500 characters).
 - The structured messages migration for `ConversationAgent` is a prerequisite for clean memory injection. Without it, memory text would be concatenated into a flat user message alongside persona instructions and conversation history, causing attention dilution.
 - The three-placeholder template design allows reordering without code changes — to prioritize Learning Profile over Topic Memory, swap their positions in `conversation-system.txt`.
 - Memory generation uses the same `ChatLanguageModel` bean as `CorrectionAgent` and `ReportAgent` — no separate LLM configuration needed. The same `max-tokens: 2048` output limit applies, which is far above the 400-500 character summaries.

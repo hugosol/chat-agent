@@ -33,7 +33,7 @@ class LlmCallLogRepositoryTest {
         log.setUserId("user-1");
         log.setAgentType("CONVERSATION");
         log.setMode("WORKPLACE_STANDUP");
-        log.setModel("deepseek-v4-flash");
+        log.setModel("deepseek-v4-flash-vision-exp");
         log.setRequestPrompt("{\"text\":\"some prompt\"}");
         log.setResponseText("Some response text");
         log.setInputTokens(120);
@@ -48,7 +48,7 @@ class LlmCallLogRepositoryTest {
         assertThat(found.get().getUserId()).isEqualTo("user-1");
         assertThat(found.get().getAgentType()).isEqualTo("CONVERSATION");
         assertThat(found.get().getMode()).isEqualTo("WORKPLACE_STANDUP");
-        assertThat(found.get().getModel()).isEqualTo("deepseek-v4-flash");
+        assertThat(found.get().getModel()).isEqualTo("deepseek-v4-flash-vision-exp");
         assertThat(found.get().getRequestPrompt()).isEqualTo("{\"text\":\"some prompt\"}");
         assertThat(found.get().getResponseText()).isEqualTo("Some response text");
         assertThat(found.get().getInputTokens()).isEqualTo(120);
@@ -61,7 +61,7 @@ class LlmCallLogRepositoryTest {
     @Test
     void saveAndFindById_errorRecordHasNullResponseAndTokens() {
         LlmCallLog log = new LlmCallLog();
-        log.setModel("deepseek-v4-flash");
+        log.setModel("deepseek-v4-flash-vision-exp");
         log.setRequestPrompt("{\"text\":\"bad prompt\"}");
         log.setDurationMs(500L);
         log.setStatus("ERROR");
@@ -82,7 +82,7 @@ class LlmCallLogRepositoryTest {
         Instant now = Instant.now();
 
         LlmCallLog oldLog = new LlmCallLog();
-        oldLog.setModel("deepseek-v4-flash");
+        oldLog.setModel("deepseek-v4-flash-vision-exp");
         oldLog.setRequestPrompt("old");
         oldLog.setResponseText("old response");
         oldLog.setDurationMs(100L);
@@ -98,7 +98,7 @@ class LlmCallLogRepositoryTest {
         entityManager.clear();
 
         LlmCallLog recentLog = new LlmCallLog();
-        recentLog.setModel("deepseek-v4-flash");
+        recentLog.setModel("deepseek-v4-flash-vision-exp");
         recentLog.setRequestPrompt("recent");
         recentLog.setResponseText("recent response");
         recentLog.setDurationMs(100L);
@@ -117,7 +117,7 @@ class LlmCallLogRepositoryTest {
     @Test
     void deleteByCreateTimeBefore_preservesRecentRecords() {
         LlmCallLog log = new LlmCallLog();
-        log.setModel("deepseek-v4-flash");
+        log.setModel("deepseek-v4-flash-vision-exp");
         log.setRequestPrompt("test");
         log.setResponseText("test response");
         log.setDurationMs(100L);

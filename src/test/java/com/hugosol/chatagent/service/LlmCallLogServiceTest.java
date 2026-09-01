@@ -24,7 +24,7 @@ class LlmCallLogServiceTest {
     void setUp() {
         repository = mock(LlmCallLogRepository.class);
         executor = Executors.newSingleThreadExecutor();
-        service = new LlmCallLogService(repository, executor, "deepseek-v4-flash");
+        service = new LlmCallLogService(repository, executor, "deepseek-v4-flash-vision-exp");
     }
 
     @Test
@@ -40,7 +40,7 @@ class LlmCallLogServiceTest {
         assertThat(saved.getUserId()).isEqualTo("user-1");
         assertThat(saved.getAgentType()).isEqualTo("CONVERSATION");
         assertThat(saved.getMode()).isEqualTo("WORKPLACE_STANDUP");
-        assertThat(saved.getModel()).isEqualTo("deepseek-v4-flash");
+        assertThat(saved.getModel()).isEqualTo("deepseek-v4-flash-vision-exp");
         assertThat(saved.getRequestPrompt()).isEqualTo("{\"messages\":[...]}");
         assertThat(saved.getResponseText()).isEqualTo("Hello world");
         assertThat(saved.getInputTokens()).isEqualTo(100);
