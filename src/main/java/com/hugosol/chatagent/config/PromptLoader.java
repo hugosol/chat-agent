@@ -24,7 +24,7 @@ public class PromptLoader {
             Resource resource = resourceLoader.getResource("classpath:prompts/" + promptFile);
             String content = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             log.debug("Loaded prompt file: {}", promptFile);
-            return content;
+            return normalizeLineEndings(content);
         } catch (IOException e) {
             log.error("Failed to load prompt file: {}", promptFile, e);
             throw new RuntimeException("Failed to load prompt: " + promptFile, e);
@@ -37,11 +37,15 @@ public class PromptLoader {
             if (resource.exists()) {
                 String content = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 log.debug("Loaded prompt file: {}", promptFile);
-                return content;
+                return normalizeLineEndings(content);
             }
         } catch (IOException e) {
             log.warn("Failed to load prompt file {}, falling back", promptFile, e);
         }
         return fallback;
+    }
+
+    private String normalizeLineEndings(String content) {
+        return content.replace("\r\n", "\n").replace("\r", "\n");
     }
 }
